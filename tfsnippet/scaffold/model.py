@@ -59,6 +59,8 @@ class Model(object):
         """
         if self._has_built:
             return
+        self._has_built = True
+
         default_name = camel_to_underscore(self.__class__.__name__)
         with tf.variable_scope(self.name, default_name=default_name) as scope:
             # store the model variable scope
@@ -73,13 +75,12 @@ class Model(object):
                     ph_dtype = var.dtype.base_dtype
                     ph_name = 'assign_ph'
                     op_name = 'assign_op'
-                    ph = tf.placeholder(ph_dtype, var.shape, ph_name)
+                    ph = tf.placeholder(ph_dtype, var.get_shape(), ph_name)
                     op = tf.assign(var, ph, name=op_name)
                     self._set_param_value_ph_op[name] = (ph, op)
-                self._set_all_param_values_op = \
-                    tf.group(*self._set_param_value_ph_op.values())
-
-        self._has_built = True
+                self._set_all_param_values_op = tf.group(*(
+                    v[1] for v in six.itervalues(self._set_param_value_ph_op)
+                ))
 
     def _build(self):
         """Build the model.
@@ -119,7 +120,7 @@ class Model(object):
         scope_name = self.model_variable_scope.name + '/'
         scope_name_len = len(scope_name)
         return {
-            var.name[scope_name_len:].rstrip(':', 1)[0]: var
+            var.name[scope_name_len:].rsplit(':', 1)[0]: var
             for var in tf.get_collection(collection, scope_name)
         }
 
