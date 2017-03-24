@@ -41,6 +41,7 @@ class Model(object):
     @property
     def model_variable_scope(self):
         """Get the model variable scope."""
+        self.build()
         return self._model_varscope
 
     @property

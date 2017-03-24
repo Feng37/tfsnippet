@@ -89,3 +89,8 @@ class ModelTestCase(unittest.TestCase):
                     model.get_param_values(),
                     {'model_var': 100, 'nested/nested_var': 30}
                 )
+
+            # test name de-duplication
+            self.assertEquals(MyModel().model_variable_scope.name, 'my_model_1')
+            self.assertEquals(MyModel('the_model').model_variable_scope.name,
+                              'the_model')
