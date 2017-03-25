@@ -8,7 +8,7 @@ __all__ = [
 
 
 def get_default_session_or_error():
-    """Get the default session, or raises an error if there's no one.
+    """Get the default session, or raise an error if there's no one.
 
     Raises
     ------

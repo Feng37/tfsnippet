@@ -125,7 +125,7 @@ class Model(object):
             for var in tf.get_collection(collection, scope_name)
         }
 
-    def get_param_variables(self):
+    def get_param_variables(self, trainable=None):
         """Get the model parameter variables.
 
         The parameter variables are the variables in `model_variable_scope`
@@ -135,12 +135,23 @@ class Model(object):
         more variables other than those specified in `MODEL_VARIABLES`
         collection, it is generally not a good practice.
 
+        Parameters
+        ----------
+        trainable : bool
+            If set to True, will only get the trainable parameters.
+
         Returns
         -------
         dict[str, tf.Variable]
             Dict which maps from relative names to variable objects.
         """
-        return self.get_model_variables(tf.GraphKeys.MODEL_VARIABLES)
+        model_vars = self.get_model_variables(tf.GraphKeys.MODEL_VARIABLES)
+        if trainable:
+            collection = tf.GraphKeys.TRAINABLE_VARIABLES
+            train_vars = self.get_model_variables(collection)
+            model_vars = {k: v for k, v in six.iteritems(model_vars)
+                          if k in train_vars}
+        return model_vars
 
     def get_param_values(self):
         """Get the model parameter values as numpy arrays.
