@@ -4,6 +4,7 @@ import six
 import tensorflow as tf
 
 from tfsnippet.utils import camel_to_underscore, get_default_session_or_error
+from .defaults import get_option_defaults
 
 __all__ = ['Model']
 
@@ -37,6 +38,31 @@ class Model(object):
         # the placeholders and operations for set parameter values
         self._set_param_value_ph_op = {}
         self._set_all_param_values_op = None
+
+        # memorize the default parameter values at construction time
+        self._option_defaults_at_construction = get_option_defaults()
+        self._cached_option_defaults = [None, None]
+
+    @property
+    def option_defaults(self):
+        """Get the default parameters.
+         
+        The returned default parameters should be merged from current 
+        active context and from those specified at construction time.
+        
+        Returns
+        -------
+        ParamDefaults
+            The default parameters.
+        """
+        defaults = get_option_defaults()
+        if defaults is self._option_defaults_at_construction:
+            return defaults
+        if defaults is not self._cached_option_defaults[0]:
+            self._cached_option_defaults[1] = \
+                defaults.merge(self._option_defaults_at_construction)
+            self._cached_option_defaults[0] = defaults
+        return self._cached_option_defaults[1]
 
     @property
     def model_variable_scope(self):
@@ -95,6 +121,10 @@ class Model(object):
         be added to `tf.GraphKeys.MODEL_VARIABLES` collection, in order to
         be distinguished from auxiliary variables used for training or
         evaluation.
+        
+        Note that the derived classes should use the parameter values defined
+        in `param_defaults`, so that the behavior of `build()` can follow
+        the context at construction time.
         """
         raise NotImplementedError()
 

@@ -28,7 +28,7 @@ class NormalTestCase(unittest.TestCase):
             Normal, {'mean': mean, 'stddev': stddev}
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (N_SAMPLES, 3))
         big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
@@ -39,7 +39,7 @@ class NormalTestCase(unittest.TestCase):
             explicit_batch_size=True
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (N_SAMPLES, 3))
         big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
@@ -50,7 +50,7 @@ class NormalTestCase(unittest.TestCase):
             sample_shape=(4, 5)
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (4, 5, N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (4, 5, N_SAMPLES, 3))
         big_number_verify(
             np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev,
             N_SAMPLES * 20
@@ -64,7 +64,7 @@ class NormalTestCase(unittest.TestCase):
             sample_shape=(4, 5), explicit_batch_size=True
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (4, 5, N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (4, 5, N_SAMPLES, 3))
         big_number_verify(
             np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev,
             N_SAMPLES * 20
@@ -78,7 +78,7 @@ class NormalTestCase(unittest.TestCase):
             sample_shape=[1]
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (1, N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (1, N_SAMPLES, 3))
         big_number_verify(
             np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
@@ -92,7 +92,7 @@ class NormalTestCase(unittest.TestCase):
             Normal, {'mean': mean_3d, 'stddev': stddev_3d}
         )
         true_prob, true_log_prob = likelihood(samples, mean_3d, stddev_3d)
-        self.assertEquals(samples.shape, (N_SAMPLES, 4, 3))
+        self.assertEqual(samples.shape, (N_SAMPLES, 4, 3))
         for i in range(4):
             big_number_verify(
                 np.mean(samples[:, i, :], axis=0), mean + bias[i],
@@ -106,7 +106,7 @@ class NormalTestCase(unittest.TestCase):
             Normal, {'mean': mean, 'logstd': np.log(stddev)}
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
-        self.assertEquals(samples.shape, (N_SAMPLES, 3))
+        self.assertEqual(samples.shape, (N_SAMPLES, 3))
         big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)

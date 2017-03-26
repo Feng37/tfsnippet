@@ -50,10 +50,10 @@ class ModelTestCase(unittest.TestCase):
             self.assertFalse(model.has_built)
             model.build()
             self.assertTrue(model.has_built)
-            self.assertEquals(model.model_variable_scope.name, 'my_model')
+            self.assertEqual(model.model_variable_scope.name, 'my_model')
 
             # test get all variables
-            self.assertEquals(
+            self.assertEqual(
                 model.get_model_variables(),
                 {'model_var': model.model_var,
                  'other_var': model.other_var,
@@ -61,7 +61,7 @@ class ModelTestCase(unittest.TestCase):
             )
 
             # test get parameter variables
-            self.assertEquals(
+            self.assertEqual(
                 model.get_param_variables(),
                 {'model_var': model.model_var,
                  'nested/nested_var': model.nested_var}
@@ -71,13 +71,13 @@ class ModelTestCase(unittest.TestCase):
             init_op = tf.global_variables_initializer()
             with tf.Session() as session:
                 session.run(init_op)
-                self.assertEquals(
+                self.assertEqual(
                     model.get_param_values(),
                     {'model_var': 1, 'nested/nested_var': 3}
                 )
                 model.set_param_values(
                     {'model_var': 10, 'nested/nested_var': 30})
-                self.assertEquals(
+                self.assertEqual(
                     model.get_param_values(),
                     {'model_var': 10, 'nested/nested_var': 30}
                 )
@@ -85,12 +85,12 @@ class ModelTestCase(unittest.TestCase):
                     model.set_param_values({'model_var': 10})
                 model.set_param_values(
                     {'model_var': 100}, partial_set=True)
-                self.assertEquals(
+                self.assertEqual(
                     model.get_param_values(),
                     {'model_var': 100, 'nested/nested_var': 30}
                 )
 
             # test name de-duplication
-            self.assertEquals(MyModel().model_variable_scope.name, 'my_model_1')
-            self.assertEquals(MyModel('the_model').model_variable_scope.name,
+            self.assertEqual(MyModel().model_variable_scope.name, 'my_model_1')
+            self.assertEqual(MyModel('the_model').model_variable_scope.name,
                               'the_model')

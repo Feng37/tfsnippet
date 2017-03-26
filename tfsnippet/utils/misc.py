@@ -3,10 +3,8 @@ import six
 import numpy as np
 import tensorflow as tf
 
-from mlcomp.utils import camel_to_underscore
-
 __all__ = [
-    'camel_to_underscore', 'is_integer', 'is_deterministic_shape',
+    'is_integer', 'is_deterministic_shape',
 ]
 
 

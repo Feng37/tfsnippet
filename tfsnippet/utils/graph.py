@@ -41,8 +41,11 @@ def get_global_step(graph=None):
     global_step = tf.train.get_global_step(graph)
     if global_step is None:
         global_step = tf.get_variable(
-            'global_step', initializer=0, dtype=tf.int64,
+            'global_step',
+            initializer=0,
+            dtype=tf.int64,
             collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                         tf.GraphKeys.GLOBAL_STEP]
+                         tf.GraphKeys.GLOBAL_STEP],
+            trainable=False
         )
     return global_step

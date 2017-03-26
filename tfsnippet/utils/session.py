@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
+import os
+
 import tensorflow as tf
+from logging import getLogger
 
 __all__ = [
-    'get_default_session_or_error',
-    'get_variables_as_dict', 'set_variables_from_dict',
+    'get_default_session_or_error', 'try_get_variable_value',
+    'VariableSaver',
 ]
 
 
@@ -21,66 +24,114 @@ def get_default_session_or_error():
     return ret
 
 
-def get_variables_as_dict(collection=tf.GraphKeys.GLOBAL_VARIABLES,
-                          scope=None):
-    """Get the values of TensorFlow variables as dict.
-
+def try_get_variable_value(v, sess=None):
+    """Attempt to get the variable value.
+    
     Parameters
     ----------
-    collection : str
-        Choose variables from this collection. Default is GLOBAL_VARIABLES.
-
-    scope : str
-        If specified, will choose the variables whose name matches
-        the regex pattern specified in this argument.
-
+    v : tf.Variable
+        The variable whose value is to be fetched.
+    
+    sess : tf.Session
+        The session.  If not specified, use the active session.
+        
     Returns
     -------
-    dict[str, np.ndarray]
-        The dict from variable names to values.
+    any | None
+        Returns the value of the variable if it is initialized,
+        otherwise returns None.
     """
-    session = get_default_session_or_error()
-    variables = tf.get_collection(collection, scope)
-    values = session.run(variables)
-    return {var.name: v for (var, v) in zip(variables, values)}
+    if sess is None:
+        sess = get_default_session_or_error()
+    try:
+        return sess.run(v)
+    except tf.errors.FailedPreconditionError:
+        return None
 
 
-def set_variables_from_dict(var_dict,
-                            collection=tf.GraphKeys.GLOBAL_VARIABLES,
-                            scope=None,
-                            op_name=None):
-    """Set the values of TensorFlow variables according to dict.
+class VariableSaver(object):
+    """Version controlled saving and restoring TensorFlow variables.
 
     Parameters
     ----------
-    var_dict : dict[str, np.ndarray]
-        The dict from variable names to values.
+    variables : collections.Iterable[tf.Variable] | dict[str, any]
+        List of variables, or dict of variables with explicit keys,
+        which should be saved and restored.
 
-    collection : str
-        Choose variables from this collection. Default is GLOBAL_VARIABLES.
+    save_dir : str
+        Directory where to place the saved variables.
 
-    scope : str
-        If specified, will choose the variables whose name matches
-        the regex pattern specified in this argument.
+    max_versions : int
+        Maximum versions to keep in the directory (Default is 2).
 
-    op_name : str
-        Name scope of the assignment operations.
+        At least 2 versions should be kept, in order to prevent corrupted
+        checkpoint files caused by IO failure.
+        
+    filename : str
+        Name of the files of variable values (default is "variables.dat").
 
-    Raises
-    ------
-    KeyError
-        If any of the chosen variables does not exist in `var_dict`.
+    latest_file : str
+        Name of the file which organizes the checkpoint versions
+        (default is "latest").
 
-        Note that it will not cause an error if auxiliary values are
-        specified in `var_dict` without any chosen variable depending
-        on these values.
+    save_meta : bool
+        Whether or not to save meta graph (default is True).
+
+    name : str
+        Name of this session restorer.
     """
-    session = get_default_session_or_error()
-    variables = tf.get_collection(collection, scope)
-    for v in variables:
-        if v.name not in var_dict:
-            raise KeyError('The value of variable %r is not specified in '
-                           '`var_dict`.' % (v.name,))
-    with tf.name_scope(op_name, default_name='set_variables_from_dict'):
-        assign_op = [tf.assign(v, var_dict[v.name]) for v in variables]
-    session.run(assign_op)
+
+    def __init__(self, variables, save_dir, max_versions=2,
+                 filename='variables.dat', latest_file='latest',
+                 save_meta=True, name='SessionRestorer'):
+        if not isinstance(variables, dict):
+            variables = list(variables)
+        if max_versions < 2:
+            raise ValueError('At least 2 versions should be kept.')
+        self.variables = variables
+        self.save_dir = os.path.abspath(save_dir)
+        self.filename = filename
+        self.max_versions = max_versions
+        self.latest_file = latest_file
+        self.save_meta = save_meta
+        self.name = name
+        self._saver = self._build_saver()
+
+    def _build_saver(self):
+        return tf.train.Saver(var_list=self.variables,
+                              max_to_keep=self.max_versions,
+                              name=self.name)
+
+    def get_latest_file(self):
+        """Get the latest available checkpoint file."""
+        return tf.train.latest_checkpoint(self.save_dir, self.latest_file)
+
+    def save(self, global_step=None):
+        """Save the checkpoint to file.
+
+        Parameters
+        ----------
+        global_step : int | tf.Tensor
+            The global step counter.
+        """
+        sess = get_default_session_or_error()
+        if not os.path.isdir(self.save_dir):
+            os.makedirs(self.save_dir)
+        self._saver.save(
+            sess,
+            os.path.join(self.save_dir, self.filename),
+            global_step=global_step,
+            latest_filename=self.latest_file,
+            write_meta_graph=self.save_meta
+        )
+
+    def restore(self):
+        """Restore the checkpoint from file if it exists."""
+        file_path = self.get_latest_file()
+        if file_path:
+            sess = get_default_session_or_error()
+            getLogger(__name__).info(
+                'Restore from checkpoint file %r.',
+                file_path
+            )
+            self._saver.restore(sess, file_path)
