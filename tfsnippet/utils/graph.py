@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import numpy as np
 import tensorflow as tf
 
 __all__ = [
@@ -42,7 +43,7 @@ def get_global_step(graph=None):
     if global_step is None:
         global_step = tf.get_variable(
             'global_step',
-            initializer=0,
+            initializer=np.asarray(0, dtype=np.int64),
             dtype=tf.int64,
             collections=[tf.GraphKeys.GLOBAL_VARIABLES,
                          tf.GraphKeys.GLOBAL_STEP],
