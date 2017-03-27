@@ -34,7 +34,7 @@ def get_global_step(graph=None):
 
     Returns
     -------
-    tf.Tensor
+    tf.Variable
         The global step tensor.
     """
     graph = graph or get_default_graph_or_error()

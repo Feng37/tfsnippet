@@ -6,6 +6,7 @@ from logging import getLogger
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
+    'get_uninitialized_variables', 'ensure_variables_initialized',
     'VariableSaver',
 ]
 
@@ -47,6 +48,45 @@ def try_get_variable_value(v, sess=None):
         return sess.run(v)
     except tf.errors.FailedPreconditionError:
         return None
+
+
+def get_uninitialized_variables(variables=None):
+    """Get uninitialized variables as a list.
+
+    Parameters
+    ----------
+    variables : collections.Iterable[tf.Variable]
+        Return only uninitialized variables within this list.
+        If not specified, will return all uninitialized variables.
+
+    Returns
+    -------
+    list[tf.Variable]
+    """
+    sess = get_default_session_or_error()
+    if variables is None:
+        variables = tf.global_variables()
+    else:
+        variables = list(variables)
+    init_flag = sess.run(tf.stack(
+        [tf.is_variable_initialized(v) for v in variables]
+    ))
+    return [v for v, f in zip(variables, init_flag) if not f]
+
+
+def ensure_variables_initialized(variables=None):
+    """Ensure all variables are initialized.
+
+    Parameters
+    ----------
+    variables : collections.Iterable[tf.Variable]
+        Ensure only these variables to be initialized.
+        If not specified, will ensure all variables initialized.
+    """
+    uninitialized = get_uninitialized_variables(variables)
+    if uninitialized:
+        sess = get_default_session_or_error()
+        sess.run(tf.variables_initializer(uninitialized))
 
 
 class VariableSaver(object):

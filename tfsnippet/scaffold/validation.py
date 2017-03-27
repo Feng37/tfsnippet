@@ -16,7 +16,6 @@ from tfsnippet.utils import (get_default_session_or_error,
                              VariableSaver,
                              camel_to_underscore,
                              try_get_variable_value)
-from .defaults import get_option_defaults
 
 __all__ = ['LossValidator']
 
@@ -32,7 +31,7 @@ class LossValidator(object):
     valid_loss : tf.Tensor
         The validation loss tensor.  It must be a scalar tensor.
 
-    global_step : tf.Tensor
+    global_step : tf.Tensor | tf.Variable
         Tensor to track the global step.
         
     managed_vars : dict[str, tf.Variable]
@@ -64,7 +63,6 @@ class LossValidator(object):
         self._inputs = inputs
         self._valid_loss = valid_loss
         self._global_step = global_step
-        self._valid_batch_size = get_option_defaults().predict_batch_size
         self._managed_vars = managed_vars
         self.name = name
 
@@ -96,11 +94,6 @@ class LossValidator(object):
         self._saver = None              # type: VariableSaver
         self._best_loss_val = None      # type: float
 
-    @property
-    def should_validate_in_batch(self):
-        """Whether or not to do validation in mini-batches?"""
-        return self._valid_batch_size is not None
-
     def _merge_feed_dict(self, data, feed_dict):
         ret = {t: v for t, v in zip(self._inputs, data)}
         if feed_dict:
@@ -109,7 +102,7 @@ class LossValidator(object):
                     ret[k] = v
         return ret
 
-    def _compute_loss(self, data, feed_dict):
+    def _compute_loss(self, data, batch_size, feed_dict):
         data = tuple(data)
         if len(data) != len(self._inputs):
             raise ValueError(
@@ -132,7 +125,7 @@ class LossValidator(object):
             loss = session.run(self._valid_loss, feed_dict=feed_dict)
 
         # if the mini-batches is not enabled, compute in one pass.
-        elif not self.should_validate_in_batch:
+        elif batch_size is None:
             if not data_length:
                 loss = 0.0
             else:
@@ -141,7 +134,6 @@ class LossValidator(object):
 
         # otherwise prepare for computing the loss in mini-batches.
         else:
-            batch_size = self._valid_batch_size
             batch_count = (data_length + batch_size - 1) // batch_size
             if batch_count > 0:
                 losses = np.zeros(shape=[batch_count], dtype=np.float64)
@@ -181,7 +173,7 @@ class LossValidator(object):
             self._saver.save()
         self._best_loss_val = loss
 
-    def run(self, data, feed_dict=None):
+    def run(self, data, batch_size=None, feed_dict=None):
         """Do validation with specified `data`.
         
         If there's any `keep_best` context open, then this method will
@@ -191,6 +183,9 @@ class LossValidator(object):
         ----------
         data : collections.Iterable[np.ndarray]
             The validation data arrays.
+
+        batch_size : int
+            If specified, will compute the validation loss in mini-batches.
         
         feed_dict : dict[tf.Tensor, any]
             Additional feed dict other than those specified by `data`.
@@ -201,7 +196,7 @@ class LossValidator(object):
             The averaged validation loss for given data. 
         """
         start_time = time.time()
-        loss = self._compute_loss(data, feed_dict)
+        loss = self._compute_loss(data, batch_size, feed_dict)
         if self._best_loss_val is None or loss < self._best_loss_val:
             self._update_best_loss(loss)
             best_mark = ' (*)'

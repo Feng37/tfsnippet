@@ -28,35 +28,31 @@ class ValidationTestCase(unittest.TestCase):
                 np.testing.assert_allclose(validator.run([data[:0]]), 0.0)
 
             # test compute the loss in batches (divisible)
-            with option_defaults(predict_batch_size=10):
-                validator = LossValidator([array_ph], loss)
-                with tf.Session() as sess:
-                    np.testing.assert_allclose(
-                        validator.run([data]), np.average(data))
-                    # test with empty data
-                    np.testing.assert_allclose(
-                        validator.run([data[:0]]), 0.0)
+            validator = LossValidator([array_ph], loss)
+            with tf.Session() as sess:
+                np.testing.assert_allclose(
+                    validator.run([data], batch_size=10), np.average(data))
+                # test with empty data
+                np.testing.assert_allclose(
+                    validator.run([data[:0]], batch_size=10), 0.0)
 
             # test compute the loss in batches (non-divisible)
-            with option_defaults(predict_batch_size=32):
-                validator = LossValidator([array_ph], loss)
-                with tf.Session() as sess:
-                    np.testing.assert_allclose(
-                        validator.run([data]), np.average(data))
+            validator = LossValidator([array_ph], loss)
+            with tf.Session() as sess:
+                np.testing.assert_allclose(
+                    validator.run([data], batch_size=32), np.average(data))
 
             # test compute the loss in batches (divisible, one batch)
-            with option_defaults(predict_batch_size=100):
-                validator = LossValidator([array_ph], loss)
-                with tf.Session() as sess:
-                    np.testing.assert_allclose(
-                        validator.run([data]), np.average(data))
+            validator = LossValidator([array_ph], loss)
+            with tf.Session() as sess:
+                np.testing.assert_allclose(
+                    validator.run([data], batch_size=100), np.average(data))
 
             # test compute the loss in batches (non-divisible, one batch)
-            with option_defaults(predict_batch_size=101):
-                validator = LossValidator([array_ph], loss)
-                with tf.Session() as sess:
-                    np.testing.assert_allclose(
-                        validator.run([data]), np.average(data))
+            validator = LossValidator([array_ph], loss)
+            with tf.Session() as sess:
+                np.testing.assert_allclose(
+                    validator.run([data], batch_size=101), np.average(data))
 
             # test variable saving and restoring
             a = tf.get_variable('a', dtype=tf.float32, initializer=0.)

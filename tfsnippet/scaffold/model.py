@@ -3,8 +3,9 @@ import numpy as np
 import six
 import tensorflow as tf
 
-from tfsnippet.utils import camel_to_underscore, get_default_session_or_error
-from .defaults import get_option_defaults
+from tfsnippet.utils import (camel_to_underscore, get_default_session_or_error,
+                             ensure_variables_initialized)
+from .defaults import get_option_defaults, OptionDefaults
 
 __all__ = ['Model']
 
@@ -52,7 +53,7 @@ class Model(object):
         
         Returns
         -------
-        ParamDefaults
+        OptionDefaults
             The default parameters.
         """
         defaults = get_option_defaults()
@@ -236,3 +237,8 @@ class Model(object):
                 if n in param_vars:
                     ph, op = self._set_param_value_ph_op[n]
                     session.run(op, feed_dict={ph: value})
+
+    def ensure_variables_initialized(self):
+        """Initialize all uninitialized model variables."""
+        var_list = list(six.itervalues(self.get_model_variables()))
+        ensure_variables_initialized(var_list)

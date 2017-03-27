@@ -25,12 +25,25 @@ class OptionDefaults(AutoReprObject):
         
     global_step : tf.Tensor
         The default global step tensor to use.
-        
+
+    max_epoch : int
+        The maximum training epoch num.
+
+    max_step : int
+        The maximum training steps.
+
     batch_size : int
         Default training batch size.
 
     predict_batch_size : int
         Default predicting batch size.
+
+    validation_split : float
+        The default portion of data to be splitted as validation data.
+
+    validation_shuffle : bool
+        Whether or not to shuffle the data before splitting validation data?
+        If it is not specified, most models will regard it as True.
 
     gradient_clip_by_norm : float
         If specified, clip the gradient by this norm.
@@ -54,16 +67,24 @@ class OptionDefaults(AutoReprObject):
     def __init__(self,
                  optimizer_factory=None,
                  global_step=None,
+                 max_epoch=None,
+                 max_step=None,
                  batch_size=None,
                  predict_batch_size=None,
+                 validation_split=None,
+                 validation_shuffle=None,
                  gradient_clip_by_norm=None,
                  gradient_clip_by_value=None,
                  weights_regularizer=None,
                  biases_regularizer=None):
         self.optimizer_factory = optimizer_factory
         self.global_step = global_step
+        self.max_epoch = max_epoch
+        self.max_step = max_step
         self.batch_size = batch_size
         self.predict_batch_size = predict_batch_size
+        self.validation_split = validation_split
+        self.validation_shuffle = validation_shuffle
         self.gradient_clip_by_norm = gradient_clip_by_norm
         self.gradient_clip_by_value = gradient_clip_by_value
         self.weights_regularizer = weights_regularizer
@@ -164,7 +185,7 @@ class OptionDefaults(AutoReprObject):
         
         Returns
         -------
-        tf.Tensor
+        tf.Variable
             The global step tensor.
         """
         if self.global_step is not None:
