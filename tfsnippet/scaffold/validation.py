@@ -195,18 +195,9 @@ class LossValidator(object):
         float
             The averaged validation loss for given data. 
         """
-        start_time = time.time()
         loss = self._compute_loss(data, batch_size, feed_dict)
         if self._best_loss_val is None or loss < self._best_loss_val:
             self._update_best_loss(loss)
-            best_mark = ' (*)'
-        else:
-            best_mark = ''
-        end_time = time.time()
-        getLogger(__name__).info(
-            'Validation done in %.2f secs, loss: %.6g%s.',
-            end_time - start_time, loss, best_mark
-        )
         return loss
 
     @contextmanager
@@ -251,7 +242,8 @@ class LossValidator(object):
                 if self._best_loss_val is not None and \
                         np.isnan(self._best_loss_val):
                     self._best_loss_val = None
-                self._saver = VariableSaver(self._managed_vars, save_dir)
+                self._saver = VariableSaver(
+                    self._managed_vars, save_dir, save_meta=False)
 
                 # go into to the context
                 self._context_entered = True

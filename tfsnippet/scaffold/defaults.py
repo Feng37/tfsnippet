@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import six
 import tensorflow as tf
 
-from tfsnippet.utils import AutoReprObject, ContextStack, get_global_step
+from tfsnippet.utils import AutoReprObject, ContextStack
 
 __all__ = [
     'OptionDefaults', 'option_defaults', 'get_option_defaults',
@@ -22,9 +22,6 @@ class OptionDefaults(AutoReprObject):
     ----------
     optimizer_factory : () -> tf.train.Optimizer
         Type of the training optimizer, or a factory to create the optimizer.
-        
-    global_step : tf.Tensor
-        The default global step tensor to use.
 
     max_epoch : int
         The maximum training epoch num.
@@ -66,7 +63,6 @@ class OptionDefaults(AutoReprObject):
 
     def __init__(self,
                  optimizer_factory=None,
-                 global_step=None,
                  max_epoch=None,
                  max_step=None,
                  batch_size=None,
@@ -78,7 +74,6 @@ class OptionDefaults(AutoReprObject):
                  weights_regularizer=None,
                  biases_regularizer=None):
         self.optimizer_factory = optimizer_factory
-        self.global_step = global_step
         self.max_epoch = max_epoch
         self.max_step = max_step
         self.batch_size = batch_size
@@ -177,21 +172,6 @@ class OptionDefaults(AutoReprObject):
             return tf.train.AdamOptimizer()
         return self.optimizer_factory()
 
-    def get_global_step(self):
-        """Get the global step tensor.
-        
-        If the global step tensor is not configured, will get one
-        using `tfsnippet.utils.get_global_step`.
-        
-        Returns
-        -------
-        tf.Variable
-            The global step tensor.
-        """
-        if self.global_step is not None:
-            return self.global_step
-        return get_global_step()
-
     def clip_gradient(self, grad_vars):
         """Clip the gradients by default parameters.
 
@@ -213,7 +193,7 @@ class OptionDefaults(AutoReprObject):
                 for grad, var in grad_vars
             ]
         if self.gradient_clip_by_value is not None:
-            clip_value = self.gradient_clip_by_norm
+            clip_value = self.gradient_clip_by_value
             clip_low, clip_high = -clip_value, clip_value
             grad_vars = [
                 (tf.clip_by_value(grad, clip_low, clip_high), var)

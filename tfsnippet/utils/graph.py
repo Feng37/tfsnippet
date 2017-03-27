@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-import numpy as np
 import tensorflow as tf
 
 __all__ = [
-    'get_default_graph_or_error', 'get_global_step',
+    'get_default_graph_or_error'
 ]
 
 
@@ -19,34 +18,3 @@ def get_default_graph_or_error():
     if ret is None:
         raise RuntimeError('No graph is active.')
     return ret
-
-
-def get_global_step(graph=None):
-    """Get the global step tensor from `graph`.
-
-    If the `graph` is not specified, use the default graph.
-    Furthermore, if the global step tensor does not exist,
-    create a new one of int64 type.
-
-    Parameters
-    ----------
-    graph : tf.Graph
-        The graph, and if not specified, use the default graph.
-
-    Returns
-    -------
-    tf.Variable
-        The global step tensor.
-    """
-    graph = graph or get_default_graph_or_error()
-    global_step = tf.train.get_global_step(graph)
-    if global_step is None:
-        global_step = tf.get_variable(
-            'global_step',
-            initializer=np.asarray(0, dtype=np.int64),
-            dtype=tf.int64,
-            collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                         tf.GraphKeys.GLOBAL_STEP],
-            trainable=False
-        )
-    return global_step

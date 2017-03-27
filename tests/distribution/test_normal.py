@@ -20,7 +20,8 @@ class NormalTestCase(unittest.TestCase):
             c = -0.5 * np.log(np.pi * 2)
             precision = 1. / var
             log_prob = c - logstd - 0.5 * precision * ((x - mu) ** 2)
-            prob = np.exp(log_prob)
+            prob = (np.exp(-0.5 * (x - mu) ** 2 / std ** 2) /
+                    np.sqrt(2 * np.pi) / std)
             return np.asarray([prob, log_prob])
 
         # test 2d sampling

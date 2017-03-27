@@ -34,7 +34,10 @@ class Model(object):
         self._has_built = False
 
         # the variable scope of all variables defined in this model.
-        self._model_varscope = None     # type: tf.VariableScope
+        self._model_varscope = None         # type: tf.VariableScope
+
+        # the global step variable of this model.
+        self._global_step = None            # type: tf.Variable
 
         # the placeholders and operations for set parameter values
         self._set_param_value_ph_op = {}
@@ -76,6 +79,29 @@ class Model(object):
         """Whether or not the model has been built?"""
         return self._has_built
 
+    def set_global_step(self, global_step):
+        """Manually set a variable as global step.
+        
+        Parameters
+        ----------
+        global_step : tf.Variable
+            The global step variable to use.
+            
+        Raises
+        ------
+        RuntimeError
+            If the `global_step` has already been set or created.
+        """
+        if self._global_step is not None:
+            raise RuntimeError(
+                'The `global_step` variable has already been set or created.')
+        self._global_step = global_step
+
+    def get_global_step(self):
+        """Get the global step variable of this model."""
+        self.build()
+        return self._global_step
+
     def build(self):
         """Build the model and the trainer.
 
@@ -93,6 +119,13 @@ class Model(object):
         with tf.variable_scope(self.name, default_name=default_name) as scope:
             # store the model variable scope
             self._model_varscope = scope
+
+            # create the global step variable if there's none
+            if self._global_step is None:
+                self._global_step = tf.get_variable(
+                    'global_step', dtype=tf.int64, trainable=False,
+                    initializer=np.asarray(0, dtype=np.int64)
+                )
 
             # build the model objects
             self._build()
