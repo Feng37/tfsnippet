@@ -27,6 +27,9 @@ class Model(object):
         Name of the model.
     """
 
+    #: default options of this model
+    OPTION_DEFAULTS = None      # type: OptionDefaults
+
     def __init__(self, name=None):
         self.name = name
 
@@ -44,7 +47,10 @@ class Model(object):
         self._set_all_param_values_op = None
 
         # memorize the default parameter values at construction time
-        self._option_defaults_at_construction = get_option_defaults()
+        option_defaults = get_option_defaults()
+        if self.OPTION_DEFAULTS:
+            option_defaults = self.OPTION_DEFAULTS.merge(option_defaults)
+        self._option_defaults_at_construction = option_defaults
         self._cached_option_defaults = [None, None]
 
     @property
