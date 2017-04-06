@@ -48,3 +48,30 @@ def get_distribution_samples(distribution_class, kwargs, n_samples=N_SAMPLES,
             )
             raise
 
+
+def compute_distribution_prob(distribution_class, kwargs, data):
+    with tf.Graph().as_default():
+        try:
+            kwargs_ph = {
+                k: tf.placeholder(shape=a.shape, dtype=floatx())
+                for k, a in six.iteritems(kwargs)
+            }
+            data_ph = tf.placeholder(shape=data.shape, dtype=floatx())
+            keys = sorted(six.iterkeys(kwargs))
+            distribution = distribution_class(**kwargs_ph)
+            prob = distribution.prob(data)
+            log_prob = distribution.log_prob(data)
+            with tf.Session() as session:
+                feed_dict = {
+                    kwargs_ph[k]: kwargs[k] for k in keys
+                }
+                feed_dict[data_ph] = data
+                result = session.run([prob, log_prob], feed_dict=feed_dict)
+            return tuple(np.asarray(r) for r in result)
+        except Exception:
+            getLogger(__name__).exception(
+                'failed to compute prob for %r' %
+                ((distribution_class, kwargs),)
+            )
+            raise
+

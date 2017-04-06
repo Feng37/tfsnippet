@@ -4,7 +4,8 @@ import unittest
 import numpy as np
 
 from tfsnippet.distribution import Normal
-from .helper import get_distribution_samples, N_SAMPLES, big_number_verify
+from .helper import (get_distribution_samples, N_SAMPLES, big_number_verify,
+                     compute_distribution_prob)
 
 
 class NormalTestCase(unittest.TestCase):
@@ -99,6 +100,16 @@ class NormalTestCase(unittest.TestCase):
                 np.mean(samples[:, i, :], axis=0), mean + bias[i],
                 stddev + bias[i], N_SAMPLES
             )
+        np.testing.assert_allclose(prob, true_prob, **tol)
+        np.testing.assert_allclose(log_prob, true_log_prob, **tol)
+
+        # test computing log-likelihood on 1d samples with 2d parameters
+        sample_1d = samples[0, 0, :]
+        prob, log_prob = compute_distribution_prob(
+            Normal, {'mean': mean_3d, 'stddev': stddev_3d}, sample_1d
+        )
+        true_prob, true_log_prob = likelihood(sample_1d, mean_3d, stddev_3d)
+        self.assertEqual(sample_1d.shape, (3,))
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
