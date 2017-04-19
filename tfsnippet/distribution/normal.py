@@ -38,12 +38,18 @@ class Normal(Distribution):
         self._stdx = tf.convert_to_tensor(stdx, dtype=floatx())
         if stddev is None:
             self._stdx_is_log = True
-            self._stddev = tf.exp(self._stdx)
+            self._stddev = tf.exp(self._stdx, name='stddev')
             self._logstd = self._stdx
+            self._var = tf.exp(2. * self._logstd, name='variance')
+            self._precision = tf.exp(-2. * self._logstd, name='precision')
         else:
             self._stdx_is_log = False
             self._stddev = self._stdx
-            self._logstd = tf.log(self._stdx)
+            self._logstd = tf.log(self._stdx, name='logstd')
+            self._var = tf.square(self._stddev, name='variance')
+            self._precision = 1. / self._var
+        self._logvar = 2. * self._logstd
+        self._log_precision = -self._logvar
         try:
             tf.broadcast_static_shape(self._mean.get_shape(),
                                       self._stdx.get_shape())
@@ -75,6 +81,26 @@ class Normal(Distribution):
         """Get the log standard derivation of Normal distribution."""
         return self._logstd
 
+    @property
+    def var(self):
+        """Get the variance of Normal distribution."""
+        return self._var
+
+    @property
+    def logvar(self):
+        """Get the log-variance of Normal distribution."""
+        return self._logvar
+
+    @property
+    def precision(self):
+        """Get the precision of Normal distribution."""
+        return self._precision
+
+    @property
+    def log_precision(self):
+        """Get the log-precision of Normal distribution."""
+        return self._log_precision
+
     def sample(self, sample_shape=()):
         mean, stdx, stdx_is_log = self._mean, self._stdx, self._stdx_is_log
         dynamic_sample_shape = tf.concat(
@@ -94,11 +120,17 @@ class Normal(Distribution):
 
     def log_prob(self, x):
         c = -0.5 * np.log(2 * np.pi)
-        if self._stdx_is_log:
-            precision = tf.exp(-2 * self._stdx)
-        else:
-            precision = 1. / tf.square(self._stdx)
-        return c - self.logstd - 0.5 * precision * tf.square(x - self.mean)
+        return c - self.logstd - 0.5 * self.precision * tf.square(x - self.mean)
 
     def prob(self, x):
         return tf.exp(self.log_prob(x))
+
+    def analytic_kld(self, other):
+        if isinstance(other, Normal):
+            with tf.name_scope('analytic_kld'):
+                return 0.5 * (
+                    self.var * other.precision +
+                    tf.square(other.mean - self.mean) * other.precision +
+                    other.logvar - self.logvar - 1
+                )
+        raise NotImplementedError()

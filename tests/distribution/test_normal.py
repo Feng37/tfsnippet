@@ -4,8 +4,9 @@ import unittest
 import numpy as np
 
 from tfsnippet.distribution import Normal
-from .helper import (get_distribution_samples, N_SAMPLES, big_number_verify,
-                     compute_distribution_prob)
+from .helper import (get_distribution_samples, big_number_verify,
+                     compute_distribution_prob, compute_analytic_kld,
+                     N_SAMPLES)
 
 
 class NormalTestCase(unittest.TestCase):
@@ -122,3 +123,81 @@ class NormalTestCase(unittest.TestCase):
         big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
+
+        # test the parameters of the distribution
+        (x_prob, x_log_prob, x_mean, x_stddev, x_logstd, x_var, x_logvar,
+         x_precision, x_log_precision) = \
+            compute_distribution_prob(
+                Normal, {'mean': mean, 'stddev': stddev}, mean,
+                func=lambda d: [d.mean, d.stddev, d.logstd, d.var, d.logvar,
+                                d.precision, d.log_precision]
+            )
+
+        np.testing.assert_allclose(x_mean, mean, **tol)
+        np.testing.assert_allclose(x_stddev, stddev, **tol)
+        np.testing.assert_allclose(x_logstd, np.log(stddev), **tol)
+        np.testing.assert_allclose(x_var, np.square(stddev), **tol)
+        np.testing.assert_allclose(x_logvar, 2. * np.log(stddev), **tol)
+        np.testing.assert_allclose(x_precision, 1. / np.square(stddev), **tol)
+        np.testing.assert_allclose(x_log_precision, -2. * np.log(stddev), **tol)
+
+        # test the parameters of the distribution when logstd is specified
+        (x_prob, x_log_prob, x_mean, x_stddev, x_logstd, x_var, x_logvar,
+         x_precision, x_log_precision) = \
+            compute_distribution_prob(
+                Normal, {'mean': mean, 'logstd': np.log(stddev)}, mean,
+                func=lambda d: [d.mean, d.stddev, d.logstd, d.var, d.logvar,
+                                d.precision, d.log_precision]
+            )
+
+        np.testing.assert_allclose(x_mean, mean, **tol)
+        np.testing.assert_allclose(x_stddev, stddev, **tol)
+        np.testing.assert_allclose(x_logstd, np.log(stddev), **tol)
+        np.testing.assert_allclose(x_var, np.square(stddev), **tol)
+        np.testing.assert_allclose(x_logvar, 2. * np.log(stddev), **tol)
+        np.testing.assert_allclose(x_precision, 1. / np.square(stddev), **tol)
+        np.testing.assert_allclose(x_log_precision, -2. * np.log(stddev), **tol)
+
+        # test KL-divergence defined by stddev
+        kld = compute_analytic_kld(
+            Normal,
+            {'mean': mean, 'stddev': stddev},
+            {'mean': np.asarray(0.), 'stddev': np.asarray(1.)}
+        )
+        logvar = 2. * np.log(stddev)
+        np.testing.assert_allclose(
+            kld,
+            0.5 * (np.square(stddev) + np.square(mean) - 1 - logvar),
+            **tol
+        )
+
+        # test KL-divergence defined by log-stddev
+        kld = compute_analytic_kld(
+            Normal,
+            {'mean': mean, 'logstd': np.log(stddev)},
+            {'mean': np.asarray(0.), 'logstd': np.asarray(0.)}
+        )
+        logvar = 2. * np.log(stddev)
+        np.testing.assert_allclose(
+            kld,
+            0.5 * (np.square(stddev) + np.square(mean) - 1 - logvar),
+            **tol
+        )
+
+        # test more complicated situations
+        mean2 = np.asarray([-5.0, 3.0, 0.1])
+        stddev2 = np.asarray([2.0, 0.1, 3.0])
+        kld = compute_analytic_kld(
+            Normal,
+            {'mean': mean, 'stddev': stddev},
+            {'mean': mean2, 'stddev': stddev2}
+        )
+        np.testing.assert_allclose(
+            kld,
+            0.5 * (
+                np.square(stddev) / np.square(stddev2) +
+                np.square(mean2 - mean) / np.square(stddev2) +
+                2. * (np.log(stddev2) - np.log(stddev)) - 1
+            ),
+            **tol
+        )

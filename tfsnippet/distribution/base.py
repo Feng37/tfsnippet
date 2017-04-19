@@ -17,7 +17,8 @@ class Distribution(object):
 
         Returns
         -------
-        tensor
+        tf.Tensor
+            The samples as tensor.
         """
         raise NotImplementedError()
 
@@ -35,13 +36,13 @@ class Distribution(object):
 
         Returns
         -------
-        tensor
+        tf.Tensor
             The likelihood of `x`.
         """
         raise NotImplementedError()
 
     def log_prob(self, x):
-        """Compute the log-likelihood of `x` against the distribution.
+        """Compute the log-probability of `x` against the distribution.
 
         Parameters
         ----------
@@ -50,7 +51,28 @@ class Distribution(object):
 
         Returns
         -------
-        tensor
-            The log-likelihood of `x`.
+        tf.Tensor
+            The log-probability of `x`.
+        """
+        raise NotImplementedError()
+
+    def analytic_kld(self, other):
+        """Compute the KLD(self || other) using the analytic method.
+        
+        Parameters
+        ----------
+        other : Distribution
+            The other distribution.
+        
+        Raises
+        ------
+        NotImplementedError
+            If the KL-divergence of this distribution and `other` cannot be
+            computed analytically.
+    
+        Returns
+        -------
+        tf.Tensor
+            The KL-divergence.
         """
         raise NotImplementedError()
