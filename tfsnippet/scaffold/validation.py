@@ -170,7 +170,7 @@ class LossValidator(object):
             self._best_loss_ph: loss
         })
         if self._saver is not None:
-            self._saver.save()
+            self._saver.save(self._global_step)
         self._best_loss_val = loss
 
     def run(self, data, batch_size=None, feed_dict=None):

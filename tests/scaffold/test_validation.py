@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.scaffold import LossValidator, option_defaults
+from tfsnippet.scaffold import LossValidator
 
 
 class ValidationTestCase(unittest.TestCase):
