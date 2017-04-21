@@ -44,7 +44,6 @@ class ScopeUnitTest(unittest.TestCase):
             _get_var(name, shape=(None,))
     
     def test_open_variable_scope(self):
-        """Test the function `open_variable_scope`."""
         GLOBAL_VARIABLES_KEY = tf.GraphKeys.GLOBAL_VARIABLES
 
         with tf.Graph().as_default():
@@ -167,6 +166,34 @@ class ScopeUnitTest(unittest.TestCase):
                     self.assertEqual(_get_var('v1').name, 'a/c/v1:0')
                     self.assertEqual(_get_op('o1').name, 'a/c/o1_2:0')
                     self._assert_reuse_var('v1')
-                    
+
+            # test open an existing variable scope with unique name scope
+            with open_variable_scope(a, unique_name_scope=True) as s:
+                self.assertEqual(s.name, 'a')
+                self.assertEqual(s.original_name_scope, 'a/')
+                self._assert_var_exists('v1')
+                self.assertEqual(_get_var('v4').name, 'a/v4:0')
+                self.assertEqual(_get_op('o1').name, 'a_1/o1:0')
+
+            with open_variable_scope(c, unique_name_scope=True) as s:
+                self.assertEqual(s.name, 'a/c')
+                self.assertEqual(s.original_name_scope, 'a/c/')
+                self._assert_var_exists('v1')
+                self.assertEqual(_get_var('v4').name, 'a/c/v4:0')
+                self.assertEqual(_get_op('o1').name, 'a/c_1/o1:0')
+
+            with open_variable_scope('a'):
+                with open_variable_scope('c', unique_name_scope=True) as s:
+                    self.assertEqual(s.name, 'a/c')
+                    self.assertEqual(s.original_name_scope, 'a/c/')
+                    self._assert_var_exists('v1')
+                    self.assertEqual(_get_var('v5').name, 'a/c/v5:0')
+                    self.assertEqual(_get_op('o1').name, 'a/c_2/o1:0')
+
+            with self.assertRaises(ValueError):
+                # root name scope cannot be opened via `unique_name_scope`.
+                with open_variable_scope('', unique_name_scope=True) as s:
+                    pass
+
 if __name__ == '__main__':
     unittest.main()

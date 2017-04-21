@@ -12,7 +12,9 @@ __all__ = [
 
 
 @contextmanager
-def auto_reuse_variables(name_or_scope, **kwargs):
+def auto_reuse_variables(name_or_scope,
+                         unique_name_scope=False,
+                         **kwargs):
     """Open a variable scope, while automatically choosing `reuse` flag.
     
     The `reuse` flag will be set to False if the variable scope is opened
@@ -23,7 +25,14 @@ def auto_reuse_variables(name_or_scope, **kwargs):
     ----------
     name_or_scope : str | tf.VariableScope
         The name of the variable scope, or the variable scope to open.
-    
+        
+    unique_name_scope : bool
+        Whether or not to open a unique name scope?
+
+        If False, the original name scope of the variable scope will be
+        reopened.  Otherwise a unique name scope will be opened.
+        (default is False)
+
     **kwargs
         Other parameters for opening the variable scope.
         
@@ -37,7 +46,7 @@ def auto_reuse_variables(name_or_scope, **kwargs):
             '`reuse` is not an argument of `auto_reuse_variables`.')
 
     # open the variable scope temporarily to capture the actual scope
-    with open_variable_scope(name_or_scope) as vs:
+    with open_variable_scope(name_or_scope, unique_name_scope=False) as vs:
         variable_scope = vs
 
     # check whether or not the variable scope has been initialized
@@ -48,7 +57,10 @@ def auto_reuse_variables(name_or_scope, **kwargs):
     reuse = variable_scope.name in initialized_scopes
 
     # re-enter the variable scope with proper `reuse` flag
-    with open_variable_scope(name_or_scope, reuse=reuse, **kwargs) as vs:
+    with open_variable_scope(name_or_scope,
+                             unique_name_scope=unique_name_scope,
+                             reuse=reuse,
+                             **kwargs) as vs:
         yield vs
         initialized_scopes.add(vs.name)
 

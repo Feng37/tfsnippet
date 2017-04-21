@@ -12,6 +12,7 @@ __all__ = [
 
 @contextmanager
 def open_variable_scope(name_or_scope,
+                        unique_name_scope=False,
                         reuse=None,
                         initializer=None,
                         regularizer=None,
@@ -26,13 +27,20 @@ def open_variable_scope(name_or_scope,
     be opened under the current name scope.
     
     This method thus fixes this issue, by ensuring to open the original name
-    scope if a variable scope is re-opened.
+    scope if a variable scope is re-opened, if `keep_name_scope` is required.
     
     Parameters
     ----------
     name_or_scope : str | tf.VariableScope
         The name of the scope, or the variable scope object.
-         
+        
+    unique_name_scope : bool
+        Whether or not to open a unique name scope?
+
+        If False, the original name scope of the variable scope will be
+        reopened.  Otherwise a unique name scope will be opened.
+        (default is False)
+                  
     reuse : None | bool
         Whether or not to reuse the variables in opened scope?
         
@@ -44,7 +52,11 @@ def open_variable_scope(name_or_scope,
     tf.VariableScope
         The opened variable scope.
     """
-    if isinstance(name_or_scope, six.string_types):
+    graph = tf.get_default_graph()
+
+    if isinstance(name_or_scope, tf.VariableScope):
+        old_name_scope = name_or_scope.original_name_scope
+    elif isinstance(name_or_scope, six.string_types):
         old = tf.get_variable_scope()
         if old and old.original_name_scope:
             old_name_scope = old.original_name_scope
@@ -56,7 +68,12 @@ def open_variable_scope(name_or_scope,
         if not old_name_scope.endswith('/'):
             old_name_scope += '/'
     else:
-        old_name_scope = name_or_scope.original_name_scope
+        raise TypeError(
+            '`name_or_scope` is neither a tf.VariableScope nor a string.')
+
+    if unique_name_scope and not old_name_scope.strip('/'):
+        raise ValueError('`unique_name_scope` can be set to True only if '
+                         'the variable scope to open is not the root scope.')
 
     with variable_scope_ops._pure_variable_scope(
             name_or_scope,
@@ -68,8 +85,33 @@ def open_variable_scope(name_or_scope,
             custom_getter=custom_getter,
             old_name_scope=old_name_scope,
             dtype=dtype) as pure_variable_scope:
-        name_scope = pure_variable_scope.original_name_scope
-        if not name_scope.endswith('/'):
-            name_scope += '/'
-        with tf.name_scope(name_scope):
-            yield pure_variable_scope
+        name_scope = pure_variable_scope.original_name_scope.rstrip('/')
+
+        # query whether or not the full name scope has been used
+        # if not, we must open the name scope by unique routine, otherwise
+        # the name scope will not be marked as opened
+        if name_scope and \
+                graph.unique_name(name_scope, mark_as_used=False) == name_scope:
+            unique_name_scope = True
+
+        # open the parent name scope, then open the child by relative name,
+        # so that the child scope will be unique.
+        if unique_name_scope:
+            scope_segments = name_scope.rsplit('/', 1)
+            if len(scope_segments) > 1:
+                parent_scope = scope_segments[0] + '/'
+                child_scope = scope_segments[1]
+            else:
+                parent_scope = ''
+                child_scope = scope_segments[0]
+
+            with tf.name_scope(parent_scope):
+                with tf.name_scope(child_scope):
+                    yield pure_variable_scope
+
+        # otherwise open the full name scope directly
+        else:
+            if name_scope:
+                name_scope += '/'
+            with tf.name_scope(name_scope):
+                yield pure_variable_scope
