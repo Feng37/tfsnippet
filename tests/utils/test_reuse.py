@@ -39,14 +39,14 @@ class ReuseTestCase(unittest.TestCase):
 
     def test_auto_reuse_variables(self):
         with tf.Graph().as_default() as graph1:
-            # test reuse flag == False at the first time
+            # test reuse == False at the first time
             with auto_reuse_variables('a') as vs:
                 self.assertEqual(vs.name, 'a')
                 v1 = _get_var('v1')
                 self.assertEqual(v1.name, 'a/v1:0')
                 self.assertEqual(_get_op('op1').name, 'a/op1:0')
 
-            # test reuse flag == True at the second time
+            # test reuse == True at the second time
             with auto_reuse_variables('a') as vs:
                 self.assertEqual(vs.name, 'a')
                 self.assertIs(_get_var('v1'), v1)

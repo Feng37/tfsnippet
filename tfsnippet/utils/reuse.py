@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
+import functools
 import weakref
 from contextlib import contextmanager
 
+import six
 import tensorflow as tf
 
 from .scope import open_variable_scope
 
 __all__ = [
-    'auto_reuse_variables',
+    'auto_reuse_variables', 'static_reuse',
 ]
 
 
@@ -67,3 +69,17 @@ def auto_reuse_variables(name_or_scope,
 #: dict to track the initialization state for each variable scope
 #: belonging to every living graph.
 __auto_reuse_variables_graph_dict = weakref.WeakKeyDictionary()
+
+
+def static_reuse(method=None, scope=None):
+    """"""
+    if method is None:
+        return functools.partial(static_reuse, scope=scope)
+    scope = scope or method.__name__
+
+    @six.wraps(method)
+    def wrapper(*args, **kwargs):
+        with auto_reuse_variables(scope, unique_name_scope=True):
+            return method(*args, **kwargs)
+
+    return wrapper
