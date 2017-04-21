@@ -50,18 +50,27 @@ class ReuseTestCase(unittest.TestCase):
             with auto_reuse_variables('a') as vs:
                 self.assertEqual(vs.name, 'a')
                 self.assertIs(_get_var('v1'), v1)
-                self.assertEqual(v1.name, 'a/v1:0')
+                self.assertEqual(_get_var('v1').name, 'a/v1:0')
                 self.assertEqual(_get_op('op1').name, 'a/op1_1:0')
                 self._assert_var_not_exists('v2')
 
             # test reuse the variable scope at different name
             with tf.variable_scope('b'):
                 with auto_reuse_variables('a') as vs:
+                    scope_b_a = vs
                     self.assertEqual(vs.name, 'b/a')
                     b_v1 = _get_var('v1')
                     self.assertIsNot(b_v1, v1)
                     self.assertEqual(b_v1.name, 'b/a/v1:0')
                     self.assertEqual(_get_op('op1').name, 'b/a/op1:0')
+
+            # test to open the variable scope using scope object
+            with auto_reuse_variables(scope_b_a) as vs:
+                self.assertEqual(scope_b_a.name, 'b/a')
+                self.assertIs(_get_var('v1'), b_v1)
+                self.assertEqual(_get_var('v1').name, 'b/a/v1:0')
+                self.assertEqual(_get_op('op1').name, 'b/a/op1_1:0')
+                self._assert_var_not_exists('v2')
 
         with tf.Graph().as_default() as graph2:
             # test reuse the variable scope at different graph
