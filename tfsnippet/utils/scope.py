@@ -12,6 +12,7 @@ __all__ = [
 
 @contextmanager
 def open_variable_scope(name_or_scope,
+                        pure_variable_scope=False,
                         unique_name_scope=False,
                         reuse=None,
                         initializer=None,
@@ -34,12 +35,19 @@ def open_variable_scope(name_or_scope,
     name_or_scope : str | tf.VariableScope
         The name of the scope, or the variable scope object.
         
+    pure_variable_scope : bool
+        Whether or not to open a pure variable scope?
+        
+        If set to True, a pure variable scope will be opened without
+        changing the current name scope. (default is False)
+
     unique_name_scope : bool
         Whether or not to open a unique name scope?
+        This argument will be ignored if `pure_variable_scope` is True.
 
-        If False, the original name scope of the variable scope will be
-        reopened.  Otherwise a unique name scope will be opened.
-        (default is False)
+        If set to True, a unique name scope will be opened.
+        Otherwise the original name scope of the variable scope will be
+        reopened. (default is False)
                   
     reuse : None | bool
         Whether or not to reuse the variables in opened scope?
@@ -84,34 +92,39 @@ def open_variable_scope(name_or_scope,
             partitioner=partitioner,
             custom_getter=custom_getter,
             old_name_scope=old_name_scope,
-            dtype=dtype) as pure_variable_scope:
-        name_scope = pure_variable_scope.original_name_scope.rstrip('/')
+            dtype=dtype) as vs:
+        if not pure_variable_scope:
+            name_scope = vs.original_name_scope.rstrip('/')
 
-        # query whether or not the full name scope has been used
-        # if not, we must open the name scope by unique routine, otherwise
-        # the name scope will not be marked as opened
-        if name_scope and \
-                graph.unique_name(name_scope, mark_as_used=False) == name_scope:
-            unique_name_scope = True
+            # query whether or not the full name scope has been used
+            # if not, we must open the name scope by unique routine, otherwise
+            # the name scope will not be marked as opened
+            is_first_open = name_scope and (
+                graph.unique_name(name_scope, mark_as_used=False) == name_scope
+            )
+            if is_first_open:
+                unique_name_scope = True
 
-        # open the parent name scope, then open the child by relative name,
-        # so that the child scope will be unique.
-        if unique_name_scope:
-            scope_segments = name_scope.rsplit('/', 1)
-            if len(scope_segments) > 1:
-                parent_scope = scope_segments[0] + '/'
-                child_scope = scope_segments[1]
+            # open the parent name scope, then open the child by relative name,
+            # so that the child scope will be unique.
+            if unique_name_scope:
+                scope_segments = name_scope.rsplit('/', 1)
+                if len(scope_segments) > 1:
+                    parent_scope = scope_segments[0] + '/'
+                    child_scope = scope_segments[1]
+                else:
+                    parent_scope = ''
+                    child_scope = scope_segments[0]
+
+                with tf.name_scope(parent_scope):
+                    with tf.name_scope(child_scope):
+                        yield vs
+
+            # otherwise open the full name scope directly
             else:
-                parent_scope = ''
-                child_scope = scope_segments[0]
-
-            with tf.name_scope(parent_scope):
-                with tf.name_scope(child_scope):
-                    yield pure_variable_scope
-
-        # otherwise open the full name scope directly
+                if name_scope:
+                    name_scope += '/'
+                with tf.name_scope(name_scope):
+                    yield vs
         else:
-            if name_scope:
-                name_scope += '/'
-            with tf.name_scope(name_scope):
-                yield pure_variable_scope
+            yield vs

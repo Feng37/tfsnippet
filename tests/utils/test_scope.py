@@ -42,7 +42,7 @@ class ScopeUnitTest(unittest.TestCase):
             r'^Trying to share variable (|.*/)%s, but specified shape.*' % name)
         with self._assert_exception(ValueError, pattern):
             _get_var(name, shape=(None,))
-    
+
     def test_open_variable_scope(self):
         GLOBAL_VARIABLES_KEY = tf.GraphKeys.GLOBAL_VARIABLES
 
@@ -190,10 +190,28 @@ class ScopeUnitTest(unittest.TestCase):
                     self.assertEqual(_get_var('v5').name, 'a/c/v5:0')
                     self.assertEqual(_get_op('o1').name, 'a/c_2/o1:0')
 
+            with open_variable_scope('d', unique_name_scope=True) as s:
+                self.assertEqual(s.name, 'd')
+                self.assertEqual(_get_op('o1').name, 'd/o1:0')
+
+            with open_variable_scope('d', unique_name_scope=True) as s:
+                self.assertEqual(s.name, 'd')
+                self.assertEqual(_get_op('o1').name, 'd_1/o1:0')
+
             with self.assertRaises(ValueError):
                 # root name scope cannot be opened via `unique_name_scope`.
                 with open_variable_scope('', unique_name_scope=True) as s:
                     pass
+
+            # test to open a pure variable scope
+            with open_variable_scope(a) as s:
+                with open_variable_scope('c', pure_variable_scope=True) as s:
+                    self.assertEqual(s.name, 'a/c')
+                    self.assertEqual(s.original_name_scope, 'a/c/')
+                    self._assert_var_exists('v1')
+                    self.assertEqual(_get_var('v6').name, 'a/c/v6:0')
+                    self.assertEqual(_get_op('o4').name, 'a/o4:0')
+
 
 if __name__ == '__main__':
     unittest.main()
