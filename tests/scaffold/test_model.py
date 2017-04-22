@@ -50,7 +50,7 @@ class ModelTestCase(unittest.TestCase):
             self.assertFalse(model.has_built)
             model.build()
             self.assertTrue(model.has_built)
-            self.assertEqual(model.model_variable_scope.name, 'my_model')
+            self.assertEqual(model.variable_scope.name, 'my_model')
 
             # test get all variables
             self.assertEqual(
@@ -94,6 +94,6 @@ class ModelTestCase(unittest.TestCase):
                 )
 
             # test name de-duplication
-            self.assertEqual(MyModel().model_variable_scope.name, 'my_model_1')
-            self.assertEqual(MyModel('the_model').model_variable_scope.name,
-                              'the_model')
+            self.assertEqual(MyModel().variable_scope.name, 'my_model_1')
+            self.assertEqual(MyModel('the_model').variable_scope.name,
+                             'the_model')

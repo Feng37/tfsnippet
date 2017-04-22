@@ -5,7 +5,7 @@ from contextlib import contextmanager
 
 import tensorflow as tf
 
-from tfsnippet.utils import open_variable_scope
+from tfsnippet.utils import open_variable_scope, ScopedObject, instance_reuse
 
 
 def _get_var(name, **kwargs):
@@ -15,6 +15,13 @@ def _get_var(name, **kwargs):
 
 def _get_op(name):
     return tf.add(1, 2, name=name)
+
+
+class _ScopedObject(ScopedObject):
+
+    @instance_reuse
+    def f(self):
+        return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
 
 
 class ScopeUnitTest(unittest.TestCase):
@@ -211,6 +218,40 @@ class ScopeUnitTest(unittest.TestCase):
                     self._assert_var_exists('v1')
                     self.assertEqual(_get_var('v6').name, 'a/c/v6:0')
                     self.assertEqual(_get_op('o4').name, 'a/o4:0')
+
+    def test_ScopedObject(self):
+        with tf.Graph().as_default():
+            o1 = _ScopedObject(default_name='o')
+            self.assertEqual(o1.variable_scope.name, 'o')
+            self.assertEqual(o1.variable_scope.original_name_scope, 'o/')
+            var_1, op_1 = o1.f()
+            self.assertEqual(var_1.name, 'o/f/var:0')
+            self.assertEqual(op_1.name, 'o/f/op:0')
+
+            # test the second object with the same default name
+            o2 = _ScopedObject(default_name='o')
+            self.assertEqual(o2.variable_scope.name, 'o_1')
+            self.assertEqual(o2.variable_scope.original_name_scope, 'o_1/')
+            var_2, op_2 = o2.f()
+            self.assertEqual(var_2.name, 'o_1/f/var:0')
+            self.assertEqual(op_2.name, 'o_1/f/op:0')
+
+            # test the third object with the same name as o1
+            o3 = _ScopedObject(name='o')
+            self.assertEqual(o3.variable_scope.name, 'o')
+            self.assertEqual(o3.variable_scope.original_name_scope, 'o_2/')
+            var_3, op_3 = o3.f()
+            self.assertEqual(var_3.name, 'o/f/var:0')
+            self.assertEqual(op_3.name, 'o_2/f/op:0')
+
+            # test the object under other scope
+            with tf.variable_scope('c'):
+                o4 = _ScopedObject(default_name='o')
+                self.assertEqual(o4.variable_scope.name, 'c/o')
+                self.assertEqual(o4.variable_scope.original_name_scope, 'c/o/')
+                var_4, op_4 = o4.f()
+                self.assertEqual(var_4.name, 'c/o/f/var:0')
+                self.assertEqual(op_4.name, 'c/o/f/op:0')
 
 
 if __name__ == '__main__':

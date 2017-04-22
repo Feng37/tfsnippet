@@ -20,7 +20,7 @@ def _get_op(name):
 class _Reusable(object):
 
     def __init__(self, name):
-        with tf.variable_scope(name) as vs:
+        with tf.variable_scope(None, default_name=name) as vs:
             self.variable_scope = vs
 
     @instance_reuse
@@ -200,14 +200,14 @@ class ReuseTestCase(unittest.TestCase):
             self.assertEqual(op_2.name, 'obj/g/op_1:0')
 
             # test reuse on another object
-            obj2 = _Reusable('obj2')
+            obj2 = _Reusable('obj')
             var_1, op_1 = obj2.f()
             var_2, op_2 = obj2.f()
             self.assertIs(var_1, var_2)
             self.assertIsNot(op_1, op_2)
-            self.assertEqual(var_1.name, 'obj2/f/var:0')
-            self.assertEqual(op_1.name, 'obj2/f/op:0')
-            self.assertEqual(op_2.name, 'obj2/f_1/op:0')
+            self.assertEqual(var_1.name, 'obj_1/f/var:0')
+            self.assertEqual(op_1.name, 'obj_1/f/op:0')
+            self.assertEqual(op_2.name, 'obj_1/f_1/op:0')
 
 if __name__ == '__main__':
     unittest.main()

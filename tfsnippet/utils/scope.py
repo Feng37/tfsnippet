@@ -5,8 +5,10 @@ import six
 import tensorflow as tf
 from tensorflow.python.ops import variable_scope as variable_scope_ops
 
+from .imported import camel_to_underscore
+
 __all__ = [
-    'open_variable_scope'
+    'open_variable_scope', 'ScopedObject',
 ]
 
 
@@ -29,6 +31,12 @@ def open_variable_scope(name_or_scope,
     
     This method thus fixes this issue, by ensuring to open the original name
     scope if a variable scope is re-opened, if `keep_name_scope` is required.
+    
+    Notes
+    -----
+    This method does not support `default_name`, which is used to suggest
+    a name template for choosing a unique variable scope name, used in
+    `tf.variable_scope`.  It opens exactly `name_or_scope`.
     
     Parameters
     ----------
@@ -128,3 +136,42 @@ def open_variable_scope(name_or_scope,
                     yield vs
         else:
             yield vs
+
+
+class ScopedObject(object):
+    """Base class for all objects owns a variable scope.
+    
+    Such an object is compatible with the use patterns of `instance_reuse`.
+
+    Parameters
+    ----------
+    name : str
+        Name of this object.
+        
+        Note that if `name` is specified, the variable scope of constructed
+        object will take exactly this name, even if another object has already
+        taken such name.  That is to say, these two objects will share the same
+        variable scope.
+        
+    default_name : str
+        Default name of this object.
+        
+        When `name` is not specified, the object will obtain a variable scope
+        with unique name, according to the name suggested by `default_name`.
+        If `default_name` is also not specified, it will use the underscored
+        class name as the default name.
+    """
+
+    def __init__(self, name=None, default_name=None):
+        self.name = name
+
+        # get the TensorFlow variable scope
+        if not default_name:
+            default_name = camel_to_underscore(self.__class__.__name__)
+        with tf.variable_scope(name, default_name=default_name) as vs:
+            self._variable_scope = vs       # type: tf.VariableScope
+
+    @property
+    def variable_scope(self):
+        """Get the variable scope of this object."""
+        return self._variable_scope
