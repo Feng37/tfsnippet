@@ -4,6 +4,8 @@ import os
 import tensorflow as tf
 from logging import getLogger
 
+from .scope import ScopedObject, open_variable_scope
+
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
     'get_uninitialized_variables', 'ensure_variables_initialized',
@@ -89,7 +91,7 @@ def ensure_variables_initialized(variables=None):
         sess.run(tf.variables_initializer(uninitialized))
 
 
-class VariableSaver(object):
+class VariableSaver(ScopedObject):
     """Version controlled saving and restoring TensorFlow variables.
 
     Parameters
@@ -119,23 +121,27 @@ class VariableSaver(object):
 
     name : str
         Name of this session restorer.
+        
+    default_name : str
+        Default name of this session restorer.
     """
 
     def __init__(self, variables, save_dir, max_versions=2,
                  filename='variables.dat', latest_file='latest',
-                 save_meta=True, name='SessionRestorer'):
+                 save_meta=True, name=None, default_name=None):
         if not isinstance(variables, dict):
             variables = list(variables)
         if max_versions < 2:
             raise ValueError('At least 2 versions should be kept.')
+        super(VariableSaver, self).__init__(name, default_name)
         self.variables = variables
         self.save_dir = os.path.abspath(save_dir)
         self.filename = filename
         self.max_versions = max_versions
         self.latest_file = latest_file
         self.save_meta = save_meta
-        self.name = name
-        self._saver = self._build_saver()
+        with open_variable_scope(self.variable_scope):
+            self._saver = self._build_saver()
 
     def _build_saver(self):
         return tf.train.Saver(var_list=self.variables,

@@ -1,4 +1,8 @@
-six >= 1.10.0
+# anaconda packages
 numpy >= 1.11
 pandas >= 0.19
+six >= 1.10.0
+
+# pip-only packages
+git+https://github.com/korepwx/mlcomp.git@dev
 Flask >= 0.11.1

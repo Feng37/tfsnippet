@@ -2,7 +2,6 @@
 import copy
 import os
 import shutil
-import time
 from contextlib import contextmanager
 from logging import getLogger
 
@@ -14,13 +13,15 @@ from tfsnippet.utils import (get_default_session_or_error,
                              minibatch_slices_iterator,
                              TemporaryDirectory,
                              VariableSaver,
-                             camel_to_underscore,
-                             try_get_variable_value)
+                             try_get_variable_value,
+                             ScopedObject,
+                             open_variable_scope,
+                             makedirs)
 
 __all__ = ['LossValidator']
 
 
-class LossValidator(object):
+class LossValidator(ScopedObject):
     """Class to help do validation on loss in training process.
     
     Parameters
@@ -40,12 +41,15 @@ class LossValidator(object):
         
     name : str
         Name of this loss validator.
+        
+    default_name : str
+        Default name of this loss validator.
     """
 
     BEST_LOSS_SAVE_KEY = 'best_validation_loss'
 
     def __init__(self, inputs, valid_loss, global_step=None, managed_vars=None,
-                 name=None):
+                 name=None, default_name=None):
         if not isinstance(valid_loss, tf.Tensor) or \
                 len(valid_loss.get_shape()) != 0:
             raise TypeError('`valid_loss` is expected to be a scalar tensor, '
@@ -56,6 +60,9 @@ class LossValidator(object):
                     'Variable name %r is reserved.' %
                     self.BEST_LOSS_SAVE_KEY
                 )
+        super(LossValidator, self).__init__(name, default_name)
+
+        # memorize the arguments
         inputs = tuple(inputs)
         if valid_loss in inputs:
             valid_loss = tf.identity(valid_loss)
@@ -64,12 +71,10 @@ class LossValidator(object):
         self._valid_loss = valid_loss
         self._global_step = global_step
         self._managed_vars = managed_vars
-        self.name = name
 
         # create the variable, the tensors and the operations to track
         # best validation loss
-        default_name = camel_to_underscore(self.__class__.__name__)
-        with tf.variable_scope(self.name, default_name=default_name):
+        with open_variable_scope(self.variable_scope):
             self._best_loss = tf.get_variable(
                 'best_loss',
                 initializer=np.nan,
@@ -233,7 +238,7 @@ class LossValidator(object):
             # backup the old `best_loss` and `saver` in case we are in
             # nested `keep_best` context
             save_dir = os.path.abspath(save_dir)
-            os.makedirs(save_dir, exist_ok=True)
+            makedirs(save_dir, exist_ok=True)
 
             try:
                 # restore the best loss from variable, in case it is
@@ -242,8 +247,9 @@ class LossValidator(object):
                 if self._best_loss_val is not None and \
                         np.isnan(self._best_loss_val):
                     self._best_loss_val = None
-                self._saver = VariableSaver(
-                    self._managed_vars, save_dir, save_meta=False)
+                with open_variable_scope(self.variable_scope):
+                    self._saver = VariableSaver(
+                        self._managed_vars, save_dir, save_meta=False)
 
                 # go into to the context
                 self._context_entered = True
