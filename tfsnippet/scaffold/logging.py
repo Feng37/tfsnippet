@@ -124,9 +124,9 @@ def _get_tensor_value(v):
 class TrainLogger(ScopedObject):
     """Loss and variables logger.
     
-    This class provides convenient methods for printing training losses,
-    and for writing variable summaries onto disk.  For example:
-    
+    This class provides convenient methods for printing training metrics,
+    and for writing metrics summaries onto disk.  For example:
+
         logger = TrainLogger()
         with logger.enter_epoch():
             for batch in minibatch_iterator(data, ignore_incomplete_batch=True):
