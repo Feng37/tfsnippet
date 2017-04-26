@@ -7,3 +7,4 @@ from .misc import *
 from .reuse import *
 from .scope import *
 from .session import *
+from .shape import *

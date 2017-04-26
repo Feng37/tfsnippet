@@ -135,7 +135,7 @@ class OptionDefaults(AutoReprObject):
         """
         config_values = self.as_dict()
         config_values.update(kwargs)
-        return OptionDefaults(**config_values)
+        return self.__class__(**config_values)
 
     def merge(self, other):
         """Merge the parameters with another `OptionDefaults` instance.
@@ -155,7 +155,7 @@ class OptionDefaults(AutoReprObject):
         """
         config_values = self.as_dict()
         config_values.update(other.as_dict())
-        return OptionDefaults(**config_values)
+        return self.__class__(**config_values)
 
     def get_optimizer(self):
         """Get an optimizer according to default parameters.

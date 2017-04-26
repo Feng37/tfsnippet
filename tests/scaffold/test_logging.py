@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import re
 import time
 import unittest
@@ -6,7 +7,6 @@ import unittest
 import itertools
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.summary.event_accumulator import EventAccumulator
 
 from mlcomp.utils import TemporaryDirectory
 from tfsnippet.scaffold import TrainLogger
@@ -219,18 +219,24 @@ class LoggingTestCase(unittest.TestCase):
             sw.close()
 
             # read the metric summary
-            acc = EventAccumulator(tempdir)
-            acc.Reload()
-            self.assertEqual(sorted(acc.Tags()['scalars']),
-                             ['acc', 'valid_loss'])
+            acc_steps = []
+            acc_values = []
+            valid_loss_steps = []
+            valid_loss_values = []
+            tags = set()
 
-            def extract_scalar(tag):
-                events = acc.Scalars(tag)
-                steps = np.asarray([e.step for e in events], dtype=np.int)
-                values = np.asarray([e.value for e in events], dtype=np.float64)
-                return steps, values
+            event_file_path = os.path.join(tempdir, os.listdir(tempdir)[0])
+            for e in tf.train.summary_iterator(event_file_path):
+                for v in e.summary.value:
+                    tags.add(v.tag)
+                    if v.tag == 'acc':
+                        acc_steps.append(e.step)
+                        acc_values.append(v.simple_value)
+                    elif v.tag == 'valid_loss':
+                        valid_loss_steps.append(e.step)
+                        valid_loss_values.append(v.simple_value)
 
-            acc_steps, acc_values = extract_scalar('acc')
+            self.assertEqual(sorted(tags), ['acc', 'valid_loss'])
             np.testing.assert_equal(acc_steps, np.arange(1, 21))
             np.testing.assert_almost_equal(
                 acc_values,
@@ -238,8 +244,6 @@ class LoggingTestCase(unittest.TestCase):
                     np.arange(10), np.arange(10)
                 ])
             )
-
-            valid_loss_steps, valid_loss_values = extract_scalar('valid_loss')
             np.testing.assert_equal(valid_loss_steps, [10, 20])
             np.testing.assert_almost_equal(
                 valid_loss_values,
