@@ -85,12 +85,10 @@ class ReshapeHelper(ScopedObject):
     """Class to help build the argument for `tf.reshape`.
     
     It is often the case we need to reshape a tensor with dynamic shape
-    argument, while the simple `-1` trick no longer applies.  For example,
-    when the `sample_size` and `batch_size` are both dynamic.
-    
+    argument, while the simple `-1` trick no longer applies.
     With the help of this class, it is easy to do dynamic reshaping with
     the most proper way.  For example:
-    
+
         x = tf.placeholder(tf.float32, shape=[None, None, 2])
         group_size = tf.placeholder(tf.int32, shape=())
         x_reshaped = (
