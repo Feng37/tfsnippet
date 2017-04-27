@@ -9,6 +9,8 @@ __all__ = [
 
 def is_integer(x):
     """Test whether or not `x` is a Python integer or a Numpy integer."""
+    if isinstance(x, bool):
+        return False
     return isinstance(x, __INTEGER_TYPES)
 
 __INTEGER_TYPES = (

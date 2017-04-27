@@ -21,7 +21,7 @@ class MiscTestCase(unittest.TestCase):
                 msg='%r should be interpreted as integer.' % (v,)
             )
         self.assertFalse(is_integer(np.asarray(0, dtype=np.int)))
-        for v in [float(1.0), '', object(), None, (), {}, []]:
+        for v in [float(1.0), '', object(), None, True, (), {}, []]:
             self.assertFalse(
                 is_integer(v),
                 msg='%r should not be interpreted as integer.' % (v,)

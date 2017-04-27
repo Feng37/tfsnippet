@@ -2,7 +2,8 @@
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import floatx, is_integer
+from tfsnippet.utils import floatx, is_integer, instance_reuse, \
+    open_variable_scope
 from .base import Distribution
 
 __all__ = ['Normal']
@@ -28,16 +29,20 @@ class Normal(Distribution):
         If `stddev` is specified, then `logstd` will be ignored.
         
     name : str
-        Optional name of this normal distribution.
+        Name of this normal distribution.
+        
+    default_name : str
+        Default name of this normal distribution.
     """
 
-    def __init__(self, mean, stddev=None, logstd=None, name=None):
+    def __init__(self, mean, stddev=None, logstd=None, name=None,
+                 default_name=None):
         stdx = stddev if stddev is not None else logstd
         if stdx is None:
             raise ValueError('One of `stddev`, `logstd` should be specified.')
-        super(Normal, self).__init__(name=name)
+        super(Normal, self).__init__(name=name, default_name=default_name)
 
-        with tf.name_scope(self.name_scope), tf.name_scope('init'):
+        with open_variable_scope(self.variable_scope), tf.name_scope('init'):
             # check the shape of parameters
             self._mean = tf.convert_to_tensor(mean, dtype=floatx())
             self._stdx = tf.convert_to_tensor(stdx, dtype=floatx())
@@ -108,45 +113,42 @@ class Normal(Distribution):
         """Get the log-precision of Normal distribution."""
         return self._log_prec
 
+    @instance_reuse
     def sample(self, sample_shape=()):
-        with tf.name_scope(self.name_scope, values=[sample_shape]), \
-                tf.name_scope('sample'):
-            mean, stdx, stdx_is_log = self._mean, self._stdx, self._stdx_is_log
-            dynamic_sample_shape = tf.concat(
-                [sample_shape, self._dynamic_batch_shape],
-                axis=0
-            )
-            dtype = mean.dtype.base_dtype
-            samples = mean + (
-                self.stddev *
-                tf.random_normal(dynamic_sample_shape, dtype=dtype)
-            )
-            static_sample_shape = tf.TensorShape(
-                tuple(None if not is_integer(i) else i for i in sample_shape))
-            samples.set_shape(
-                static_sample_shape.concatenate(self._static_batch_shape))
-            return samples
+        mean, stdx, stdx_is_log = self._mean, self._stdx, self._stdx_is_log
+        dynamic_sample_shape = tf.concat(
+            [sample_shape, self._dynamic_batch_shape],
+            axis=0
+        )
+        dtype = mean.dtype.base_dtype
+        samples = mean + (
+            self.stddev *
+            tf.random_normal(dynamic_sample_shape, dtype=dtype)
+        )
+        static_sample_shape = tf.TensorShape(
+            tuple(None if not is_integer(i) else i for i in sample_shape))
+        samples.set_shape(
+            static_sample_shape.concatenate(self._static_batch_shape))
+        return samples
 
+    @instance_reuse
     def log_prob(self, x):
-        with tf.name_scope(self.name_scope, values=[x]), \
-                tf.name_scope('log_prob'):
-            c = -0.5 * np.log(2 * np.pi)
-            return (
-                c - self.logstd -
-                0.5 * self.precision * tf.square(x - self.mean)
-            )
+        c = -0.5 * np.log(2 * np.pi)
+        return (
+            c - self.logstd -
+            0.5 * self.precision * tf.square(x - self.mean)
+        )
 
+    @instance_reuse
     def prob(self, x):
-        with tf.name_scope(self.name_scope, values=[x]), \
-                tf.name_scope('prob'):
-            return tf.exp(self.log_prob(x))
+        return tf.exp(self.log_prob(x))
 
+    @instance_reuse
     def analytic_kld(self, other):
         if isinstance(other, Normal):
-            with tf.name_scope(self.name_scope), tf.name_scope('normal_kld'):
-                return 0.5 * (
-                    self.var * other.precision +
-                    tf.square(other.mean - self.mean) * other.precision +
-                    other.logvar - self.logvar - 1
-                )
+            return 0.5 * (
+                self.var * other.precision +
+                tf.square(other.mean - self.mean) * other.precision +
+                other.logvar - self.logvar - 1
+            )
         raise NotImplementedError()

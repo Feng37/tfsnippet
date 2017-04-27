@@ -2,29 +2,13 @@
 import tensorflow as tf
 
 from mlcomp.utils import camel_to_underscore
+from tfsnippet.utils import ScopedObject
 
 __all__ = ['Distribution']
 
 
-class Distribution(object):
-    """Base class for various distributions.
-    
-    Parameters
-    ----------
-    name : str
-        Name of this distribution.
-    """
-
-    def __init__(self, name=None):
-        default_name = camel_to_underscore(self.__class__.__name__)
-        self.name = name
-        with tf.name_scope(name=name, default_name=default_name) as ns:
-            self._name_scope = ns
-
-    @property
-    def name_scope(self):
-        """Get the name scope for arithmetic operations of this distribution."""
-        return self._name_scope
+class Distribution(ScopedObject):
+    """Base class for various distributions."""
 
     def sample(self, sample_shape=()):
         """Sample from the distribution.
