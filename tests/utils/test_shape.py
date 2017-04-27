@@ -6,6 +6,7 @@ import tensorflow as tf
 
 from tfsnippet.utils import (get_dimension_size,
                              is_deterministic_shape,
+                             repeat_tensor_for_samples,
                              ReshapeHelper)
 
 
@@ -120,6 +121,35 @@ class ShapeTestCase(unittest.TestCase):
                 with self.assertRaises(TypeError,
                                        msg='%r is not a shape.' % (v,)):
                     is_deterministic_shape(v)
+
+
+    def test_repeat_tensor_for_samples(self):
+        def check_function(x_data, sz_data, bz_data):
+            return np.tile(
+                x_data,
+                [sz_data * bz_data // x_data.shape[0]] +
+                [1] * (len(x_data.shape) - 1)
+            )
+
+        with tf.Graph().as_default(), tf.Session().as_default():
+            x = tf.placeholder(tf.float32, (None, 3, 4))
+            sample_size = tf.placeholder(tf.int32, ())
+            batch_size = tf.placeholder(tf.int32, ())
+            x_data = np.arange(48).reshape([-1, 3, 4])
+            sz_data = 3
+            bz_data = 4
+            self.assertTrue(
+                np.all(
+                    repeat_tensor_for_samples(
+                        x, sample_size, batch_size
+                    ).eval({
+                        x: x_data, sample_size: sz_data, batch_size: bz_data
+                    }) ==
+                    check_function(x_data, sz_data, bz_data)
+                )
+            )
+
+
 
     def test_ReshapeHelper(self):
         with tf.Graph().as_default(), tf.Session().as_default():

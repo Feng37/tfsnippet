@@ -9,6 +9,7 @@ __all__ = [
     'get_dimension_size',
     'is_deterministic_shape',
     'ReshapeHelper',
+    'repeat_tensor_for_samples'
 ]
 
 
@@ -58,12 +59,13 @@ def is_deterministic_shape(x):
 
     If `x` is not any of the above listed types, a TypeError will be raised.
     """
+
     def delegated():
         if isinstance(x, (tuple, list)):
             for i in x:
                 if i is None or isinstance(i, (tf.Tensor, tf.Variable)):
                     if not i.dtype.base_dtype.is_integer or \
-                            i.get_shape().ndims != 0:
+                                    i.get_shape().ndims != 0:
                         return None
                     return False
                 elif not is_integer(i):
@@ -75,10 +77,105 @@ def is_deterministic_shape(x):
             if not x.dtype.base_dtype.is_integer or x.get_shape().ndims != 1:
                 return None
             return False
+
     ret = delegated()
     if ret is None:
         raise TypeError('%r is not a shape object.' % (x,))
     return ret
+
+
+def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
+    """Repeat the tensor `x` whose first-dimension should be 1 or 
+    `sample_size` or `batch_size` to a repeated tensor whose first-dimension 
+    will be `sample_size` * `batch_size`.
+    
+    Parameters
+    ----------
+    x: tf.Tensor | tf.Variable
+        The tensor or variable need to be repeated. 
+        
+    sample_size: int | tf.Tensor | tf.Variable
+        The size of samples, which should be an integer scalar.
+        
+    batch_size: int | tf.Tensor | tf.Variable
+        The size of batch, which should be an integer scalar.
+
+    Returns
+    -------
+    tf.Tensor
+        The repeated tensor generated from `x`.
+    """
+    if not isinstance(x, (tf.Tensor, tf.Variable)):
+        raise TypeError('`x` is neither a tf.Tensor nor a tf.Variable.')
+    if x.get_shape().ndims == 0:
+        raise ValueError('`x` must be a tensor, not a scalar.')
+    if x.get_shape().ndims is None:
+        raise ValueError('The number of dimensions of `x` is not '
+                         'deterministic, which is not supported.')
+
+    def check_size_arg(n, v):
+        flag = True
+        if isinstance(v, (tf.Tensor, tf.Variable)):
+            if v.get_shape().ndims != 0 or not v.dtype.is_integer:
+                flag = False
+        elif not is_integer(v):
+            flag = False
+        if not flag:
+            raise ValueError('`%s` must be a scalar integer.' % n)
+
+    check_size_arg('sample_size', sample_size)
+    check_size_arg('batch_size', batch_size)
+
+    with tf.name_scope(name=name, default_name='repeat_tensor_for_samples',
+                       values=[x, sample_size, batch_size]):
+        # Check the validation of the shape of `x` statically
+        first_dim = get_dimension_size(x, 0)
+        if isinstance(first_dim, int) and isinstance(batch_size, int):
+            if first_dim != 1 and first_dim != batch_size:
+                raise ValueError('`batch_size` != first dimension of `x`.')
+
+        # fast routine: first_dim === 1, just repeat `x` at first dim
+        if first_dim == 1:
+            multiples = (
+                [sample_size * batch_size] + [1] * (x.get_shape().ndims - 1)
+            )
+            if not is_deterministic_shape(multiples):
+                multiples = tf.stack(multiples)
+            return tf.tile(x, multiples)
+
+        # slow routine: first_dim is dynamic or != 1, tile the two dimensions
+        else:
+            x = tf.expand_dims(x, axis=0)
+            if isinstance(first_dim, (tf.Tensor, tf.Variable)):
+                assert_ops = [
+                    tf.Assert(
+                        tf.logical_or(tf.equal(first_dim, 1),
+                                      tf.equal(first_dim, batch_size)),
+                        [first_dim]
+                    )
+                ]
+                batch_repeat = tf.cond(
+                    tf.equal(first_dim, 1),
+                    lambda: batch_size,
+                    lambda: tf.constant(1)
+                )
+            else:
+                assert_ops = []
+                batch_repeat = 1
+
+            multiples = (
+                [sample_size, batch_repeat] + [1] * (x.get_shape().ndims - 2)
+            )
+            if not is_deterministic_shape(multiples):
+                multiples = tf.stack(multiples)
+
+            with tf.control_dependencies(assert_ops):
+                x = tf.tile(x, multiples)
+
+            helper = ReshapeHelper()
+            helper.add(sample_size * batch_size)
+            helper.add_template(x, lambda s: s[2:])
+            return helper.reshape(x)
 
 
 class ReshapeHelper(ScopedObject):
@@ -136,7 +233,7 @@ class ReshapeHelper(ScopedObject):
             The shape which could be used as argument in `tf.reshape`.
         """
         if self.is_deterministic:
-            assert(len(self._pieces) == 1)
+            assert (len(self._pieces) == 1)
             return tuple(self._pieces[0])
         else:
             return tf.concat(self._pieces, axis=0)
@@ -171,7 +268,7 @@ class ReshapeHelper(ScopedObject):
             Optional name for this reshape operation.
         """
         with open_variable_scope(self.variable_scope), \
-                tf.name_scope(name=name, default_name='reshape'):
+             tf.name_scope(name=name, default_name='reshape'):
             x_reshaped = tf.reshape(x, self.get_dynamic_shape(), name=name)
             if not self.is_deterministic:
                 x_reshaped.set_shape(self.get_static_shape())
@@ -218,7 +315,7 @@ class ReshapeHelper(ScopedObject):
             self._static_dims.append(shape_or_dim)
 
         elif isinstance(shape_or_dim, (tf.Variable, tf.Tensor)) and \
-                shape_or_dim.get_shape().ndims == 0:
+                        shape_or_dim.get_shape().ndims == 0:
             self._pieces[-1].append(shape_or_dim)
             self._static_dims.append(None)
 
@@ -246,8 +343,8 @@ class ReshapeHelper(ScopedObject):
                             self._static_dims.append(None)
                         self._pieces[-1].append(dim)
                 else:
-                    assert(isinstance(shape_or_dim, (tf.Variable, tf.Tensor)))
-                    assert(shape_or_dim.get_shape().ndims == 1)
+                    assert (isinstance(shape_or_dim, (tf.Variable, tf.Tensor)))
+                    assert (shape_or_dim.get_shape().ndims == 1)
                     # require at least the shape of the shape tensor is fixed
                     if not shape_or_dim.get_shape().is_fully_defined():
                         raise ValueError(
@@ -302,12 +399,12 @@ class ReshapeHelper(ScopedObject):
             return self.add(shape)
 
         elif isinstance(shape, tf.Dimension):
-            assert(slice_func is not None)
+            assert (slice_func is not None)
             shape = shape.value
             if shape is None:
                 dynamic_shape = slice_func(tf.shape(x))
                 if not isinstance(dynamic_shape, tf.Tensor) or \
-                        dynamic_shape.get_shape().ndims != 0:
+                                dynamic_shape.get_shape().ndims != 0:
                     raise TypeError(
                         '`slice_func` transforms shape tensor into '
                         'object %r, which is not a shape dimension.' %
