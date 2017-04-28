@@ -99,20 +99,15 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
         
     batch_size: int | tf.Tensor | tf.Variable
         The size of batch, which should be an integer scalar.
+        
+    name : str
+        Optional name of this operation.
 
     Returns
     -------
     tf.Tensor
         The repeated tensor generated from `x`.
     """
-    if not isinstance(x, (tf.Tensor, tf.Variable)):
-        raise TypeError('`x` is neither a tf.Tensor nor a tf.Variable.')
-    if x.get_shape().ndims == 0:
-        raise ValueError('`x` must be a tensor, not a scalar.')
-    if x.get_shape().ndims is None:
-        raise ValueError('The number of dimensions of `x` is not '
-                         'deterministic, which is not supported.')
-
     def check_size_arg(n, v):
         flag = True
         if isinstance(v, (tf.Tensor, tf.Variable)):
@@ -128,11 +123,22 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
 
     with tf.name_scope(name=name, default_name='repeat_tensor_for_samples',
                        values=[x, sample_size, batch_size]):
+        if not isinstance(x, (tf.Variable, tf.Tensor)):
+            x = tf.convert_to_tensor(x)
+        if x.get_shape().ndims == 0:
+            raise ValueError('`x` must be a tensor, not a scalar.')
+        if x.get_shape().ndims is None:
+            raise ValueError('The number of dimensions of `x` is not '
+                             'deterministic, which is not supported.')
+
         # Check the validation of the shape of `x` statically
         first_dim = get_dimension_size(x, 0)
+        batch_size_mismatch_msg = (
+            'first dimension of `x` does not match `batch_size`'
+        )
         if isinstance(first_dim, int) and isinstance(batch_size, int):
             if first_dim != 1 and first_dim != batch_size:
-                raise ValueError('`batch_size` != first dimension of `x`.')
+                raise ValueError(batch_size_mismatch_msg)
 
         # fast routine: first_dim === 1, just repeat `x` at first dim
         if first_dim == 1:
@@ -145,13 +151,16 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
 
         # slow routine: first_dim is dynamic or != 1, tile the two dimensions
         else:
-            x = tf.expand_dims(x, axis=0)
-            if isinstance(first_dim, (tf.Tensor, tf.Variable)):
+            assert_ops = []
+            if isinstance(first_dim, (tf.Tensor, tf.Variable)) or \
+                    isinstance(batch_size, (tf.Tensor, tf.Variable)):
                 assert_ops = [
                     tf.Assert(
-                        tf.logical_or(tf.equal(first_dim, 1),
-                                      tf.equal(first_dim, batch_size)),
-                        [first_dim]
+                        tf.logical_or(
+                            tf.equal(first_dim, 1),
+                            tf.equal(first_dim, batch_size)
+                        ),
+                        [batch_size_mismatch_msg, first_dim, batch_size]
                     )
                 ]
                 batch_repeat = tf.cond(
@@ -160,22 +169,29 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
                     lambda: tf.convert_to_tensor(1)
                 )
             else:
-                assert_ops = []
+                # first dimension != 1, and it's ensured to match `batch_size`.
                 batch_repeat = 1
 
-            multiples = (
-                [sample_size, batch_repeat] + [1] * (x.get_shape().ndims - 2)
-            )
-            if not is_deterministic_shape(multiples):
-                multiples = tf.stack(multiples)
+            def f(ret):
+                ret = tf.expand_dims(ret, axis=0)
+                multiple_shape = (
+                    [sample_size, batch_repeat] +
+                    [1] * (ret.get_shape().ndims - 2)
+                )
+                if not is_deterministic_shape(multiple_shape):
+                    multiple_shape = tf.stack(multiple_shape)
 
-            with tf.control_dependencies(assert_ops):
-                x = tf.tile(x, multiples)
+                ret = tf.tile(ret, multiple_shape)
 
-            helper = ReshapeHelper()
-            helper.add(sample_size * batch_size)
-            helper.add_template(x, lambda s: s[2:])
-            return helper.reshape(x)
+                helper = ReshapeHelper()
+                helper.add(sample_size * batch_size)
+                helper.add_template(ret, lambda s: s[2:])
+                return helper.reshape(ret)
+
+            if assert_ops:
+                with tf.control_dependencies(assert_ops):
+                    return f(x)
+            return f(x)
 
 
 class ReshapeHelper(ScopedObject):
@@ -268,7 +284,7 @@ class ReshapeHelper(ScopedObject):
             Optional name for this reshape operation.
         """
         with open_variable_scope(self.variable_scope), \
-             tf.name_scope(name=name, default_name='reshape'):
+                tf.name_scope(name=name, default_name='reshape'):
             x_reshaped = tf.reshape(x, self.get_dynamic_shape(), name=name)
             if not self.is_deterministic:
                 x_reshaped.set_shape(self.get_static_shape())

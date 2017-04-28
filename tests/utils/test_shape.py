@@ -122,43 +122,167 @@ class ShapeTestCase(unittest.TestCase):
                                        msg='%r is not a shape.' % (v,)):
                     is_deterministic_shape(v)
 
-
     def test_repeat_tensor_for_samples(self):
-        def check_function(x_data, sz_data, bz_data):
+        def np_repeat(x, sample_size, batch_size):
             return np.tile(
-                x_data,
-                [sz_data * bz_data // x_data.shape[0]] +
-                [1] * (len(x_data.shape) - 1)
+                x,
+                [sample_size * batch_size // x.shape[0]] +
+                [1] * (len(x.shape) - 1)
+            )
+
+        def do_repeat(x, x_ph, sample_size, sample_size_ph, batch_size,
+                      batch_size_ph):
+
+            with tf.name_scope('do_repeat'):
+                def f(a, b):
+                    if a is not None:
+                        feed_dict[a] = b
+                        return a
+                    return b
+
+                feed_dict = {}
+                x_repeated = repeat_tensor_for_samples(
+                    f(x_ph, x),
+                    f(sample_size_ph, sample_size),
+                    f(batch_size_ph, batch_size),
+                )
+                return x_repeated.eval(feed_dict)
+
+        def do_check(x, x_ph, sample_size, sample_size_ph, batch_size,
+                     batch_size_ph):
+            np.testing.assert_equal(
+                do_repeat(x, x_ph, sample_size, sample_size_ph, batch_size,
+                          batch_size_ph),
+                np_repeat(x, sample_size, batch_size),
+                err_msg='result mismatch for args %r' %
+                        ((x, x_ph, sample_size, sample_size_ph, batch_size,
+                          batch_size_ph),)
             )
 
         with tf.Graph().as_default(), tf.Session().as_default():
-            x = tf.placeholder(tf.float32, (None, 3, 4))
-            sample_size = tf.placeholder(tf.int32, ())
-            batch_size = tf.placeholder(tf.int32, ())
+            # test regular data
             x_data = np.arange(48).reshape([-1, 3, 4])
-            sz_data = 3
-            bz_data = 4
-            self.assertTrue(
-                np.all(
-                    repeat_tensor_for_samples(
-                        x, sample_size, batch_size
-                    ).eval({
-                        x: x_data, sample_size: sz_data, batch_size: bz_data
-                    }) ==
-                    check_function(x_data, sz_data, bz_data)
-                )
+            do_check(
+                x_data, None,
+                3, None,
+                4, None
             )
-            self.assertTrue(
-                np.all(
-                    repeat_tensor_for_samples(
-                        x, sz_data, bz_data
-                    ).eval({
-                        x: x_data
-                    }) ==
-                    check_function(x_data, sz_data, bz_data)
-                )
+            do_check(
+                x_data, None,
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (4, 3, 4)),
+                3, None,
+                4, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (4, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, 3, 4)),
+                3, None,
+                4, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
             )
 
+            # test batch_size of x is 1.
+            x_data = np.arange(48).reshape([1, -1, 3, 4])
+            do_check(
+                x_data, None,
+                3, None,
+                1, None
+            )
+            do_check(
+                x_data, None,
+                3, tf.placeholder(tf.int32, shape=()),
+                1, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (1, 4, 3, 4)),
+                3, None,
+                1, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (1, 4, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                1, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, None, 3, 4)),
+                3, None,
+                1, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, None, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                1, tf.placeholder(tf.int32, ())
+            )
+
+            do_check(
+                x_data, None,
+                3, None,
+                4, None
+            )
+            do_check(
+                x_data, None,
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (1, 4, 3, 4)),
+                3, None,
+                4, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (1, 4, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, None, 3, 4)),
+                3, None,
+                4, None
+            )
+            do_check(
+                x_data, tf.placeholder(tf.float32, (None, None, 3, 4)),
+                3, tf.placeholder(tf.int32, shape=()),
+                4, tf.placeholder(tf.int32, ())
+            )
+
+            # test raises
+            x_data = np.arange(48).reshape([-1, 3, 4])
+            with self.assertRaises(ValueError) as cm:
+                do_repeat(x_data, None, 3, None, 3, None)
+            self.assertIn('first dimension of `x` does not match `batch_size`',
+                          str(cm.exception))
+
+            x_data = np.arange(48).reshape([-1, 3, 4])
+            with self.assertRaises(Exception) as cm:
+                do_repeat(
+                    x_data, tf.placeholder(tf.float32, (4, 3, 4)),
+                    3, tf.placeholder(tf.int32, shape=()),
+                    3, tf.placeholder(tf.int32, ())
+                )
+            self.assertIn('first dimension of `x` does not match `batch_size`',
+                          str(cm.exception))
+
+            x_data = np.arange(48).reshape([-1, 3, 4])
+            with self.assertRaises(Exception) as cm:
+                do_repeat(
+                    x_data, tf.placeholder(tf.float32, (None, 3, 4)),
+                    3, tf.placeholder(tf.int32, shape=()),
+                    3, None
+                )
+            self.assertIn('first dimension of `x` does not match `batch_size`',
+                          str(cm.exception))
 
     def test_ReshapeHelper(self):
         with tf.Graph().as_default(), tf.Session().as_default():
