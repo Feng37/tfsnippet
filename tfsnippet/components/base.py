@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from tfsnippet.utils import ScopedObject, open_variable_scope
+from tfsnippet.utils import ScopedObject, auto_reuse_variables
 
 __all__ = ['BaseComponent']
 
@@ -9,19 +9,30 @@ class BaseComponent(ScopedObject):
     
     A neural network component is basically a reusable object that
     could derive outputs for inputs, using the same, fixed set of
-    parameters all the time.
+    parameters every time.
     
-    In order to implement such a component, derived classes should 
-    implement a `_build` method, which takes the inputs and compute outputs.
-    The `_build` method will be called by `BaseComponent.__call__` each
-    time the component object is being used, and a proper variable scope
-    (with `reuse` flag automatically set) will be opened before calling
-    `_build` method.
+    For example, one may implement a reusable neural network component
+    as follows:
+    
+        from tensorflow.contrib import layers
+
+        class Component(BaseComponent):
+        
+            def _build(self, inputs):
+                return layers.fully_connected(
+                    inputs, 
+                    num_outputs=2,
+                    scope='fully_connected'
+                )
+                
+    Note that the `scope` argument in the above example is necessary,
+    in which it enables the fully connected layer to use the same set
+    of parameters every time when `_build` is called.
     """
 
     def _build(self, *args, **kwargs):
         raise NotImplementedError()
 
     def __call__(self, *args, **kwargs):
-        with open_variable_scope(self.variable_scope):
+        with auto_reuse_variables(self.variable_scope, unique_name_scope=True):
             return self._build(*args, **kwargs)
