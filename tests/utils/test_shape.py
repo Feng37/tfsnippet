@@ -148,7 +148,16 @@ class ShapeTestCase(unittest.TestCase):
                     check_function(x_data, sz_data, bz_data)
                 )
             )
-
+            self.assertTrue(
+                np.all(
+                    repeat_tensor_for_samples(
+                        x, sz_data, bz_data
+                    ).eval({
+                        x: x_data
+                    }) ==
+                    check_function(x_data, sz_data, bz_data)
+                )
+            )
 
 
     def test_ReshapeHelper(self):

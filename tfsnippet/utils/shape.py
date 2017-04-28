@@ -156,8 +156,8 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
                 ]
                 batch_repeat = tf.cond(
                     tf.equal(first_dim, 1),
-                    lambda: batch_size,
-                    lambda: tf.constant(1)
+                    lambda: tf.convert_to_tensor(batch_size),
+                    lambda: tf.convert_to_tensor(1)
                 )
             else:
                 assert_ops = []
