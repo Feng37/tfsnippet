@@ -2,7 +2,8 @@
 import tensorflow as tf
 
 from .misc import is_integer
-from .scope import VarScopeObject, open_variable_scope, NameScopeObject
+from .scope import VarScopeObject, open_variable_scope, NameScopeObject, \
+    instance_name_scope
 from .reuse import instance_reuse
 
 __all__ = [
@@ -236,25 +237,20 @@ class ReshapeHelper(NameScopeObject):
         """
         return all(v is not None for v in self._static_dims)
 
-    def get_dynamic_shape(self, name=None):
+    @instance_name_scope
+    def get_dynamic_shape(self):
         """Get static tuple of int if deterministic, or dynamic shape tensor.
-        
-        Parameters
-        ----------
-        name : str
-            Optional name of this operation.
         
         Returns
         -------
         tuple[int] | tf.Tensor
             The shape which could be used as argument in `tf.reshape`.
         """
-        with self.sub_name_scope(name or 'get_dynamic_shape'):
-            if self.is_deterministic:
-                assert (len(self._pieces) == 1)
-                return tuple(self._pieces[0])
-            else:
-                return tf.concat(self._pieces, axis=0)
+        if self.is_deterministic:
+            assert (len(self._pieces) == 1)
+            return tuple(self._pieces[0])
+        else:
+            return tf.concat(self._pieces, axis=0)
 
     def get_static_shape(self):
         """Get the static tensor shape.
@@ -274,22 +270,19 @@ class ReshapeHelper(NameScopeObject):
         return tf.TensorShape(
             [v if v != -1 else None for v in self._static_dims])
 
-    def reshape(self, x, name=None):
+    @instance_name_scope
+    def reshape(self, x):
         """Reshape `x` into desired shape.
         
         Parameters
         ----------
         x : tf.Tensor | tf.Variable
             The tensor to be reshaped.
-            
-        name : str
-            Optional name for this reshape operation.
         """
-        with self.sub_name_scope(name or 'reshape'):
-            x_reshaped = tf.reshape(x, self.get_dynamic_shape(), name=name)
-            if not self.is_deterministic:
-                x_reshaped.set_shape(self.get_static_shape())
-            return x_reshaped
+        x_reshaped = tf.reshape(x, self.get_dynamic_shape())
+        if not self.is_deterministic:
+            x_reshaped.set_shape(self.get_static_shape())
+        return x_reshaped
 
     def _check_negative_one(self, *dimensions):
         neg_one_count = sum(v == -1 for v in dimensions)
@@ -376,6 +369,7 @@ class ReshapeHelper(NameScopeObject):
 
         return self
 
+    @instance_name_scope
     def add_template(self, x, slice_func=None):
         """Add a piece of shape or a dimension, according to the shape of `x`.
         
@@ -391,47 +385,46 @@ class ReshapeHelper(NameScopeObject):
         -------
         self
         """
-        with self.sub_name_scope('add_template'):
-            # attempt to get the deterministic shape
-            shape = x.get_shape()
-            if slice_func is not None:
-                shape = slice_func(shape)
+        # attempt to get the deterministic shape
+        shape = x.get_shape()
+        if slice_func is not None:
+            shape = slice_func(shape)
 
-            if isinstance(shape, tf.TensorShape):
-                shape = shape.as_list()
-                if any(v is None for v in shape):
-                    dynamic_shape = tf.shape(x)
-                    if slice_func is not None:
-                        dynamic_shape = slice_func(dynamic_shape)
-                    if not isinstance(dynamic_shape, tf.Tensor) \
-                            or dynamic_shape.get_shape().ndims != 1:
-                        raise TypeError(
-                            '`slice_func` transforms shape tensor into '
-                            'object %r, which is not a shape tensor.' %
-                            (dynamic_shape,)
-                        )
-                    for i, v in enumerate(shape):
-                        if v is None:
-                            shape[i] = dynamic_shape[i]
-                return self.add(shape)
+        if isinstance(shape, tf.TensorShape):
+            shape = shape.as_list()
+            if any(v is None for v in shape):
+                dynamic_shape = tf.shape(x)
+                if slice_func is not None:
+                    dynamic_shape = slice_func(dynamic_shape)
+                if not isinstance(dynamic_shape, tf.Tensor) \
+                        or dynamic_shape.get_shape().ndims != 1:
+                    raise TypeError(
+                        '`slice_func` transforms shape tensor into '
+                        'object %r, which is not a shape tensor.' %
+                        (dynamic_shape,)
+                    )
+                for i, v in enumerate(shape):
+                    if v is None:
+                        shape[i] = dynamic_shape[i]
+            return self.add(shape)
 
-            elif isinstance(shape, tf.Dimension):
-                assert (slice_func is not None)
-                shape = shape.value
-                if shape is None:
-                    dynamic_shape = slice_func(tf.shape(x))
-                    if not isinstance(dynamic_shape, tf.Tensor) or \
-                            dynamic_shape.get_shape().ndims != 0:
-                        raise TypeError(
-                            '`slice_func` transforms shape tensor into '
-                            'object %r, which is not a shape dimension.' %
-                            (dynamic_shape,)
-                        )
-                    shape = dynamic_shape
-                return self.add(shape)
+        elif isinstance(shape, tf.Dimension):
+            assert (slice_func is not None)
+            shape = shape.value
+            if shape is None:
+                dynamic_shape = slice_func(tf.shape(x))
+                if not isinstance(dynamic_shape, tf.Tensor) or \
+                        dynamic_shape.get_shape().ndims != 0:
+                    raise TypeError(
+                        '`slice_func` transforms shape tensor into '
+                        'object %r, which is not a shape dimension.' %
+                        (dynamic_shape,)
+                    )
+                shape = dynamic_shape
+            return self.add(shape)
 
-            else:
-                raise TypeError(
-                    '`slice_func` transforms shape into object %r, which is '
-                    'neither shape nor dimension.' % (shape,)
-                )
+        else:
+            raise TypeError(
+                '`slice_func` transforms shape into object %r, which is '
+                'neither shape nor dimension.' % (shape,)
+            )

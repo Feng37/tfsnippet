@@ -35,12 +35,14 @@ class Normal(Distribution):
         Default name of this normal distribution.
     """
 
-    def __init__(self, mean, stddev=None, logstd=None, name=None,
-                 default_name=None):
+    def __init__(self, mean, stddev=None, logstd=None, group_event_ndims=None,
+                 name=None, default_name=None):
         stdx = stddev if stddev is not None else logstd
         if stdx is None:
             raise ValueError('One of `stddev`, `logstd` should be specified.')
-        super(Normal, self).__init__(name=name, default_name=default_name)
+        super(Normal, self).__init__(group_event_ndims=group_event_ndims,
+                                     name=name,
+                                     default_name=default_name)
 
         with open_variable_scope(self.variable_scope), tf.name_scope('init'):
             # check the shape of parameters
@@ -77,6 +79,14 @@ class Normal(Distribution):
             self._dynamic_batch_shape = tf.broadcast_dynamic_shape(
                 tf.shape(self._mean), tf.shape(self._stdx)
             )
+
+    @property
+    def dynamic_batch_shape(self):
+        return self._dynamic_batch_shape
+
+    @property
+    def static_batch_shape(self):
+        return self._static_batch_shape
 
     @property
     def mean(self):
@@ -131,17 +141,15 @@ class Normal(Distribution):
             static_sample_shape.concatenate(self._static_batch_shape))
         return samples
 
-    @instance_reuse
-    def log_prob(self, x):
+    def _prob(self, x):
+        return tf.exp(self.log_prob(x))
+
+    def _log_prob(self, x):
         c = -0.5 * np.log(2 * np.pi)
         return (
             c - self.logstd -
             0.5 * self.precision * tf.square(x - self.mean)
         )
-
-    @instance_reuse
-    def prob(self, x):
-        return tf.exp(self.log_prob(x))
 
     @instance_reuse
     def analytic_kld(self, other):

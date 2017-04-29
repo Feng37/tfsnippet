@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import functools
+import inspect
 from contextlib import contextmanager
 
 import six
@@ -8,7 +10,8 @@ from tensorflow.python.ops import variable_scope as variable_scope_ops
 from .imported import camel_to_underscore
 
 __all__ = [
-    'open_variable_scope', 'VarScopeObject', 'NameScopeObject',
+    'open_variable_scope', 'instance_name_scope',
+    'VarScopeObject', 'NameScopeObject',
     'get_variables_as_dict',
 ]
 
@@ -178,6 +181,83 @@ class VarScopeObject(object):
         return self._variable_scope
 
 
+def instance_name_scope(method=None, scope=None):
+    """Decorate an instance method within proper name scope.
+
+    This decorator should be applied to unbound instance methods, and
+    the instances that owns the methods are expected to have `name_scope`
+    attribute.  For example:
+
+        class Foo(object):
+
+            def __init__(self, name):
+                with tf.name_scope(name) as ns:
+                    self.name_scope = ns
+
+            @instance_name_scope
+            def foo(self):
+                return tf.add(1, 2, name='add')
+
+    The above example is then equivalent to the following code:
+
+        class Foo(object):
+
+            def __init__(self, name):
+                with tf.name_scope(name) as ns:
+                    self.name_scope = ns
+
+            def foo(self):
+                with tf.name_scope(self.name_scope):
+                    with tf.name_scope('foo'):
+                        return tf.add(1, 2, name='add')
+
+    In which the `instance_name_scope` decorator will first re-open the 
+    `name_scope` of the instance, then open a new name scope (with unique
+    name) according to the method name.
+
+    Parameters
+    ----------
+    scope : str
+        The name of the scope.  If not set, will use the name of the method
+        as scope name.
+    """
+
+    if method is None:
+        return functools.partial(instance_name_scope, scope=scope)
+
+    # check whether or not `method` looks like an instance method
+    if six.PY2:
+        getargspec = inspect.getargspec
+    else:
+        getargspec = inspect.getfullargspec
+
+    argspec = getargspec(method)
+    if argspec.args[0] != 'self':
+        raise TypeError('`method` seems not to be an instance method '
+                        '(whose first argument should be `self`).')
+    if inspect.ismethod(method):
+        raise TypeError('`method` is expected to be unbound instance method.')
+
+    # determine the scope name
+    scope = scope or method.__name__
+
+    @six.wraps(method)
+    def wrapper(*args, **kwargs):
+        obj = args[0]
+        name_scope = obj.name_scope
+        if not isinstance(name_scope, six.string_types) or \
+                (name_scope and not name_scope.endswith('/')):
+            raise TypeError('`name_scope` attribute of the instance %r '
+                            'is expected to be the full name of a name scope, '
+                            'but got %r.' % (obj, name_scope,))
+
+        with tf.name_scope(name_scope):
+            with tf.name_scope(scope):
+                return method(*args, **kwargs)
+
+    return wrapper
+
+
 class NameScopeObject(object):
     """Base class for all objects that owns a name scope.
     
@@ -195,6 +275,13 @@ class NameScopeObject(object):
     In the above example, each `op1` will be directly created in the object
     name scope, while each `op2` will be created in some sub scope within
     the object name scope.
+    
+    Notes
+    -----
+    It is better to use `VarScopeObject` instead of `NameScopeObject`
+    if the class might be used as a basis for other classes, since the
+    designer of the base class may not know whether or not the child
+    classes need to create variables ahead of time.
     
     Parameters
     ----------
@@ -218,31 +305,6 @@ class NameScopeObject(object):
     def name_scope(self):
         """Get the full name scope of this object."""
         return self._name_scope
-
-    @contextmanager
-    def sub_name_scope(self, name=None, values=None):
-        """Open a context of sub name scope.
-        
-        Parameters
-        ----------
-        name : str
-            Name of the sub name scope.  If not specified, will open
-            the name scope of this object without a sub scope.
-            
-        values
-            Input values of this name scope.
-            
-        Yields
-        ------
-        str
-            The full name scope.
-        """
-        with tf.name_scope(name=self.name_scope, values=values):
-            if name:
-                with tf.name_scope(name) as ns:
-                    yield ns
-            else:
-                yield self.name_scope
 
 
 def get_variables_as_dict(scope=None, collection=tf.GraphKeys.GLOBAL_VARIABLES):

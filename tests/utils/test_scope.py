@@ -7,7 +7,8 @@ import tensorflow as tf
 
 from tfsnippet.utils import (open_variable_scope, VarScopeObject,
                              instance_reuse,
-                             get_variables_as_dict, NameScopeObject)
+                             get_variables_as_dict, NameScopeObject,
+                             instance_name_scope)
 
 
 def _get_var(name, **kwargs):
@@ -29,12 +30,16 @@ class _VarScopeObject(VarScopeObject):
 class _NameScopeObject(NameScopeObject):
 
     def f(self):
-        with self.sub_name_scope():
+        with tf.name_scope(self.name_scope):
             return tf.add(1, 2, name='op')
 
+    @instance_name_scope
     def g(self):
-        with self.sub_name_scope('g'):
-            return tf.add(1, 2, name='op')
+        return tf.add(1, 2, name='op')
+
+    @instance_name_scope(scope='g')
+    def h(self):
+        return tf.add(1, 2, name='op')
 
 
 class ScopeUnitTest(unittest.TestCase):
@@ -280,15 +285,19 @@ class ScopeUnitTest(unittest.TestCase):
             self.assertEqual(o1.f().name, 'o/op_1:0')
             self.assertEqual(o1.g().name, 'o/g/op:0')
             self.assertEqual(o1.g().name, 'o/g_1/op:0')
+            self.assertEqual(o1.h().name, 'o/g_2/op:0')
+            self.assertEqual(o1.h().name, 'o/g_3/op:0')
 
             with tf.name_scope('child'):
                 self.assertEqual(o1.f().name, 'o/op_2:0')
-                self.assertEqual(o1.g().name, 'o/g_2/op:0')
+                self.assertEqual(o1.g().name, 'o/g_4/op:0')
+                self.assertEqual(o1.h().name, 'o/g_5/op:0')
 
             o2 = _NameScopeObject(name='o')
             self.assertEqual(o2.name_scope, 'o_1/')
             self.assertEqual(o2.f().name, 'o_1/op:0')
             self.assertEqual(o2.g().name, 'o_1/g/op:0')
+            self.assertEqual(o2.h().name, 'o_1/g_1/op:0')
 
     def test_get_variables_as_dict(self):
         GLOBAL_VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
