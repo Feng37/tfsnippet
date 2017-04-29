@@ -5,8 +5,9 @@ from contextlib import contextmanager
 
 import tensorflow as tf
 
-from tfsnippet.utils import (open_variable_scope, ScopedObject, instance_reuse,
-                             get_variables_as_dict)
+from tfsnippet.utils import (open_variable_scope, VarScopeObject,
+                             instance_reuse,
+                             get_variables_as_dict, NameScopeObject)
 
 
 def _get_var(name, **kwargs):
@@ -18,11 +19,22 @@ def _get_op(name):
     return tf.add(1, 2, name=name)
 
 
-class _ScopedObject(ScopedObject):
+class _VarScopeObject(VarScopeObject):
 
     @instance_reuse
     def f(self):
         return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+
+class _NameScopeObject(NameScopeObject):
+
+    def f(self):
+        with self.sub_name_scope():
+            return tf.add(1, 2, name='op')
+
+    def g(self):
+        with self.sub_name_scope('g'):
+            return tf.add(1, 2, name='op')
 
 
 class ScopeUnitTest(unittest.TestCase):
@@ -220,17 +232,23 @@ class ScopeUnitTest(unittest.TestCase):
                     self.assertEqual(_get_var('v6').name, 'a/c/v6:0')
                     self.assertEqual(_get_op('o4').name, 'a/o4:0')
 
-    def test_ScopedObject(self):
+    def test_VarScopeObject(self):
         with tf.Graph().as_default():
-            o1 = _ScopedObject(default_name='o')
+            o1 = _VarScopeObject(default_name='o')
             self.assertEqual(o1.variable_scope.name, 'o')
             self.assertEqual(o1.variable_scope.original_name_scope, 'o/')
             var_1, op_1 = o1.f()
             self.assertEqual(var_1.name, 'o/f/var:0')
             self.assertEqual(op_1.name, 'o/f/op:0')
 
+            with tf.variable_scope('child'):
+                var_child, op_child = o1.f()
+                self.assertIs(var_child, var_1)
+                self.assertEqual(var_child.name, 'o/f/var:0')
+                self.assertEqual(op_child.name, 'o/f_1/op:0')
+
             # test the second object with the same default name
-            o2 = _ScopedObject(default_name='o')
+            o2 = _VarScopeObject(default_name='o')
             self.assertEqual(o2.variable_scope.name, 'o_1')
             self.assertEqual(o2.variable_scope.original_name_scope, 'o_1/')
             var_2, op_2 = o2.f()
@@ -238,7 +256,7 @@ class ScopeUnitTest(unittest.TestCase):
             self.assertEqual(op_2.name, 'o_1/f/op:0')
 
             # test the third object with the same name as o1
-            o3 = _ScopedObject(name='o')
+            o3 = _VarScopeObject(name='o')
             self.assertEqual(o3.variable_scope.name, 'o')
             self.assertEqual(o3.variable_scope.original_name_scope, 'o_2/')
             var_3, op_3 = o3.f()
@@ -247,12 +265,30 @@ class ScopeUnitTest(unittest.TestCase):
 
             # test the object under other scope
             with tf.variable_scope('c'):
-                o4 = _ScopedObject(default_name='o')
+                o4 = _VarScopeObject(default_name='o')
                 self.assertEqual(o4.variable_scope.name, 'c/o')
                 self.assertEqual(o4.variable_scope.original_name_scope, 'c/o/')
                 var_4, op_4 = o4.f()
                 self.assertEqual(var_4.name, 'c/o/f/var:0')
                 self.assertEqual(op_4.name, 'c/o/f/op:0')
+
+    def test_NameScopeObject(self):
+        with tf.Graph().as_default():
+            o1 = _NameScopeObject(name='o')
+            self.assertEqual(o1.name_scope, 'o/')
+            self.assertEqual(o1.f().name, 'o/op:0')
+            self.assertEqual(o1.f().name, 'o/op_1:0')
+            self.assertEqual(o1.g().name, 'o/g/op:0')
+            self.assertEqual(o1.g().name, 'o/g_1/op:0')
+
+            with tf.name_scope('child'):
+                self.assertEqual(o1.f().name, 'o/op_2:0')
+                self.assertEqual(o1.g().name, 'o/g_2/op:0')
+
+            o2 = _NameScopeObject(name='o')
+            self.assertEqual(o2.name_scope, 'o_1/')
+            self.assertEqual(o2.f().name, 'o_1/op:0')
+            self.assertEqual(o2.g().name, 'o_1/g/op:0')
 
     def test_get_variables_as_dict(self):
         GLOBAL_VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES

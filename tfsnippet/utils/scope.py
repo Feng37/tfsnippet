@@ -8,7 +8,7 @@ from tensorflow.python.ops import variable_scope as variable_scope_ops
 from .imported import camel_to_underscore
 
 __all__ = [
-    'open_variable_scope', 'ScopedObject',
+    'open_variable_scope', 'VarScopeObject', 'NameScopeObject',
     'get_variables_as_dict',
 ]
 
@@ -139,7 +139,7 @@ def open_variable_scope(name_or_scope,
             yield vs
 
 
-class ScopedObject(object):
+class VarScopeObject(object):
     """Base class for all objects owns a variable scope.
     
     Such an object is compatible with the use patterns of `instance_reuse`.
@@ -176,6 +176,73 @@ class ScopedObject(object):
     def variable_scope(self):
         """Get the variable scope of this object."""
         return self._variable_scope
+
+
+class NameScopeObject(object):
+    """Base class for all objects that owns a name scope.
+    
+    Unlike `VarScopeObject`, a `NameScopeObject` does not own variable scope.
+    A `NameScopeObject` can reuse its name scope as follows:
+    
+        class MyScopeObject(NameScopeObject):
+            
+            def f(self):
+                with tf.name_scope(self.name_scope):
+                    op1 = tf.add(1, 2, name='op1')
+                    with tf.name_scope('sub_scope'):
+                        op2 = tf.add(1, 2, name='op2')
+
+    In the above example, each `op1` will be directly created in the object
+    name scope, while each `op2` will be created in some sub scope within
+    the object name scope.
+    
+    Parameters
+    ----------
+    name : str
+        Default name of this object.
+        
+        The object will obtain a name scope with unique name, according to the
+        specified `name`.  If `name` is not specified, the underscored class 
+        name will be chosen as the name.
+    """
+
+    def __init__(self, name=None):
+        self.name = name
+
+        # get the TensorFlow name scope
+        default_name = camel_to_underscore(self.__class__.__name__)
+        with tf.name_scope(name, default_name=default_name) as ns:
+            self._name_scope = ns
+
+    @property
+    def name_scope(self):
+        """Get the full name scope of this object."""
+        return self._name_scope
+
+    @contextmanager
+    def sub_name_scope(self, name=None, values=None):
+        """Open a context of sub name scope.
+        
+        Parameters
+        ----------
+        name : str
+            Name of the sub name scope.  If not specified, will open
+            the name scope of this object without a sub scope.
+            
+        values
+            Input values of this name scope.
+            
+        Yields
+        ------
+        str
+            The full name scope.
+        """
+        with tf.name_scope(name=self.name_scope, values=values):
+            if name:
+                with tf.name_scope(name) as ns:
+                    yield ns
+            else:
+                yield self.name_scope
 
 
 def get_variables_as_dict(scope=None, collection=tf.GraphKeys.GLOBAL_VARIABLES):

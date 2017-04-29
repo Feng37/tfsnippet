@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from mlcomp.utils import camel_to_underscore
-from tfsnippet.utils import ScopedObject
+from tfsnippet.utils import VarScopeObject
 
 __all__ = ['Distribution']
 
 
-class Distribution(ScopedObject):
+class Distribution(VarScopeObject):
     """Base class for various distributions."""
 
     def sample(self, sample_shape=()):

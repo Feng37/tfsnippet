@@ -16,14 +16,15 @@ from tfsnippet.utils import (get_default_session_or_error,
                              TemporaryDirectory,
                              VariableSaver,
                              try_get_variable_value,
-                             ScopedObject,
+                             VarScopeObject,
                              open_variable_scope,
+                             auto_reuse_variables,
                              makedirs)
 
 __all__ = ['LossValidator']
 
 
-class LossValidator(ScopedObject):
+class LossValidator(VarScopeObject):
     """Class to help do validation on loss in training process.
     
     Parameters
@@ -76,7 +77,7 @@ class LossValidator(ScopedObject):
 
         # create the variable, the tensors and the operations to track
         # best validation loss
-        with open_variable_scope(self.variable_scope):
+        with auto_reuse_variables(self.variable_scope):
             self._best_loss = tf.get_variable(
                 'best_loss',
                 initializer=np.nan,

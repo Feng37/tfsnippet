@@ -5,7 +5,8 @@ import six
 import tensorflow as tf
 from logging import getLogger
 
-from .scope import ScopedObject, open_variable_scope
+from .scope import VarScopeObject
+from .reuse import auto_reuse_variables
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
@@ -178,7 +179,7 @@ def set_variable_values(variables, values, name=None):
         ])
 
 
-class VariableSaver(ScopedObject):
+class VariableSaver(VarScopeObject):
     """Version controlled saving and restoring TensorFlow variables.
 
     Parameters
@@ -227,13 +228,11 @@ class VariableSaver(ScopedObject):
         self.max_versions = max_versions
         self.latest_file = latest_file
         self.save_meta = save_meta
-        with open_variable_scope(self.variable_scope):
-            self._saver = self._build_saver()
-
-    def _build_saver(self):
-        return tf.train.Saver(var_list=self.variables,
-                              max_to_keep=self.max_versions,
-                              name=self.name)
+        with auto_reuse_variables(self.variable_scope):
+            self._saver = tf.train.Saver(
+                var_list=self.variables, max_to_keep=self.max_versions,
+                name='saver'
+            )
 
     def get_latest_file(self):
         """Get the latest available checkpoint file."""

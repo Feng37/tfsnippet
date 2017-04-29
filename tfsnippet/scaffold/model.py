@@ -6,14 +6,14 @@ import tensorflow as tf
 from tfsnippet.utils import (get_default_session_or_error,
                              ensure_variables_initialized,
                              open_variable_scope,
-                             ScopedObject,
+                             VarScopeObject,
                              deprecated)
 from .defaults import get_option_defaults, OptionDefaults
 
 __all__ = ['Model']
 
 
-class Model(ScopedObject):
+class Model(VarScopeObject):
     """Scaffold for defining models with TensorFlow.
 
     This class provides a basic scaffold for defining models with TensorFlow.

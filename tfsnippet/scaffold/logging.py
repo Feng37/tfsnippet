@@ -9,7 +9,7 @@ import six
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import get_default_session_or_error, ScopedObject
+from tfsnippet.utils import get_default_session_or_error, VarScopeObject
 
 __all__ = [
     'TrainLogger',
@@ -121,9 +121,9 @@ def _get_tensor_value(v):
     return v
 
 
-class TrainLogger(ScopedObject):
+class TrainLogger(VarScopeObject):
     """Loss and variables logger.
-    
+
     This class provides convenient methods for printing training metrics,
     and for writing metrics summaries onto disk.  For example:
 

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from tfsnippet.utils import ScopedObject, auto_reuse_variables
+from tfsnippet.utils import VarScopeObject, auto_reuse_variables
 
 __all__ = ['Component']
 
 
-class Component(ScopedObject):
+class Component(VarScopeObject):
     """Base class for neural network components.
     
     A neural network component is basically a reusable object that
