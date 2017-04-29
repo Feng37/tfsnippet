@@ -54,7 +54,7 @@ class ModelTestCase(unittest.TestCase):
 
             # test get all variables
             self.assertEqual(
-                model.get_model_variables(),
+                model.get_variables(),
                 {
                     'model_var': model.model_var,
                     'other_var': model.other_var,

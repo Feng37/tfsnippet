@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 
+import six
 import tensorflow as tf
 from logging import getLogger
 
@@ -9,6 +10,7 @@ from .scope import ScopedObject, open_variable_scope
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
     'get_uninitialized_variables', 'ensure_variables_initialized',
+    'get_variable_values', 'set_variable_values',
     'VariableSaver',
 ]
 
@@ -52,14 +54,17 @@ def try_get_variable_value(v, sess=None):
         return None
 
 
-def get_uninitialized_variables(variables=None):
+def get_uninitialized_variables(variables=None, name=None):
     """Get uninitialized variables as a list.
 
     Parameters
     ----------
     variables : collections.Iterable[tf.Variable]
         Return only uninitialized variables within this list.
-        If not specified, will return all uninitialized variables.
+        If not specified, will return all uninitialized global variables.
+        
+    name : str
+        Optional name of this operation.
 
     Returns
     -------
@@ -70,13 +75,14 @@ def get_uninitialized_variables(variables=None):
         variables = tf.global_variables()
     else:
         variables = list(variables)
-    init_flag = sess.run(tf.stack(
-        [tf.is_variable_initialized(v) for v in variables]
-    ))
+    with tf.name_scope(name, default_name='get_uninitialized_variables'):
+        init_flag = sess.run(tf.stack(
+            [tf.is_variable_initialized(v) for v in variables]
+        ))
     return [v for v, f in zip(variables, init_flag) if not f]
 
 
-def ensure_variables_initialized(variables=None):
+def ensure_variables_initialized(variables=None, name=None):
     """Ensure all variables are initialized.
 
     Parameters
@@ -84,11 +90,92 @@ def ensure_variables_initialized(variables=None):
     variables : collections.Iterable[tf.Variable]
         Ensure only these variables to be initialized.
         If not specified, will ensure all variables initialized.
+        
+    name : str
+        Optional name of this operation.
     """
-    uninitialized = get_uninitialized_variables(variables)
-    if uninitialized:
-        sess = get_default_session_or_error()
-        sess.run(tf.variables_initializer(uninitialized))
+    with tf.name_scope(name, default_name='ensure_variables_initialized'):
+        uninitialized = get_uninitialized_variables(variables)
+        if uninitialized:
+            sess = get_default_session_or_error()
+            sess.run(tf.variables_initializer(uninitialized))
+
+
+def get_variable_values(variables):
+    """Get the values of variables.
+    
+    Parameters
+    ----------
+    variables : list[tf.Variable] | dict[str, tf.Variable]
+        A list or a dict of variables.
+        
+    Returns
+    -------
+    list[any] | dict[str, any]
+        The value list if `variables` are specified as a list,
+        or dict if `variables` are specified as a dict.
+    """
+    session = get_default_session_or_error()
+    if isinstance(variables, dict):
+        names = list(variables.keys())
+        values = session.run([variables[n] for n in names])
+        return {n: v for n, v in zip(names, values)}
+    else:
+        return session.run(list(variables))
+
+
+def set_variable_values(variables, values, name=None):
+    """Set the values of variables.
+    
+    Note that this method will create a new set of graph nodes each time
+    it is called, thus is not suitable for repeated variable assignments.
+    
+    Parameters
+    ----------
+    variables : list[tf.Variable] | dict[str, tf.Variable]
+        A list or a dict of variables.
+        
+    values : list[any] | dict[str, any]
+        The list or the dict of values.
+        
+    name : str
+        Optional name of this operation.
+        
+    Raises
+    ------
+    KeyError | IndexError
+        If the specified values does not match variables.
+    """
+    # collect the variables and the values
+    assign_dict = {}
+    if isinstance(variables, dict):
+        if not isinstance(values, dict):
+            raise TypeError('`values` is expected to be a dict '
+                            'since `variables` is a dict.')
+        for name, var in six.iteritems(variables):
+            if not isinstance(var, tf.Variable):
+                raise TypeError('%r is not a variable.' % (var,))
+            assign_dict[var] = values[name]
+
+    else:
+        variables = list(variables)
+        values = list(values)
+        if len(variables) != len(values):
+            raise IndexError('Length of `values` does not match `variables`.')
+        for var, value in zip(variables, values):
+            if not isinstance(var, tf.Variable):
+                raise TypeError('%r is not a variable.' % (var,))
+            assign_dict[var] = value
+
+    # get the session
+    session = get_default_session_or_error()
+
+    # perform assign operations
+    with tf.name_scope(name, default_name='set_variable_values'):
+        session.run([
+            tf.assign(var, value)
+            for var, value in six.iteritems(assign_dict)
+        ])
 
 
 class VariableSaver(ScopedObject):

@@ -5,7 +5,8 @@ from contextlib import contextmanager
 
 import tensorflow as tf
 
-from tfsnippet.utils import open_variable_scope, ScopedObject, instance_reuse
+from tfsnippet.utils import (open_variable_scope, ScopedObject, instance_reuse,
+                             get_variables_as_dict)
 
 
 def _get_var(name, **kwargs):
@@ -253,6 +254,70 @@ class ScopeUnitTest(unittest.TestCase):
                 self.assertEqual(var_4.name, 'c/o/f/var:0')
                 self.assertEqual(op_4.name, 'c/o/f/op:0')
 
+    def test_get_variables_as_dict(self):
+        GLOBAL_VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES
+        MODEL_VARIABLES = tf.GraphKeys.MODEL_VARIABLES
+        LOCAL_VARIABLES = tf.GraphKeys.LOCAL_VARIABLES
+
+        with tf.Graph().as_default():
+            # create the variables to be checked
+            a = tf.get_variable(
+                'a', shape=(), collections=[GLOBAL_VARIABLES, MODEL_VARIABLES])
+            b = tf.get_variable(
+                'b', shape=(), collections=[GLOBAL_VARIABLES])
+            c = tf.get_variable(
+                'c', shape=(), collections=[MODEL_VARIABLES])
+
+            with tf.variable_scope('child') as child:
+                child_a = tf.get_variable(
+                    'a', shape=(),
+                    collections=[GLOBAL_VARIABLES, MODEL_VARIABLES])
+                child_b = tf.get_variable(
+                    'b', shape=(), collections=[GLOBAL_VARIABLES])
+                child_c = tf.get_variable(
+                    'c', shape=(), collections=[MODEL_VARIABLES])
+
+            # test to get variables as dict
+            self.assertEqual(
+                get_variables_as_dict(),
+                {'a': a, 'b': b, 'child/a': child_a, 'child/b': child_b}
+            )
+            self.assertEqual(
+                get_variables_as_dict(collection=MODEL_VARIABLES),
+                {'a': a, 'c': c, 'child/a': child_a, 'child/c': child_c}
+            )
+            self.assertEqual(
+                get_variables_as_dict(collection=LOCAL_VARIABLES),
+                {}
+            )
+            self.assertEqual(
+                get_variables_as_dict(''),
+                {'a': a, 'b': b, 'child/a': child_a, 'child/b': child_b}
+            )
+            self.assertEqual(
+                get_variables_as_dict('child'),
+                {'a': child_a, 'b': child_b}
+            )
+            self.assertEqual(
+                get_variables_as_dict('child/'),
+                {'a': child_a, 'b': child_b}
+            )
+            self.assertEqual(
+                get_variables_as_dict(child),
+                {'a': child_a, 'b': child_b}
+            )
+            self.assertEqual(
+                get_variables_as_dict('child', collection=MODEL_VARIABLES),
+                {'a': child_a, 'c': child_c}
+            )
+            self.assertEqual(
+                get_variables_as_dict('child', collection=LOCAL_VARIABLES),
+                {}
+            )
+            self.assertEqual(
+                get_variables_as_dict('non_exist'),
+                {}
+            )
 
 if __name__ == '__main__':
     unittest.main()

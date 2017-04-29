@@ -176,13 +176,13 @@ class Model(ScopedObject):
         evaluation.
         
         Note that the derived classes should use the parameter values defined
-        in `param_defaults`, so that the behavior of `build()` can follow
+        in `option_defaults`, so that the behavior of `build()` can follow
         the context at construction time.
         """
         raise NotImplementedError()
 
-    def get_model_variables(self, collection=tf.GraphKeys.GLOBAL_VARIABLES):
-        """Get the model variables.
+    def get_variables(self, collection=tf.GraphKeys.GLOBAL_VARIABLES):
+        """Get the variables defined within the model's scope.
 
         This method will get variables which are in `variable_scope`
         and the specified `collection`, as a dict which maps relative
@@ -208,15 +208,19 @@ class Model(ScopedObject):
             for var in tf.get_collection(collection, scope_name)
         }
 
+    @deprecated('use `get_variables` instead.')
+    def get_model_variables(self, collection=tf.GraphKeys.GLOBAL_VARIABLES):
+        """Get the model variables."""
+        return self.get_variables(collection=collection)
+
     def get_param_variables(self, trainable=None):
         """Get the model parameter variables.
 
         The parameter variables are the variables in `_variable_scope`
         and `tf.GraphKeys.MODEL_VARIABLES` collection.
 
-        Although it is possible to override this method, so as to include
-        more variables other than those specified in `MODEL_VARIABLES`
-        collection, it is generally not a good practice.
+        It is possible to override this method to provide an alternative
+        strategy of organizing model variables.
 
         Parameters
         ----------
@@ -228,10 +232,10 @@ class Model(ScopedObject):
         dict[str, tf.Variable]
             Dict which maps from relative names to variable objects.
         """
-        model_vars = self.get_model_variables(tf.GraphKeys.MODEL_VARIABLES)
+        model_vars = self.get_variables(tf.GraphKeys.MODEL_VARIABLES)
         if trainable:
             collection = tf.GraphKeys.TRAINABLE_VARIABLES
-            train_vars = self.get_model_variables(collection)
+            train_vars = self.get_variables(collection)
             model_vars = {k: v for k, v in six.iteritems(model_vars)
                           if k in train_vars}
         return model_vars
@@ -297,5 +301,5 @@ class Model(ScopedObject):
         also be initialized.  Otherwise the `global_step` must be manually
         initialized.
         """
-        var_list = list(six.itervalues(self.get_model_variables()))
+        var_list = list(six.itervalues(self.get_variables()))
         ensure_variables_initialized(var_list)

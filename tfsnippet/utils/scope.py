@@ -9,6 +9,7 @@ from .imported import camel_to_underscore
 
 __all__ = [
     'open_variable_scope', 'ScopedObject',
+    'get_variables_as_dict',
 ]
 
 
@@ -175,3 +176,43 @@ class ScopedObject(object):
     def variable_scope(self):
         """Get the variable scope of this object."""
         return self._variable_scope
+
+
+def get_variables_as_dict(scope=None, collection=tf.GraphKeys.GLOBAL_VARIABLES):
+    """Get all the variables as dict.
+
+    Parameters
+    ----------
+    scope : str | tf.VariableScope
+        If specified, will get the variables only within this scope.
+        The name of the variable scope, or the variable scope object.
+
+    collection : str
+        Get the variables only belong this collection.
+        (default is tf.GraphKeys.GLOBAL_VARIABLES)
+
+    Returns
+    -------
+    dict[str, tf.Variable]
+        Dict which maps from names to variable instances.
+
+        The name will be the full names of variables if `scope` is not
+        specified, or the relative names within the `scope`.
+        By "relative name" we mean the variable names without the common
+        prefix of the scope name.
+    """
+    # get the common prefix to be stripped
+    if isinstance(scope, tf.VariableScope):
+        scope_name = scope.name
+    else:
+        scope_name = scope
+    if scope_name and not scope_name.endswith('/'):
+        scope_name += '/'
+    scope_name_len = len(scope_name) if scope_name else 0
+
+    # get the variables and strip the prefix
+    variables = tf.get_collection(collection, scope_name)
+    return {
+        var.name[scope_name_len:].rsplit(':', 1)[0]: var
+        for var in variables
+    }

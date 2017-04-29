@@ -2,10 +2,10 @@ import unittest
 
 import tensorflow as tf
 
-from tfsnippet.components import BaseComponent
+from tfsnippet.components import Component
 
 
-class _MyComponent(BaseComponent):
+class _MyComponent(Component):
 
     def _build(self):
         return tf.get_variable('var', shape=())
@@ -13,7 +13,7 @@ class _MyComponent(BaseComponent):
 
 class BaseTestCase(unittest.TestCase):
 
-    def test_BaseComponent(self):
+    def test_Component(self):
 
         with tf.Graph().as_default():
             c = _MyComponent(name='comp')

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from tfsnippet.utils import ScopedObject, auto_reuse_variables
 
-__all__ = ['BaseComponent']
+__all__ = ['Component']
 
 
-class BaseComponent(ScopedObject):
+class Component(ScopedObject):
     """Base class for neural network components.
     
     A neural network component is basically a reusable object that
@@ -16,7 +16,7 @@ class BaseComponent(ScopedObject):
     
         from tensorflow.contrib import layers
 
-        class Component(BaseComponent):
+        class MyComponent(BaseComponent):
         
             def _build(self, inputs):
                 return layers.fully_connected(
@@ -24,7 +24,7 @@ class BaseComponent(ScopedObject):
                     num_outputs=2,
                     scope='fully_connected'
                 )
-                
+
     Note that the `scope` argument in the above example is necessary,
     in which it enables the fully connected layer to use the same set
     of parameters every time when `_build` is called.
