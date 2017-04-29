@@ -28,7 +28,8 @@ class MyModel(Model):
                 initializer=3,
                 dtype=tf.int32,
                 collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                             tf.GraphKeys.MODEL_VARIABLES]
+                             tf.GraphKeys.MODEL_VARIABLES],
+                trainable=False
             )
 
 
@@ -68,6 +69,10 @@ class ModelTestCase(unittest.TestCase):
                 model.get_param_variables(),
                 {'model_var': model.model_var,
                  'nested/nested_var': model.nested_var}
+            )
+            self.assertEqual(
+                model.get_param_variables(trainable=True),
+                {'model_var': model.model_var}
             )
 
             # test get parameter values and set parameter values
