@@ -9,7 +9,10 @@ import six
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import get_default_session_or_error, VarScopeObject
+from tfsnippet.utils import (get_default_session_or_error,
+                             is_integer,
+                             is_float,
+                             VarScopeObject)
 
 __all__ = [
     'TrainLogger',
@@ -116,8 +119,9 @@ def _default_metric_formatter(name, value):
 
 
 def _get_tensor_value(v):
-    if isinstance(v, (tf.Tensor, tf.Variable)):
-        v = get_default_session_or_error().run(v)
+    if not (is_integer(v) or is_float(v) or isinstance(v, np.ndarray)):
+        with tf.name_scope('get_tensor_value', values=[v]):
+            v = get_default_session_or_error().run(tf.convert_to_tensor(v))
     return v
 
 

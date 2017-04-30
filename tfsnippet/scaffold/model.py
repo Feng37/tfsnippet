@@ -5,9 +5,9 @@ import tensorflow as tf
 
 from tfsnippet.utils import (get_default_session_or_error,
                              ensure_variables_initialized,
-                             open_variable_scope,
                              VarScopeObject,
-                             deprecated)
+                             deprecated,
+                             auto_reuse_variables)
 from .defaults import get_option_defaults, OptionDefaults
 
 __all__ = ['Model']
@@ -138,7 +138,7 @@ class Model(VarScopeObject):
             return
         self._has_built = True
 
-        with open_variable_scope(self._variable_scope):
+        with auto_reuse_variables(self.variable_scope):
             # create the global step variable if there's none
             if self._global_step is None:
                 self._global_step = tf.get_variable(

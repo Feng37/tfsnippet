@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from .arith_mixin import *
 from .configutils import *
 from .graph import *
 from .imported import *

@@ -17,9 +17,9 @@ from tfsnippet.utils import (get_default_session_or_error,
                              VariableSaver,
                              try_get_variable_value,
                              VarScopeObject,
-                             open_variable_scope,
                              auto_reuse_variables,
-                             makedirs)
+                             makedirs,
+                             is_dynamic_tensor_like)
 
 __all__ = ['LossValidator']
 
@@ -53,7 +53,7 @@ class LossValidator(VarScopeObject):
 
     def __init__(self, inputs, valid_loss, global_step=None, managed_vars=None,
                  name=None, default_name=None):
-        if not isinstance(valid_loss, tf.Tensor) or \
+        if not is_dynamic_tensor_like(valid_loss) or \
                 len(valid_loss.get_shape()) != 0:
             raise TypeError('`valid_loss` is expected to be a scalar tensor, '
                             'but got %r.' % (valid_loss,))
@@ -67,6 +67,7 @@ class LossValidator(VarScopeObject):
 
         # memorize the arguments
         inputs = tuple(inputs)
+        valid_loss = tf.convert_to_tensor(valid_loss)
         if valid_loss in inputs:
             valid_loss = tf.identity(valid_loss)
 
@@ -250,7 +251,7 @@ class LossValidator(VarScopeObject):
                 if self._best_loss_val is not None and \
                         np.isnan(self._best_loss_val):
                     self._best_loss_val = None
-                with open_variable_scope(self.variable_scope):
+                with auto_reuse_variables(self.variable_scope):
                     self._saver = VariableSaver(
                         self._managed_vars, save_dir, save_meta=False)
 

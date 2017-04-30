@@ -175,14 +175,12 @@ class VarScopeObject(object):
             self._variable_scope = vs       # type: tf.VariableScope
 
     @property
-    def name(self):
-        """Get the name of this object."""
-        return self._variable_scope.name
-
-    @property
     def variable_scope(self):
         """Get the variable scope of this object."""
         return self._variable_scope
+
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__name__, self.variable_scope.name)
 
 
 def instance_name_scope(method=None, scope=None):

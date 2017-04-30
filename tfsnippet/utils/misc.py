@@ -4,12 +4,14 @@ import numpy as np
 import tensorflow as tf
 
 __all__ = [
-    'is_integer', 'get_preferred_tensor_dtype',
+    'is_integer', 'is_float', 'is_dynamic_tensor_like',
+    'convert_to_tensor_if_dynamic',
+    'get_preferred_tensor_dtype',
 ]
 
 
 def is_integer(x):
-    """Test whether or not `x` is a Python integer or a Numpy integer."""
+    """Test whether or not `x` is a Python or Numpy integer."""
     if isinstance(x, bool):
         return False
     return isinstance(x, __INTEGER_TYPES)
@@ -20,6 +22,45 @@ __INTEGER_TYPES = (
      np.int8, np.int16, np.int32, np.int64,
      np.uint8, np.uint16, np.uint32, np.uint64)
 )
+
+
+def is_float(x):
+    """Test whether or not `x` is a Python or Numpy floating number."""
+    return isinstance(x, __FLOATING_TYPES)
+
+__FLOATING_TYPES = (
+    float,
+    np.float,
+    np.float16, np.float32, np.float64, np.float128,
+)
+
+
+def is_dynamic_tensor_like(x):
+    """Check whether or not `x` should be converted by `tf.convert_to_tensor`.
+    
+    Parameters
+    ----------
+    x
+        The object to be checked.
+    """
+    from tfsnippet.bayes import StochasticTensor
+    return isinstance(x, (tf.Tensor, tf.Variable, StochasticTensor))
+
+
+def convert_to_tensor_if_dynamic(x, name=None):
+    """Convert `x` to tensor if it is dynamic.
+    
+    Parameters
+    ----------
+    x
+        The object to be converted.
+        
+    name : str
+        Optional name of this operation.
+    """
+    if is_dynamic_tensor_like(x):
+        return tf.convert_to_tensor(x, name=name)
+    return x
 
 
 def get_preferred_tensor_dtype(x):
@@ -40,11 +81,8 @@ def get_preferred_tensor_dtype(x):
     tf.DType
         The data type for specified tensor `x`.
     """
-    if isinstance(x, (tf.Tensor, tf.Variable)):
-        return x.dtype.base_dtype
-    elif isinstance(x, np.ndarray):
-        return tf.as_dtype(x.dtype)
+    if hasattr(x, 'dtype'):
+        dtype = x.dtype
+        return tf.as_dtype(dtype).base_dtype
     else:
         return tf.as_dtype(np.array([x]).dtype)
-
-    tf.Tensor
