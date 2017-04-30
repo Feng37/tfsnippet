@@ -35,6 +35,9 @@ class Distribution(VarScopeObject):
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
+        
+    name, default_name : str
+        Optional name or default name of this distribution.
     """
 
     def __init__(self, group_event_ndims=None, name=None, default_name=None):
@@ -68,7 +71,7 @@ class Distribution(VarScopeObject):
     @property
     def dynamic_batch_shape(self):
         """Get the dynamic batch shape of this distribution.
-        
+
         Returns
         -------
         tuple[int] | tf.Tensor
@@ -79,7 +82,7 @@ class Distribution(VarScopeObject):
     @property
     def static_batch_shape(self):
         """Get the static batch shape of this distribution.
-        
+
         Returns
         -------
         tf.TensorShape
@@ -91,7 +94,7 @@ class Distribution(VarScopeObject):
     @property
     def dynamic_value_shape(self):
         """Get the dynamic value shape of this distribution.
-        
+
         Returns
         -------
         tuple[int] | tf.Tensor
@@ -102,7 +105,7 @@ class Distribution(VarScopeObject):
     @property
     def static_value_shape(self):
         """Get the static value shape of this distribution.
-        
+
         Returns
         -------
         tf.TensorShape
@@ -116,8 +119,9 @@ class Distribution(VarScopeObject):
 
         Parameters
         ----------
-        sample_shape : tuple[int | tf.Tensor]
-            The shape of the samples.
+        sample_shape : tuple[int | tf.Tensor] | tf.Tensor
+            The shape of the samples, as a tuple of integers / 0-d tensors,
+            or a 1-d tensor.
 
         Returns
         -------

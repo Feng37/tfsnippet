@@ -46,3 +46,5 @@ def get_preferred_tensor_dtype(x):
         return tf.as_dtype(x.dtype)
     else:
         return tf.as_dtype(np.array([x]).dtype)
+
+    tf.Tensor

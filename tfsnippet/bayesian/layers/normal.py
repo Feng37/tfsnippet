@@ -5,4 +5,4 @@ __all__ = ['Normal']
 
 
 class Normal(StochasticTensor):
-    """Normal stochastic tensor."""
+    """Stochastic tensor of normal distribution."""

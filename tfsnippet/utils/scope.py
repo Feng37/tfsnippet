@@ -167,14 +167,17 @@ class VarScopeObject(object):
     """
 
     def __init__(self, name=None, default_name=None):
-        self.name = name
-
         # get the TensorFlow variable scope
         if not default_name:
             default_name = camel_to_underscore(self.__class__.__name__)
             default_name = default_name.lstrip('_')
         with tf.variable_scope(name, default_name=default_name) as vs:
             self._variable_scope = vs       # type: tf.VariableScope
+
+    @property
+    def name(self):
+        """Get the name of this object."""
+        return self._variable_scope.name
 
     @property
     def variable_scope(self):
