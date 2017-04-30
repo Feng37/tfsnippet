@@ -151,19 +151,23 @@ class Distribution(VarScopeObject):
         tf.Tensor
             The log-probability of `x`.
         """
-        # check the arguments
         x = tf.convert_to_tensor(x, dtype=self.dtype)
+
+        # check the shape of `x`
         x_static_shape = x.get_shape()
+        batch_value_shape = \
+            self.static_batch_shape.concatenate(self.static_value_shape)
         try:
-            tf.broadcast_static_shape(x_static_shape, self.static_batch_shape)
+            tf.broadcast_static_shape(x_static_shape, batch_value_shape)
         except ValueError:
             raise ValueError(
-                'The shape of `x` should match the distribution batch shape'
-                '(%r vs %r).' % (x_static_shape, self.static_batch_shape)
+                'The shape of `x` should match `batch_shape + value_shape` '
+                '(%r vs %r).' % (x_static_shape, batch_value_shape)
             )
 
         # determine the number of group event dimensions
-        group_event_ndims = self.group_event_ndims or group_event_ndims
+        if group_event_ndims is None:
+            group_event_ndims = self.group_event_ndims
         if group_event_ndims:
             max_group_event_ndims = self.static_batch_shape.ndims
             if group_event_ndims > max_group_event_ndims:
@@ -179,17 +183,22 @@ class Distribution(VarScopeObject):
         try:
             tf.broadcast_static_shape(log_prob_shape, self.static_batch_shape)
         except ValueError:
-            raise ValueError(
+            raise RuntimeError(
                 'The shape of computed log-prob does not match `batch_shape`, '
                 'which could be a bug in the distribution implementation. '
                 '(%r vs %r)' % (log_prob_shape, self.static_batch_shape)
             )
 
-        if group_event_ndims and group_event_ndims > 1:
-            reshaper = ReshapeHelper()
-            reshaper.add_template(log_prob, lambda s: s[: -group_event_ndims])
-            reshaper.add(-1)
-            log_prob = tf.reduce_mean(reshaper(x), axis=-1)
+        if group_event_ndims:
+            if group_event_ndims > 1:
+                reshaper = ReshapeHelper()
+                reshaper.add_template(
+                    log_prob,
+                    lambda s: s[: -group_event_ndims]
+                )
+                reshaper.add(-1)
+                log_prob = reshaper(log_prob)
+            log_prob = tf.reduce_sum(log_prob, axis=-1)
         return log_prob
 
     @instance_reuse

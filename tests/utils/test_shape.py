@@ -7,7 +7,7 @@ import tensorflow as tf
 from tfsnippet.utils import (get_dimension_size,
                              is_deterministic_shape,
                              repeat_tensor_for_samples,
-                             ReshapeHelper)
+                             ReshapeHelper, get_dynamic_tensor_shape)
 
 
 class ShapeTestCase(unittest.TestCase):
@@ -24,6 +24,10 @@ class ShapeTestCase(unittest.TestCase):
                 get_dimension_size(x, 1),
                 3
             )
+            self.assertEqual(
+                get_dimension_size(x, -1),
+                3
+            )
 
             # test get dynamic shape
             self.assertEqual(
@@ -38,12 +42,6 @@ class ShapeTestCase(unittest.TestCase):
                 get_dimension_size(x, dim).eval({x: x_data, dim: 1}),
                 3
             )
-
-            # test out of range
-            with self.assertRaises(IndexError):
-                get_dimension_size(x, -1)
-            with self.assertRaises(IndexError):
-                get_dimension_size(x, 2)
 
             # test get the dimension of tensor with even unknown number of
             # dimensions
@@ -70,6 +68,61 @@ class ShapeTestCase(unittest.TestCase):
                     shape: [3, 6, 2]
                 }),
                 2
+            )
+
+    def test_get_dynamic_tensor_shape(self):
+        with tf.Graph().as_default(), tf.Session().as_default():
+            x = tf.placeholder(tf.float32, shape=[None, 3, 4])
+            shape = tf.placeholder(tf.int32, shape=[None])
+            x_data = np.arange(24).reshape([-1, 3, 4])
+
+            # test get static shape
+            self.assertEqual(get_dynamic_tensor_shape(x[0, ...]), (3, 4))
+            self.assertEqual(
+                get_dynamic_tensor_shape(x, lambda s: s[1:]),
+                (3, 4)
+            )
+
+            # test get dynamic shape
+            x_shape = get_dynamic_tensor_shape(x)
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [3])
+            self.assertEqual(tuple(x_shape.eval({x: x_data})), (2, 3, 4))
+
+            x_shape = get_dynamic_tensor_shape(x[:, :, 0])
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [2])
+            self.assertEqual(tuple(x_shape.eval({x: x_data})), (2, 3))
+
+            x_shape = get_dynamic_tensor_shape(x, lambda s: s[:-1])
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [2])
+            self.assertEqual(tuple(x_shape.eval({x: x_data})), (2, 3))
+
+            # test get the shape of tensor with unknown number of dimensions
+            x_reshaped = tf.reshape(x, shape)
+            x_shape = get_dynamic_tensor_shape(x_reshaped)
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [None])
+            self.assertEqual(
+                tuple(x_shape.eval({x: x_data, shape: [2, 3, 2, 2]})),
+                (2, 3, 2, 2)
+            )
+
+            x_shape = get_dynamic_tensor_shape(x_reshaped[0, ...])
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [None])
+            self.assertEqual(
+                tuple(x_shape.eval({x: x_data, shape: [2, 3, 2, 2]})),
+                (3, 2, 2)
+            )
+
+            x_shape = get_dynamic_tensor_shape(x_reshaped, lambda s: s[: -1])
+            self.assertIsInstance(x_shape, tf.Tensor)
+            self.assertEqual(x_shape.get_shape().as_list(), [None])
+            self.assertEqual(
+                tuple(x_shape.eval({x: x_data, shape: [2, 3, 2, 2]})),
+                (2, 3, 2)
             )
 
     def test_is_deterministic_shape(self):
@@ -469,6 +522,14 @@ class ShapeTestCase(unittest.TestCase):
                 helper.add(tf.placeholder(dtype=tf.int32, shape=(None,)))
             self.assertIn(
                 'not deterministic, which is not supported',
+                str(cm.exception)
+            )
+
+            # test to disable "-1"
+            with self.assertRaises(ValueError) as cm:
+                ReshapeHelper(allow_negative_one=False).add(-1)
+            self.assertIn(
+                '"-1" is not allowed',
                 str(cm.exception)
             )
 

@@ -54,7 +54,8 @@ def get_distribution_samples(distribution_class, kwargs, n_samples=N_SAMPLES,
             raise
 
 
-def compute_distribution_prob(distribution_class, kwargs, data, func=None):
+def compute_distribution_prob(distribution_class, kwargs, data,
+                              func=None, group_event_ndims=None):
     with tf.Graph().as_default():
         try:
             kwargs_ph = {
@@ -64,8 +65,10 @@ def compute_distribution_prob(distribution_class, kwargs, data, func=None):
             data_ph = tf.placeholder(shape=data.shape, dtype=floatx())
             keys = sorted(six.iterkeys(kwargs))
             distribution = distribution_class(**kwargs_ph)
-            prob = distribution.prob(data)
-            log_prob = distribution.log_prob(data)
+            prob = distribution.prob(
+                data, group_event_ndims=group_event_ndims)
+            log_prob = distribution.log_prob(
+                data, group_event_ndims=group_event_ndims)
             outputs = [prob, log_prob]
             if func:
                 outputs += func(distribution)

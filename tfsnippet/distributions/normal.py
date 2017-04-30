@@ -2,10 +2,9 @@
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import (floatx,
-                             is_integer,
-                             instance_reuse,
-                             open_variable_scope)
+from tfsnippet.utils import (instance_reuse,
+                             open_variable_scope,
+                             get_preferred_tensor_dtype, ReshapeHelper)
 from .base import Distribution
 
 __all__ = ['Normal']
@@ -16,15 +15,15 @@ class Normal(Distribution):
 
     Parameters
     ----------
-    mean : tf.Tensor
+    mean : tf.Tensor | np.ndarray | float
         The mean of the Normal distribution.
         Should be broadcastable to match `stddev`.
 
-    stddev : tf.Tensor
+    stddev : tf.Tensor | np.ndarray | float
         The standard derivation of the Normal distribution.
         Should be broadcastable to match `mean`.
 
-    logstd : tf.Tensor
+    logstd : tf.Tensor | np.ndarray | float
         The log standard derivation of the Normal distribution.
         Should be broadcastable to match `mean`.
 
@@ -39,51 +38,73 @@ class Normal(Distribution):
 
     def __init__(self, mean, stddev=None, logstd=None, group_event_ndims=None,
                  name=None, default_name=None):
-        stdx = stddev if stddev is not None else logstd
-        if stdx is None:
-            raise ValueError('One of `stddev`, `logstd` should be specified.')
+        # check the arguments
+        if stddev is None and logstd is None:
+            raise ValueError('At least one of `stddev`, `logstd` should be '
+                             'specified.')
+        dtype = get_preferred_tensor_dtype(mean)
+        if not dtype.is_floating:
+            raise TypeError('Normal distribution parameters must be real '
+                            'numbers.')
+
         super(Normal, self).__init__(group_event_ndims=group_event_ndims,
                                      name=name,
                                      default_name=default_name)
 
         with open_variable_scope(self.variable_scope), tf.name_scope('init'):
-            # check the shape and data types of parameters
-            dtype = floatx()
-            if hasattr(mean, 'dtype'):
-                dtype = tf.as_dtype(mean.dtype)
-            self._mean = tf.convert_to_tensor(mean, dtype=dtype)
-            self._stdx = tf.convert_to_tensor(stdx, dtype=dtype)
-            if stddev is None:
-                self._stdx_is_log = True
-                self._stddev = tf.exp(self._stdx, name='stddev')
-                self._logstd = tf.identity(self._stdx, name='logstd')
-                self._var = tf.exp(2. * self._logstd, name='variance')
-                self._precision = tf.exp(-2. * self._logstd, name='precision')
-            else:
+            # obtain parameter tensors
+            mean = tf.convert_to_tensor(mean, dtype=dtype)
+            if stddev is not None:
+                stddev = tf.convert_to_tensor(stddev, dtype=dtype)
+                self._stdx = stddev
                 self._stdx_is_log = False
-                self._stddev = tf.identity(self._stdx, name='stddev')
-                self._logstd = tf.log(self._stdx, name='logstd')
-                self._var = tf.square(self._stddev, name='variance')
-                self._precision = tf.divide(1., self._var, name='precision')
-            self._logvar = tf.multiply(2., self._logstd, name='logvar')
-            self._log_prec = tf.negative(self._logvar, name='log_precision')
+            else:
+                logstd = tf.convert_to_tensor(logstd, dtype=dtype)
+                self._stdx = logstd
+                self._stdx_is_log = True
+
+            # check the shape and data types of parameters
+            self._mean = mean
             try:
-                tf.broadcast_static_shape(self._mean.get_shape(),
-                                          self._stdx.get_shape())
+                self._static_batch_shape = tf.broadcast_static_shape(
+                    self._mean.get_shape(),
+                    self._stdx.get_shape()
+                )
             except ValueError:
                 raise ValueError(
                     '`mean` and `stddev`/`logstd` should be '
                     'broadcastable to match each other (%r vs %r).' %
                     (self._mean.get_shape(), self._stdx.get_shape())
                 )
-
-            # get the shape of samples
-            self._static_batch_shape = tf.broadcast_static_shape(
-                self._mean.get_shape(), self._stdx.get_shape()
-            )
             self._dynamic_batch_shape = tf.broadcast_dynamic_shape(
                 tf.shape(self._mean), tf.shape(self._stdx)
             )
+
+            # derive the attributes of this Normal distribution
+            if self._stdx_is_log:
+                self._stddev = tf.exp(self._stdx, name='stddev')
+                self._logstd = tf.identity(self._stdx, name='logstd')
+                self._var = tf.exp(
+                    tf.constant(2., dtype=dtype) * self._logstd,
+                    name='variance'
+                )
+                self._precision = tf.exp(
+                    tf.constant(-2., dtype=dtype) * self._logstd,
+                    name='precision'
+                )
+            else:
+                self._stddev = tf.identity(self._stdx, name='stddev')
+                self._logstd = tf.log(self._stdx, name='logstd')
+                self._var = tf.square(self._stddev, name='variance')
+                self._precision = tf.divide(
+                    tf.constant(1., dtype=dtype), self._var,
+                    name='precision'
+                )
+            self._logvar = tf.multiply(
+                tf.constant(2., dtype=dtype), self._logstd,
+                name='logvar'
+            )
+            self._log_prec = tf.negative(self._logvar, name='log_precision')
 
     @property
     def dtype(self):
@@ -142,33 +163,38 @@ class Normal(Distribution):
 
     @instance_reuse
     def sample(self, sample_shape=()):
-        mean, stdx, stdx_is_log = self._mean, self._stdx, self._stdx_is_log
-        dynamic_sample_shape = tf.concat(
-            [sample_shape, self._dynamic_batch_shape],
+        # check the arguments of `sample_shape`
+        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
+        static_sample_shape = helper.get_static_shape()
+        dynamic_sample_shape = helper.get_dynamic_shape()
+
+        # derive the sampler
+        static_shape = (
+            tf.TensorShape(static_sample_shape).
+                concatenate(self.static_batch_shape)
+        )
+        dynamic_shape = tf.concat(
+            [dynamic_sample_shape, self.dynamic_batch_shape],
             axis=0
         )
-        dtype = mean.dtype.base_dtype
-        samples = mean + (
-            self.stddev *
-            tf.random_normal(dynamic_sample_shape, dtype=dtype)
+        samples = self.mean + self.stddev * (
+            tf.random_normal(dynamic_shape, dtype=self.dtype)
         )
-        static_sample_shape = tf.TensorShape(
-            tuple(None if not is_integer(i) else i for i in sample_shape))
-        samples.set_shape(
-            static_sample_shape.concatenate(self._static_batch_shape))
+        samples.set_shape(static_shape)
         return samples
 
     def _log_prob(self, x):
-        c = -0.5 * np.log(2 * np.pi)
+        c = tf.constant(-0.5 * np.log(2 * np.pi), dtype=self.dtype)
         return (
             c - self.logstd -
-            0.5 * self.precision * tf.square(x - self.mean)
+            tf.constant(0.5, dtype=self.dtype) * (
+                self.precision * tf.square(x - self.mean))
         )
 
     @instance_reuse
     def analytic_kld(self, other):
         if isinstance(other, Normal):
-            return 0.5 * (
+            return tf.constant(0.5, dtype=self.dtype) * (
                 self.var * other.precision +
                 tf.square(other.mean - self.mean) * other.precision +
                 other.logvar - self.logvar - 1

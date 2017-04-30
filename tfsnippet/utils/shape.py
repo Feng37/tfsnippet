@@ -6,6 +6,7 @@ from .scope import NameScopeObject, instance_name_scope
 
 __all__ = [
     'get_dimension_size',
+    'get_dynamic_tensor_shape',
     'is_deterministic_shape',
     'ReshapeHelper',
     'repeat_tensor_for_samples'
@@ -37,15 +38,56 @@ def get_dimension_size(x, dim, name=None):
             return tf.shape(x)[dim]
 
         static_shape = x.get_shape()
-        if dim < 0 or \
-                (static_shape.ndims is not None and dim >= static_shape.ndims):
-            raise IndexError('Dimension index %r is out of range.' % (dim,))
-
         if static_shape.ndims is not None:
             value = static_shape[dim].value
             if value is not None:
                 return value
         return tf.shape(x)[dim]
+
+
+def get_dynamic_tensor_shape(x, slice_func=None, name=None):
+    """Get the dynamic tensor shape of `x`.
+    
+    This method will return a tuple of integers (i.e., fully defined shape)
+    if it is possible, despite of the method name `get_dynamic_tensor_shape`.
+    
+    Parameters
+    ----------
+    x : tf.Tensor
+        The tensor whose shape should be queried.
+        
+    slice_func
+        Optional function to slice on the dynamic shape of `x`.
+
+        Given this argument, a tuple of integers will be returned
+        whenever it is possible, even if some dimension of `x`
+        discarded by `slice_func` is not deterministic.
+        
+    name : str
+        Optional name of this operation.
+    
+    Returns
+    -------
+    tuple[int] | tf.Tensor
+        Returns the shape tuple if `x` has a fully determined shape.
+        Otherwise returns the shape tensor.
+    """
+    with tf.name_scope(name=name, default_name='get_tensor_shape',
+                       values=[x]):
+        static_shape = x.get_shape()
+        if slice_func is not None:
+            static_shape = slice_func(static_shape)
+        if static_shape.is_fully_defined():
+            return tuple(static_shape.as_list())
+
+        dynamic_shape = tf.shape(x)
+        if slice_func is not None:
+            dynamic_shape = slice_func(dynamic_shape)
+        if static_shape.ndims is not None:
+            if static_shape.ndims != len(static_shape.as_list()):
+                raise RuntimeError('`slice_func` returns inconsistent shapes.')
+            dynamic_shape.set_shape(tf.TensorShape([static_shape.ndims]))
+        return dynamic_shape
 
 
 def is_deterministic_shape(x):
@@ -216,10 +258,19 @@ class ReshapeHelper(NameScopeObject):
     
     Note that this reshape helper only supports to build shapes with 
     determined number of dimensions.
+
+    Parameters
+    ----------
+    allow_negative_one : bool
+        Whether or not to allow `-1` as dimension? (default True)
+        
+    name : str
+        Optional name of this reshape helper.
     """
 
-    def __init__(self, name=None):
+    def __init__(self, allow_negative_one=True, name=None):
         super(ReshapeHelper, self).__init__(name=name)
+        self.allow_negative_one = allow_negative_one
 
         # list to queue the shape pieces
         self._pieces = [[]]
@@ -287,8 +338,12 @@ class ReshapeHelper(NameScopeObject):
 
     def _check_negative_one(self, *dimensions):
         neg_one_count = sum(v == -1 for v in dimensions)
-        if (-1 in self._static_dims) + neg_one_count > 1:
-            raise ValueError('"-1" can only appear for at most once.')
+        if self.allow_negative_one:
+            if (-1 in self._static_dims) + neg_one_count > 1:
+                raise ValueError('"-1" can only appear for at most once.')
+        else:
+            if neg_one_count > 0:
+                raise ValueError('"-1" is not allowed.')
 
     def add(self, shape_or_dim):
         """Add a piece of shape or a dimension.

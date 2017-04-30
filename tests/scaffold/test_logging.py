@@ -195,15 +195,15 @@ class LoggingTestCase(unittest.TestCase):
                 time.sleep(0.2)
             logs.append(logger.get_epoch_log())
         self._assertMatch(
-            re.compile(r'^Epoch 1/2: finished in 0.4[^ ]+ sec; '
-                       r'avg step time: 0.1[^ ]+ sec; '
-                       r'valid time: 0.2[^ ]+ sec$'),
+            re.compile(r'^Epoch 1/2: finished in 0.4[^ ]* sec; '
+                       r'avg step time: 0.1[^ ]* sec; '
+                       r'valid time: 0.2[^ ]* sec$'),
             logs[0]
         )
         self._assertMatch(
-            re.compile(r'^Epoch 2/2: finished in 0.6[^ ]+ sec; '
-                       r'avg step time: 0.2[^ ]+ sec; '
-                       r'valid time: 0.2[^ ]+ sec$'),
+            re.compile(r'^Epoch 2/2: finished in 0.6[^ ]* sec; '
+                       r'avg step time: 0.2[^ ]* sec; '
+                       r'valid time: 0.2[^ ]* sec$'),
             logs[1]
         )
 
