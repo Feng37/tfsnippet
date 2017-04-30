@@ -2,9 +2,7 @@
 import tensorflow as tf
 
 from .misc import is_integer
-from .scope import VarScopeObject, open_variable_scope, NameScopeObject, \
-    instance_name_scope
-from .reuse import instance_reuse
+from .scope import NameScopeObject, instance_name_scope
 
 __all__ = [
     'get_dimension_size',
@@ -226,6 +224,9 @@ class ReshapeHelper(NameScopeObject):
         # list to queue the shape pieces
         self._pieces = [[]]
         self._static_dims = []
+
+    def __call__(self, x):
+        return self.reshape(x)
 
     @property
     def is_deterministic(self):

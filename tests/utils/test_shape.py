@@ -295,6 +295,17 @@ class ShapeTestCase(unittest.TestCase):
             self.assertEqual(helper.get_dynamic_shape(),
                              ())
 
+            # test add empty shapes
+            helper.add(())
+            helper.add([])
+            helper.add_template(tf.placeholder(tf.float32, shape=[1, 2]),
+                                lambda s: s[:0])
+            self.assertTrue(helper.is_deterministic)
+            self.assertEqual(helper.get_static_shape().as_list(),
+                             [])
+            self.assertEqual(helper.get_dynamic_shape(),
+                             ())
+
             # test add an integer as dimension
             helper.add(1)
             self.assertTrue(helper.is_deterministic)

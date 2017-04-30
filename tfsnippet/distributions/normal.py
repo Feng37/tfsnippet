@@ -2,8 +2,10 @@
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import floatx, is_integer, instance_reuse, \
-    open_variable_scope
+from tfsnippet.utils import (floatx,
+                             is_integer,
+                             instance_reuse,
+                             open_variable_scope)
 from .base import Distribution
 
 __all__ = ['Normal']
@@ -45,9 +47,12 @@ class Normal(Distribution):
                                      default_name=default_name)
 
         with open_variable_scope(self.variable_scope), tf.name_scope('init'):
-            # check the shape of parameters
-            self._mean = tf.convert_to_tensor(mean, dtype=floatx())
-            self._stdx = tf.convert_to_tensor(stdx, dtype=floatx())
+            # check the shape and data types of parameters
+            dtype = floatx()
+            if hasattr(mean, 'dtype'):
+                dtype = tf.as_dtype(mean.dtype)
+            self._mean = tf.convert_to_tensor(mean, dtype=dtype)
+            self._stdx = tf.convert_to_tensor(stdx, dtype=dtype)
             if stddev is None:
                 self._stdx_is_log = True
                 self._stddev = tf.exp(self._stdx, name='stddev')
@@ -81,12 +86,24 @@ class Normal(Distribution):
             )
 
     @property
+    def dtype(self):
+        return self._mean.dtype.base_dtype
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
     @property
     def static_batch_shape(self):
         return self._static_batch_shape
+
+    @property
+    def dynamic_value_shape(self):
+        return ()
+
+    @property
+    def static_value_shape(self):
+        return tf.TensorShape([])
 
     @property
     def mean(self):
@@ -140,9 +157,6 @@ class Normal(Distribution):
         samples.set_shape(
             static_sample_shape.concatenate(self._static_batch_shape))
         return samples
-
-    def _prob(self, x):
-        return tf.exp(self.log_prob(x))
 
     def _log_prob(self, x):
         c = -0.5 * np.log(2 * np.pi)
