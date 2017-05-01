@@ -15,40 +15,44 @@ from tests.helper import TestCase
 
 class NormalTestCase(TestCase):
     TOL = dict(rtol=1e-3, atol=1e-5)
-    MEAN = np.asarray([0.0, 1.0, -2.0])
-    STDDEV = np.asarray([1.0, 2.0, 5.0])
+    MEAN = np.asarray([0.0, 1.0, -2.0], dtype=np.float32)
+    STDDEV = np.asarray([1.0, 2.0, 5.0], dtype=np.float32)
 
     def test_construction_error(self):
         with tf.Graph().as_default(), tf.Session().as_default():
             # test construction due to no std specified
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaisesRegex(
+                    ValueError, 'At least one of `stddev`, `logstd` should be '
+                                'specified'):
                 Normal(1.)
-            self.assertIn(
-                'At least one of `stddev`, `logstd` should be specified',
-                str(cm.exception)
-            )
 
             # test construction due to data type error
-            with self.assertRaises(TypeError) as cm:
+            with self.assertRaisesRegex(
+                    TypeError, 'Normal distribution parameters must be float '
+                               'numbers'):
                 Normal(1, 2)
-            self.assertIn(
-                'Normal distribution parameters must be real numbers',
-                str(cm.exception)
-            )
 
             # test construction error due to shape mismatch
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaisesRegex(
+                    ValueError, '`mean` and `stddev`/`logstd` should be '
+                                'broadcastable'):
                 Normal(np.arange(2, dtype=np.float32),
                        np.arange(3, dtype=np.float32))
-            self.assertIn(
-                '`mean` and `stddev`/`logstd` should be broadcastable',
-                str(cm.exception)
-            )
 
-    def test_attributes(self):
+    def test_construction(self):
         tol, mean, stddev = self.TOL, self.MEAN, self.STDDEV
 
         with tf.Graph().as_default(), tf.Session().as_default():
+            # test basic attributes
+            dist = Normal(mean, stddev)
+            self.assertEqual(dist.dtype, tf.float32)
+            self.assertEqual(dist.param_dtype, tf.float32)
+            self.assertTrue(dist.is_continuous)
+
+            dist = Normal(mean.astype(np.float64), stddev)
+            self.assertEqual(dist.dtype, tf.float64)
+            self.assertEqual(dist.param_dtype, tf.float64)
+
             # test shape attributes with fully static parameters
             dist = Normal(mean, stddev)
             self.assertEqual(dist.static_value_shape.as_list(), [])
@@ -71,43 +75,39 @@ class NormalTestCase(TestCase):
                 (3, 2)
             )
 
-        # test the parameters of the distribution
-        (x_prob, x_log_prob, x_mean, x_stddev, x_logstd, x_var, x_logvar,
-         x_precision, x_log_precision) = \
-            compute_distribution_prob(
-                Normal, {'mean': mean, 'stddev': stddev}, mean,
-                func=lambda d: [d.mean, d.stddev, d.logstd, d.var, d.logvar,
-                                d.precision, d.log_precision]
-            )
+            # test the parameters of the distribution
+            dist = Normal(mean, stddev=stddev)
+            np.testing.assert_allclose(
+                dist.mean.eval(), mean, **tol)
+            np.testing.assert_allclose(
+                dist.stddev.eval(), stddev, **tol)
+            np.testing.assert_allclose(
+                dist.logstd.eval(), np.log(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.var.eval(), np.square(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.logvar.eval(), 2. * np.log(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.precision.eval(), 1. / np.square(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.log_precision.eval(), -2. * np.log(stddev), **tol)
 
-        np.testing.assert_allclose(x_mean, mean, **tol)
-        np.testing.assert_allclose(x_stddev, stddev, **tol)
-        np.testing.assert_allclose(x_logstd, np.log(stddev), **tol)
-        np.testing.assert_allclose(x_var, np.square(stddev), **tol)
-        np.testing.assert_allclose(x_logvar, 2. * np.log(stddev), **tol)
-        np.testing.assert_allclose(x_precision, 1. / np.square(stddev),
-                                   **tol)
-        np.testing.assert_allclose(x_log_precision, -2. * np.log(stddev),
-                                   **tol)
-
-        # test the parameters of the distribution when logstd is specified
-        (x_prob, x_log_prob, x_mean, x_stddev, x_logstd, x_var, x_logvar,
-         x_precision, x_log_precision) = \
-            compute_distribution_prob(
-                Normal, {'mean': mean, 'logstd': np.log(stddev)}, mean,
-                func=lambda d: [d.mean, d.stddev, d.logstd, d.var, d.logvar,
-                                d.precision, d.log_precision]
-            )
-
-        np.testing.assert_allclose(x_mean, mean, **tol)
-        np.testing.assert_allclose(x_stddev, stddev, **tol)
-        np.testing.assert_allclose(x_logstd, np.log(stddev), **tol)
-        np.testing.assert_allclose(x_var, np.square(stddev), **tol)
-        np.testing.assert_allclose(x_logvar, 2. * np.log(stddev), **tol)
-        np.testing.assert_allclose(x_precision, 1. / np.square(stddev),
-                                   **tol)
-        np.testing.assert_allclose(x_log_precision, -2. * np.log(stddev),
-                                   **tol)
+            # test the parameters of the distribution when logstd is specified
+            dist = Normal(mean, logstd=np.log(stddev))
+            np.testing.assert_allclose(
+                dist.mean.eval(), mean, **tol)
+            np.testing.assert_allclose(
+                dist.stddev.eval(), stddev, **tol)
+            np.testing.assert_allclose(
+                dist.logstd.eval(), np.log(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.var.eval(), np.square(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.logvar.eval(), 2. * np.log(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.precision.eval(), 1. / np.square(stddev), **tol)
+            np.testing.assert_allclose(
+                dist.log_precision.eval(), -2. * np.log(stddev), **tol)
 
     def test_sampling_and_prob(self):
         tol, mean, stddev = self.TOL, self.MEAN, self.STDDEV
@@ -126,6 +126,21 @@ class NormalTestCase(TestCase):
                 log_prob = np.sum(log_prob.reshape(grouped_shape), axis=-1)
             return np.asarray([prob, log_prob])
 
+        # test 1d sampling
+        with tf.Graph().as_default(), tf.Session().as_default() as session:
+            dist = Normal(mean, stddev)
+            samples_tensor = dist.sample()
+            self.assertEqual(samples_tensor.dtype, tf.float32)
+            samples, prob, log_prob = session.run([
+                samples_tensor,
+                dist.prob(samples_tensor),
+                dist.log_prob(samples_tensor)
+            ])
+            self.assertEqual(samples.shape, (3,))
+            true_prob, true_log_prob = likelihood(samples, mean, stddev)
+            np.testing.assert_allclose(prob, true_prob, **tol)
+            np.testing.assert_allclose(log_prob, true_log_prob, **tol)
+
         # test 2d sampling
         samples, prob, log_prob = get_distribution_samples(
             Normal, {'mean': mean, 'stddev': stddev}
@@ -143,7 +158,6 @@ class NormalTestCase(TestCase):
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
         self.assertEqual(samples.shape, (N_SAMPLES, 3))
-        big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
@@ -168,10 +182,6 @@ class NormalTestCase(TestCase):
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
         self.assertEqual(samples.shape, (4, 5, N_SAMPLES, 3))
-        big_number_verify(
-            np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev,
-            N_SAMPLES * 20
-        )
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
@@ -182,8 +192,6 @@ class NormalTestCase(TestCase):
         )
         true_prob, true_log_prob = likelihood(samples, mean, stddev)
         self.assertEqual(samples.shape, (1, N_SAMPLES, 3))
-        big_number_verify(
-            np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
@@ -224,12 +232,12 @@ class NormalTestCase(TestCase):
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
         # test computing log-likelihood on 1d samples with 2d parameters
-        sample_1d = samples[0, 0, :]
+        samples_1d = samples[0, 0, :]
         prob, log_prob = compute_distribution_prob(
-            Normal, {'mean': mean_3d, 'stddev': stddev_3d}, sample_1d
+            Normal, {'mean': mean_3d, 'stddev': stddev_3d}, samples_1d
         )
-        true_prob, true_log_prob = likelihood(sample_1d, mean_3d, stddev_3d)
-        self.assertEqual(sample_1d.shape, (3,))
+        true_prob, true_log_prob = likelihood(samples_1d, mean_3d, stddev_3d)
+        self.assertEqual(samples_1d.shape, (3,))
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 

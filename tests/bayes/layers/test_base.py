@@ -54,7 +54,8 @@ class StochasticTensorTestCase(TestCase):
                                 r'StochasticTensor\.'):
                 _ = StochasticTensor(
                     distrib3,
-                    observed=np.arange(24, dtype=np.float32)
+                    observed=np.arange(24, dtype=np.float32),
+                    validate_observed_shape=True
                 )
 
             # test construct with a factory

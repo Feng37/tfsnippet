@@ -52,7 +52,17 @@ class Distribution(VarScopeObject):
 
     @property
     def dtype(self):
-        """Get the data type of arguments."""
+        """Get the data type of samples."""
+        raise NotImplementedError()
+
+    @property
+    def param_dtype(self):
+        """Get the data type of parameter(s)."""
+        raise NotImplementedError()
+
+    @property
+    def is_continuous(self):
+        """Whether or not the distribution is continous?"""
         raise NotImplementedError()
 
     @property
@@ -73,8 +83,8 @@ class Distribution(VarScopeObject):
 
         Returns
         -------
-        tuple[int] | tf.Tensor
-            The static shape tuple, or a tensor if the batch shape is dynamic.
+        tf.Tensor
+            The a tensor as the batch shape.
         """
         raise NotImplementedError()
 

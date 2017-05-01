@@ -10,7 +10,7 @@ from tfsnippet.utils import floatx
 N_SAMPLES = 10000
 
 
-def big_number_verify(x, mean, stddev, n_samples, scale=4.):
+def big_number_verify(x, mean, stddev, n_samples, scale=5.):
     np.testing.assert_array_less(
         np.abs(x - mean), stddev * scale / np.sqrt(n_samples),
         err_msg='away from expected mean by %s stddev' % scale

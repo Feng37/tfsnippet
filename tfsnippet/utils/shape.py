@@ -11,7 +11,9 @@ __all__ = [
     'get_dynamic_tensor_shape',
     'is_deterministic_shape',
     'ReshapeHelper',
-    'repeat_tensor_for_samples'
+    'repeat_tensor_for_samples',
+    'explicit_broadcast',
+    'maybe_explicit_broadcast',
 ]
 
 
@@ -494,3 +496,61 @@ class ReshapeHelper(NameScopeObject):
                 '`slice_func` transforms shape into object %r, which is '
                 'neither shape nor dimension.' % (shape,)
             )
+
+
+def explicit_broadcast(x, y, name=None):
+    """Explicit broadcast two tensors to have the same shape.
+
+    Parameters
+    ----------
+    x, y : tf.Tensor
+        The tensors to broadcast.
+        
+    name : str
+        Optional name of this operation.
+
+    Returns
+    -------
+    (tf.Tensor, tf.Tensor)  
+        The tensors after broadcast.
+    """
+    try:
+        with tf.name_scope(name, default_name='explicit_broadcast'):
+            x *= tf.ones_like(y, dtype=x.dtype)
+            y *= tf.ones_like(x, dtype=y.dtype)
+    except ValueError:
+        raise ValueError(
+            '%r and %r cannot broadcast to match. (%r vs %r)'
+            % (x, y, x.get_shape(), y.get_shape())
+        )
+    return x, y
+
+
+def maybe_explicit_broadcast(x, y, name=None):
+    """Explicit broadcast two tensors to have the same shape if necessary.
+    
+    Parameters
+    ----------
+    x, y : tf.Tensor
+        The tensors to broadcast.
+        
+    name : str
+        Optional name of this operation.
+
+    Returns
+    -------
+    (tf.Tensor, tf.Tensor)  
+        The tensors after broadcast.
+    """
+    if not (x.get_shape() and y.get_shape()):
+        x, y = explicit_broadcast(x, y)
+    else:
+        if x.get_shape().ndims != y.get_shape().ndims:
+            x, y = explicit_broadcast(x, y)
+        elif x.get_shape().is_fully_defined() and \
+                y.get_shape().is_fully_defined():
+            if x.get_shape() != y.get_shape():
+                x, y = explicit_broadcast(x, y, name=name)
+        else:
+            x, y = explicit_broadcast(x, y, name=name)
+    return x, y

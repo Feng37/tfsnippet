@@ -2,8 +2,8 @@
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import (open_variable_scope,
-                             get_preferred_tensor_dtype, ReshapeHelper)
+from tfsnippet.utils import (open_variable_scope, get_preferred_tensor_dtype,
+                             ReshapeHelper)
 from .base import Distribution
 
 __all__ = ['Normal']
@@ -21,12 +21,15 @@ class Normal(Distribution):
     stddev : tf.Tensor | np.ndarray | float
         The standard derivation of the Normal distribution.
         Should be broadcastable to match `mean`.
+        
+        Note that the range of `stddev` is :math:`(0, \\infty)`. 
 
     logstd : tf.Tensor | np.ndarray | float
         The log standard derivation of the Normal distribution.
         Should be broadcastable to match `mean`.
 
         If `stddev` is specified, then `logstd` will be ignored.
+        Note that the range of `logstd` is :math:`(-\\infty, \\infty)`.
         
     group_event_ndims : int
         If specify, this number of dimensions at the end of `batch_shape`
@@ -48,7 +51,7 @@ class Normal(Distribution):
                              'specified.')
         dtype = get_preferred_tensor_dtype(mean)
         if not dtype.is_floating:
-            raise TypeError('Normal distribution parameters must be real '
+            raise TypeError('Normal distribution parameters must be float '
                             'numbers.')
 
         super(Normal, self).__init__(group_event_ndims=group_event_ndims,
@@ -113,6 +116,14 @@ class Normal(Distribution):
     @property
     def dtype(self):
         return self._mean.dtype.base_dtype
+
+    @property
+    def param_dtype(self):
+        return self._mean.dtype.base_dtype
+
+    @property
+    def is_continuous(self):
+        return True
 
     @property
     def dynamic_batch_shape(self):

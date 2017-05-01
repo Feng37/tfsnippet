@@ -50,6 +50,12 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         tensor must be `[?] + batch_shape + value_shape`.
         And if `sample_num` is not specified, its shape must be
         `batch_shape + value_shape`.
+        
+    validate_observed_shape : bool
+        Whether or not to validate the shape of `observed`? (default False)
+
+        If set to True, the shape of `observed` must match that returned 
+        by `get_shape()`, given `sample_num` argument.
 
     group_event_ndims : int
         If specify, override the default `group_event_ndims` of `distribution`.
@@ -61,7 +67,8 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     """
 
     def __init__(self, distribution, sample_num=None, observed=None,
-                 group_event_ndims=None, name=None, default_name=None):
+                 validate_observed_shape=False, group_event_ndims=None,
+                 name=None, default_name=None):
         super(StochasticTensor, self).__init__(
             name=name,
             default_name=default_name
@@ -120,7 +127,8 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
                     dtype=distribution.dtype
                 )
                 observed_shape = observed.get_shape()
-                if not static_shape.is_compatible_with(observed_shape):
+                if validate_observed_shape and \
+                        not static_shape.is_compatible_with(observed_shape):
                     raise ValueError('The shape of observed is %r, which is '
                                      'not compatible with the shape %r of the '
                                      'StochasticTensor.' %

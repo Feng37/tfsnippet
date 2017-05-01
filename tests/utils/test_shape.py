@@ -8,7 +8,8 @@ from tfsnippet.utils import (get_dimension_size,
                              is_deterministic_shape,
                              repeat_tensor_for_samples,
                              ReshapeHelper,
-                             get_dynamic_tensor_shape)
+                             get_dynamic_tensor_shape,
+                             maybe_explicit_broadcast)
 from tests.helper import TestCase
 
 
@@ -552,6 +553,81 @@ class ShapeTestCase(TestCase):
                 }),
                 np.arange(36).reshape([1, 3, 2, 3, 2])
             )
+
+    def test_maybe_explicit_broadcast(self):
+        with tf.Graph().as_default(), tf.Session().as_default() as session:
+            # test on equal static shape
+            x = tf.convert_to_tensor(np.arange(2))
+            y = tf.convert_to_tensor(np.arange(2, 4))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            self.assertIs(xx, x)
+            self.assertEqual(xx.get_shape().as_list(), [2])
+            np.testing.assert_equal(xx.eval(), [0, 1])
+            self.assertIs(yy, y)
+            self.assertEqual(yy.get_shape().as_list(), [2])
+            np.testing.assert_equal(yy.eval(), [2, 3])
+
+            # test on fully static same dimensional shape
+            x = tf.convert_to_tensor(np.arange(2).reshape([1, 2]))
+            y = tf.convert_to_tensor(np.arange(2, 4).reshape([2, 1]))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            self.assertEqual(xx.get_shape().as_list(), [2, 2])
+            np.testing.assert_equal(xx.eval(), [[0, 1], [0, 1]])
+            self.assertEqual(yy.get_shape().as_list(), [2, 2])
+            np.testing.assert_equal(yy.eval(), [[2, 2], [3, 3]])
+
+            # test on fully static different dimensional shape
+            x = tf.convert_to_tensor(np.arange(2).reshape([2, 1]))
+            y = tf.convert_to_tensor(np.arange(2, 4))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            self.assertEqual(xx.get_shape().as_list(), [2, 2])
+            np.testing.assert_equal(xx.eval(), [[0, 0], [1, 1]])
+            self.assertEqual(yy.get_shape().as_list(), [2, 2])
+            np.testing.assert_equal(yy.eval(), [[2, 3], [2, 3]])
+
+            # test on dynamic same dimensional shape
+            x = tf.placeholder(tf.float32, (None, 3))
+            y = tf.placeholder(tf.float32, (2, None))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            x_data = np.arange(3).reshape((1, 3))
+            y_data = np.arange(3, 5).reshape((2, 1))
+            self.assertEqual(xx.get_shape().as_list(), [2, 3])
+            np.testing.assert_equal(xx.eval({x: x_data, y: y_data}),
+                                    [[0, 1, 2], [0, 1, 2]])
+            self.assertEqual(yy.get_shape().as_list(), [2, 3])
+            np.testing.assert_equal(yy.eval({x: x_data, y: y_data}),
+                                    [[3, 3, 3], [4, 4, 4]])
+
+            # test on dynamic different dimensional shape
+            x = tf.placeholder(tf.float32, (None,))
+            y = tf.placeholder(tf.float32, (None, 2))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            x_data = np.arange(1, 2)
+            y_data = np.arange(2, 6).reshape((2, 2))
+            self.assertEqual(xx.get_shape().as_list(), [None, 2])
+            np.testing.assert_equal(xx.eval({x: x_data, y: y_data}),
+                                    [[1, 1], [1, 1]])
+            self.assertEqual(yy.get_shape().as_list(), [None, 2])
+            np.testing.assert_equal(yy.eval({x: x_data, y: y_data}),
+                                    [[2, 3], [4, 5]])
+
+            # test error on static shape
+            with self.assertRaisesRegex(
+                    ValueError, '.* and .* cannot broadcast to match.*'):
+                _ = maybe_explicit_broadcast(
+                    tf.convert_to_tensor(np.arange(2)),
+                    tf.convert_to_tensor(np.arange(3))
+                )
+
+            # test error on dynamic shape
+            x = tf.placeholder(tf.float32, (None, 3))
+            y = tf.placeholder(tf.float32, (2, None))
+            xx, yy = maybe_explicit_broadcast(x, y)
+            x_data = np.arange(3).reshape((1, 3))
+            y_data = np.arange(3, 7).reshape((2, 2))
+            with self.assertRaisesRegex(
+                    Exception, r'.*Incompatible shapes: \[2,2\] vs. \[2,3\].*'):
+                session.run([xx, yy], feed_dict={x: x_data, y: y_data})
 
 if __name__ == '__main__':
     unittest.main()
