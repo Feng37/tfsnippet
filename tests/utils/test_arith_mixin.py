@@ -8,6 +8,7 @@ import tensorflow as tf
 from tests.utils._div_op import regular_div, floor_div
 from tests.utils._true_div_op import true_div
 from tfsnippet.utils import TensorArithmeticMixin
+from tests.helper import TestCase
 
 
 class _SimpleTensor(TensorArithmeticMixin):
@@ -33,7 +34,7 @@ def _to_tensor(value, dtype=None, name=None, as_ref=False):
 tf.register_tensor_conversion_function(_SimpleTensor, _to_tensor)
 
 
-class ArithMixinTestCase(unittest.TestCase):
+class ArithMixinTestCase(TestCase):
 
     def test_prerequisite(self):
         if six.PY2:

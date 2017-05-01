@@ -3,12 +3,17 @@ import unittest
 
 import tensorflow as tf
 
-from tfsnippet.utils import VariableSaver, TemporaryDirectory, \
-    try_get_variable_value, get_variable_values, get_default_session_or_error, \
-    get_uninitialized_variables, set_variable_values
+from tfsnippet.utils import (VariableSaver,
+                             TemporaryDirectory,
+                             try_get_variable_value,
+                             get_variable_values,
+                             get_default_session_or_error,
+                             get_uninitialized_variables,
+                             set_variable_values)
+from tests.helper import TestCase
 
 
-class SessionTestCase(unittest.TestCase):
+class SessionTestCase(TestCase):
 
     def test_get_default_session_or_error(self):
         def do_raise():

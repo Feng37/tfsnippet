@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import tensorflow as tf
 
 from tfsnippet.utils import auto_reuse_variables, static_reuse, instance_reuse
+from tests.helper import TestCase
 
 
 def _get_var(name, **kwargs):
@@ -36,7 +37,7 @@ class _Reusable(object):
         return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
 
 
-class ReuseTestCase(unittest.TestCase):
+class ReuseTestCase(TestCase):
 
     @contextmanager
     def _assert_exception(self, exp, msg):

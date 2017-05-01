@@ -5,9 +5,10 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.scaffold import LossValidator
+from tests.helper import TestCase
 
 
-class ValidationTestCase(unittest.TestCase):
+class LossValidatorTestCase(TestCase):
 
     def test_LossValidator(self):
         with tf.Graph().as_default():

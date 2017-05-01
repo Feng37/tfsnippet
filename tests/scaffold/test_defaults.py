@@ -5,13 +5,13 @@ import tensorflow as tf
 
 from tfsnippet.scaffold import (OptionDefaults, get_option_defaults,
                                 option_defaults)
+from tests.helper import TestCase
 
 
-class DefaultsTestCase(unittest.TestCase):
+class OptionDefaultsTestCase(TestCase):
 
-    def test_OptionDefaults(self):
+    def test_construction(self):
         with tf.Graph().as_default():
-            # test construction
             defaults = OptionDefaults()
             self.assertIsInstance(
                 defaults.get_optimizer(), tf.train.AdamOptimizer)
@@ -20,11 +20,13 @@ class DefaultsTestCase(unittest.TestCase):
             defaults = OptionDefaults(batch_size=32)
             self.assertEqual(defaults.batch_size, 32)
 
-            # test write attribute
-            with self.assertRaises(AttributeError):
+            with self.assertRaises(AttributeError) as cm:
                 defaults.batch_size = 33
+            self.assertIn('OptionDefaults object is read-only',
+                          str(cm.exception))
 
-            # test scoped context
+    def test_scoped_context(self):
+        with tf.Graph().as_default():
             self.assertIsNone(get_option_defaults().batch_size)
             self.assertIsNone(get_option_defaults().predict_batch_size)
 
@@ -35,10 +37,14 @@ class DefaultsTestCase(unittest.TestCase):
                 with option_defaults(batch_size=64):
                     self.assertEqual(get_option_defaults().batch_size, 64)
                     self.assertEqual(get_option_defaults().predict_batch_size,
-                                      512)
+                                     512)
 
                 self.assertEqual(get_option_defaults().batch_size, 32)
                 self.assertEqual(get_option_defaults().predict_batch_size, 512)
 
             self.assertIsNone(get_option_defaults().batch_size)
             self.assertIsNone(get_option_defaults().predict_batch_size)
+
+
+if __name__ == '__main__':
+    unittest.main()

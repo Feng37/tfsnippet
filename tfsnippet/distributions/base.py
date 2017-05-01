@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import (VarScopeObject, is_integer, instance_reuse,
-                             ReshapeHelper)
+from tfsnippet.utils import (VarScopeObject, is_integer, ReshapeHelper)
 
 __all__ = ['Distribution']
 
@@ -35,7 +34,7 @@ class Distribution(VarScopeObject):
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
-        
+
     name, default_name : str
         Optional name or default name of this distribution.
     """
@@ -62,11 +61,11 @@ class Distribution(VarScopeObject):
         
         Returns
         -------
-        int
+        int | None
             The number of dimensions.  If `group_event_ndims` is not 
-            specified in the contructor, will return 0.
+            specified in the constructor, will return None.
         """
-        return self._group_event_ndims or 0
+        return self._group_event_ndims
 
     @property
     def dynamic_batch_shape(self):
@@ -114,7 +113,7 @@ class Distribution(VarScopeObject):
         """
         raise NotImplementedError()
 
-    def sample(self, sample_shape=()):
+    def sample(self, sample_shape=(), name=None):
         """Sample from the distribution.
 
         Parameters
@@ -122,6 +121,9 @@ class Distribution(VarScopeObject):
         sample_shape : tuple[int | tf.Tensor] | tf.Tensor
             The shape of the samples, as a tuple of integers / 0-d tensors,
             or a 1-d tensor.
+            
+        name : str
+            Optional name of this operation.
 
         Returns
         -------
@@ -134,8 +136,7 @@ class Distribution(VarScopeObject):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
 
-    @instance_reuse
-    def log_prob(self, x, group_event_ndims=None):
+    def log_prob(self, x, group_event_ndims=None, name=None):
         """Compute the log-probability of `x` against the distribution.
         
         If `group_event_ndims` is configured, then the likelihoods of
@@ -149,64 +150,69 @@ class Distribution(VarScopeObject):
         group_event_ndims : int
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
+            
+        name : str
+            Optional name of this operation.
 
         Returns
         -------
         tf.Tensor
             The log-probability of `x`.
         """
-        x = tf.convert_to_tensor(x, dtype=self.dtype)
+        with tf.name_scope(name, default_name='prob'):
+            x = tf.convert_to_tensor(x, dtype=self.dtype)
 
-        # check the shape of `x`
-        x_static_shape = x.get_shape()
-        batch_value_shape = \
-            self.static_batch_shape.concatenate(self.static_value_shape)
-        try:
-            tf.broadcast_static_shape(x_static_shape, batch_value_shape)
-        except ValueError:
-            raise ValueError(
-                'The shape of `x` should match `batch_shape + value_shape` '
-                '(%r vs %r).' % (x_static_shape, batch_value_shape)
-            )
-
-        # determine the number of group event dimensions
-        if group_event_ndims is None:
-            group_event_ndims = self.group_event_ndims
-        if group_event_ndims:
-            max_group_event_ndims = self.static_batch_shape.ndims
-            if group_event_ndims > max_group_event_ndims:
+            # check the shape of `x`
+            x_static_shape = x.get_shape()
+            batch_value_shape = \
+                self.static_batch_shape.concatenate(self.static_value_shape)
+            try:
+                tf.broadcast_static_shape(x_static_shape, batch_value_shape)
+            except ValueError:
                 raise ValueError(
-                    'Distribution batch shape only has %d dimensions, '
-                    'so `group_event_ndims` cannot be %d.' %
-                    (max_group_event_ndims, group_event_ndims)
+                    'The shape of `x` should match `batch_shape + value_shape` '
+                    '(%r vs %r).' % (x_static_shape, batch_value_shape)
                 )
 
-        # compute the log-likelihood
-        log_prob = self._log_prob(x)
-        log_prob_shape = log_prob.get_shape()
-        try:
-            tf.broadcast_static_shape(log_prob_shape, self.static_batch_shape)
-        except ValueError:
-            raise RuntimeError(
-                'The shape of computed log-prob does not match `batch_shape`, '
-                'which could be a bug in the distribution implementation. '
-                '(%r vs %r)' % (log_prob_shape, self.static_batch_shape)
-            )
+            # determine the number of group event dimensions
+            if group_event_ndims is None:
+                group_event_ndims = self.group_event_ndims
+            if group_event_ndims:
+                max_group_event_ndims = self.static_batch_shape.ndims
+                if group_event_ndims > max_group_event_ndims:
+                    raise ValueError(
+                        'Distribution batch shape only has %d dimensions, '
+                        'so `group_event_ndims` cannot be %d.' %
+                        (max_group_event_ndims, group_event_ndims)
+                    )
 
-        if group_event_ndims:
-            if group_event_ndims > 1:
-                reshaper = ReshapeHelper()
-                reshaper.add_template(
-                    log_prob,
-                    lambda s: s[: -group_event_ndims]
+            # compute the log-likelihood
+            log_prob = self._log_prob(x)
+            log_prob_shape = log_prob.get_shape()
+            try:
+                tf.broadcast_static_shape(log_prob_shape,
+                                          self.static_batch_shape)
+            except ValueError:
+                raise RuntimeError(
+                    'The shape of computed log-prob does not match '
+                    '`batch_shape`, which could be a bug in the distribution '
+                    'implementation. (%r vs %r)' %
+                    (log_prob_shape, self.static_batch_shape)
                 )
-                reshaper.add(-1)
-                log_prob = reshaper(log_prob)
-            log_prob = tf.reduce_sum(log_prob, axis=-1)
-        return log_prob
 
-    @instance_reuse
-    def prob(self, x, group_event_ndims=None):
+            if group_event_ndims:
+                if group_event_ndims > 1:
+                    reshaper = ReshapeHelper()
+                    reshaper.add_template(
+                        log_prob,
+                        lambda s: s[: -group_event_ndims]
+                    )
+                    reshaper.add(-1)
+                    log_prob = reshaper(log_prob)
+                log_prob = tf.reduce_sum(log_prob, axis=-1)
+            return log_prob
+
+    def prob(self, x, group_event_ndims=None, name=None):
         """Compute the likelihood of `x` against the distribution.
 
         The extra dimensions at the front of `x` will be regarded as
@@ -224,21 +230,28 @@ class Distribution(VarScopeObject):
         group_event_ndims : int
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
+            
+        name : str
+            Optional name of this operation.
 
         Returns
         -------
         tf.Tensor
             The likelihood of `x`.
         """
-        return tf.exp(self.log_prob(x, group_event_ndims=group_event_ndims))
+        with tf.name_scope(name, default_name='prob'):
+            return tf.exp(self.log_prob(x, group_event_ndims=group_event_ndims))
 
-    def analytic_kld(self, other):
+    def analytic_kld(self, other, name=None):
         """Compute the KLD(self || other) using the analytic method.
-        
+
         Parameters
         ----------
         other : Distribution
             The other distribution.
+
+        name : str
+            Optional name of this operation.
         
         Raises
         ------

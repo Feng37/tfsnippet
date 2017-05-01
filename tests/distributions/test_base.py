@@ -8,6 +8,7 @@ from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (open_variable_scope,
                              get_preferred_tensor_dtype,
                              get_dynamic_tensor_shape)
+from tests.helper import TestCase
 
 
 class _MyDistribution(Distribution):
@@ -53,9 +54,21 @@ class _MyDistribution(Distribution):
         return tf.reduce_sum(x * self.p, axis=-1)
 
 
-class BaseTestCase(unittest.TestCase):
+class DistributionTestCase(TestCase):
 
-    def test_Distribution(self):
+    def test_group_event_ndims(self):
+        with tf.Graph().as_default(), tf.Session().as_default():
+            p_data = np.arange(1, 25, dtype=np.float32).reshape([2, 3, 4])
+
+            # test the group_event_ndims attribute
+            self.assertIsNone(_MyDistribution(p_data).group_event_ndims)
+            self.assertEqual(_MyDistribution(p_data, 2).group_event_ndims, 2)
+            with self.assertRaises(TypeError):
+                _MyDistribution(p_data, -1)
+            with self.assertRaises(TypeError):
+                _MyDistribution(p_data, tf.placeholder(tf.int32, ()))
+
+    def test_log_prob(self):
         with tf.Graph().as_default(), tf.Session().as_default():
             p_data = np.arange(1, 25, dtype=np.float32).reshape([2, 3, 4])
             p1 = tf.placeholder(tf.float32, (2, 3, None))
@@ -70,14 +83,6 @@ class BaseTestCase(unittest.TestCase):
             x3 = tf.placeholder(tf.float32, (None, 2, 3, 4))
 
             log_prob_data = np.sum(x_data * p_data, axis=-1)
-
-            # test the group_event_ndims attribute
-            self.assertEqual(_MyDistribution(p_data).group_event_ndims, 0)
-            self.assertEqual(_MyDistribution(p_data, 2).group_event_ndims, 2)
-            with self.assertRaises(TypeError):
-                _MyDistribution(p_data, -1)
-            with self.assertRaises(TypeError):
-                _MyDistribution(p_data, tf.placeholder(tf.int32, ()))
 
             # test log_prob with `group_event_ndims` by fully static data
             dist = _MyDistribution(p_data)

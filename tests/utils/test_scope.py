@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
 import unittest
-from contextlib import contextmanager
 
 import tensorflow as tf
 
@@ -9,6 +8,7 @@ from tfsnippet.utils import (open_variable_scope, VarScopeObject,
                              instance_reuse,
                              get_variables_as_dict, NameScopeObject,
                              instance_name_scope)
+from tests.helper import TestCase
 
 
 def _get_var(name, **kwargs):
@@ -42,30 +42,17 @@ class _NameScopeObject(NameScopeObject):
         return tf.add(1, 2, name='op')
 
 
-class ScopeUnitTest(unittest.TestCase):
-
-    @contextmanager
-    def _assert_exception(self, exp, msg):
-        with self.assertRaises(exp) as cm:
-            yield
-        got_msg = str(cm.exception)
-        if hasattr(msg, 'match'):
-            self.assertTrue(
-                msg.match(got_msg),
-                msg='expected message %r but got %r' % (msg, got_msg)
-            )
-        else:
-            self.assertEqual(got_msg, msg)
+class ScopeTestCase(TestCase):
 
     def _assert_var_exists(self, name):
         pattern = re.compile(r'^Variable (|.*/)%s already exists.*' % name)
-        with self._assert_exception(ValueError, pattern):
+        with self.assertRaisesRegex(ValueError, pattern):
             _get_var(name)
 
     def _assert_reuse_var(self, name):
         pattern = re.compile(
             r'^Trying to share variable (|.*/)%s, but specified shape.*' % name)
-        with self._assert_exception(ValueError, pattern):
+        with self.assertRaisesRegex(ValueError, pattern):
             _get_var(name, shape=(None,))
 
     def test_open_variable_scope(self):

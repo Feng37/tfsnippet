@@ -3,6 +3,7 @@ import unittest
 import tensorflow as tf
 
 from tfsnippet.components import Component
+from tests.helper import TestCase
 
 
 class _MyComponent(Component):
@@ -11,7 +12,7 @@ class _MyComponent(Component):
         return tf.get_variable('var', shape=())
 
 
-class BaseTestCase(unittest.TestCase):
+class ComponentTestCase(TestCase):
 
     def test_Component(self):
 

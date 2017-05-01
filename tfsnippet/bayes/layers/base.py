@@ -5,7 +5,8 @@ from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (VarScopeObject,
                              is_integer,
                              open_variable_scope,
-                             TensorArithmeticMixin)
+                             TensorArithmeticMixin,
+                             instance_reuse)
 
 __all__ = ['StochasticTensor']
 
@@ -28,8 +29,9 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
 
     Parameters
     ----------
-    distribution : Distribution
-        The distribution of this stochastic tensor.
+    distribution : Distribution | () -> Distribution
+        The distribution of this stochastic tensor, or a factory that
+        constructs the distribution.
 
     sample_num : int | tf.Tensor | tf.Variable
         Optional number of samples to take. (default None)
@@ -49,18 +51,44 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         And if `sample_num` is not specified, its shape must be
         `batch_shape + value_shape`.
 
+    group_event_ndims : int
+        If specify, override the default `group_event_ndims` of `distribution`.
+        This argument can further be overrided by `group_event_ndims` argument
+        of `prob` and `log_prob` method. 
+
     name, default_name : str
         Optional name or default name of this stochastic tensor.
     """
 
     def __init__(self, distribution, sample_num=None, observed=None,
-                 name=None, default_name=None):
+                 group_event_ndims=None, name=None, default_name=None):
         super(StochasticTensor, self).__init__(
             name=name,
             default_name=default_name
         )
 
+        with open_variable_scope(self.variable_scope):
+            if not isinstance(distribution, Distribution) and \
+                    callable(distribution):
+                # we support the factory of distributions, so that
+                # the scope of distribution can be contained in the
+                # scope of stochastic tensor.
+                distribution = distribution()
+
+        if not isinstance(distribution, Distribution):
+            raise TypeError(
+                'Expected a Distribution but got %r.' % (distribution,))
+
         with open_variable_scope(self.variable_scope), tf.name_scope('init'):
+            if group_event_ndims is not None:
+                if not is_integer(group_event_ndims) or group_event_ndims < 0:
+                    raise TypeError(
+                        '`group_event_ndims` must be a non-negative integer '
+                        'constant.'
+                    )
+            else:
+                group_event_ndims = distribution.group_event_ndims
+
             if sample_num is not None:
                 if is_integer(sample_num):
                     if sample_num < 1:
@@ -80,22 +108,65 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
             else:
                 sample_shape = ()
                 static_sample_shape = ()
+
+            static_shape = (
+                tf.TensorShape(list(static_sample_shape)).
+                    concatenate(distribution.static_batch_shape).
+                    concatenate(distribution.static_value_shape)
+            )
             if observed is not None:
                 observed = tf.convert_to_tensor(
                     observed,
                     dtype=distribution.dtype
                 )
+                observed_shape = observed.get_shape()
+                if not static_shape.is_compatible_with(observed_shape):
+                    raise ValueError('The shape of observed is %r, which is '
+                                     'not compatible with the shape %r of the '
+                                     'StochasticTensor.' %
+                                     (observed_shape, static_shape))
+                static_shape = observed_shape
 
             self._distrib = distribution
             self._sample_num = sample_num
+            self._group_event_ndims = group_event_ndims
             self._sample_shape = sample_shape
-            self._static_sample_shape = (
-                tf.TensorShape(list(static_sample_shape)).
-                    concatenate(distribution.static_batch_shape).
-                    concatenate(distribution.static_value_shape)
-            )
+            self._static_shape = static_shape
             self._observed_tensor = observed
-            self._computed_tensor = observed    # type: tf.Tensor
+            self._computed_tensor = None
+
+    def __repr__(self):
+        return 'StochasticTensor(%r)' % (self.computed_tensor,)
+
+    def __hash__(self):
+        # Necessary to support Python's collection membership operators
+        return id(self)
+
+    def __eq__(self, other):
+        # Necessary to support Python's collection membership operators
+        return id(self) == id(other)
+
+    def get_shape(self):
+        """Get the static shape of this stochastic tensor.
+        
+        Returns
+        -------
+        tf.TensorShape
+            The static shape of this stochastic tensor.
+        """
+        return self._static_shape
+
+    @property
+    def group_event_ndims(self):
+        """Get the number of dimensions to be considered as events group.
+        
+        Returns
+        -------
+        int | None
+            The number of dimensions.  If `group_event_ndims` is not 
+            specified in the constructor, will return None.
+        """
+        return self._group_event_ndims
 
     @property
     def distribution(self):
@@ -119,34 +190,82 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
 
     @property
     def observed_tensor(self):
-        """Get the observed tensor, if specified."""
+        """Get the observed tensor, if specified.
+        
+        Returns
+        -------
+        tf.Tensor
+            The observed tensor.
+        """
         return self._observed_tensor
+
+    @instance_reuse(scope='sample')
+    def _sample_tensor(self):
+        return self._distrib.sample(self._sample_shape)
 
     @property
     def computed_tensor(self):
-        """Get the observed or sampled tensor."""
+        """Get the observed or sampled tensor.
+        
+        Returns
+        -------
+        tf.Tensor
+            The observed or sampled tensor.
+        """
         if self._computed_tensor is None:
             if self._observed_tensor is not None:
                 self._computed_tensor = self._observed_tensor
             else:
-                self._computed_tensor = self._distrib.sample(self._sample_shape)
+                self._computed_tensor = self._sample_tensor()
         return self._computed_tensor
 
-    @property
-    def get_shape(self):
-        """Get the static shape of this stochastic tensor."""
-        return self._static_sample_shape
+    def prob(self, group_event_ndims=None, name=None):
+        """Compute the likelihood of this stochastic tensor.
 
-    def __repr__(self):
-        return 'StochasticTensor(%r)' % (self.computed_tensor,)
+        Parameters
+        ----------
+        group_event_ndims : int
+            If specified, will override the `group_event_ndims` configured
+            in both this stochastic tensor and the distribution.
+            
+        name : str
+            Optional name of this operation.
 
-    def __hash__(self):
-        # Necessary to support Python's collection membership operators
-        return id(self)
+        Returns
+        -------
+        tf.Tensor
+            The likelihood of this stochastic tensor.
+        """
+        if group_event_ndims is None:
+            group_event_ndims = self._group_event_ndims
+        return self._distrib.prob(
+            self.computed_tensor, group_event_ndims=group_event_ndims,
+            name=name
+        )
 
-    def __eq__(self, other):
-        # Necessary to support Python's collection membership operators
-        return id(self) == id(other)
+    def log_prob(self, group_event_ndims=None, name=None):
+        """Compute the log-likelihood of this stochastic tensor.
+
+        Parameters
+        ----------
+        group_event_ndims : int
+            If specified, will override the `group_event_ndims` configured
+            in both this stochastic tensor and the distribution.
+            
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tf.Tensor
+            The log-likelihood of this stochastic tensor.
+        """
+        if group_event_ndims is None:
+            group_event_ndims = self._group_event_ndims
+        return self._distrib.log_prob(
+            self.computed_tensor, group_event_ndims=group_event_ndims,
+            name=name
+        )
 
 
 def _stochastic_to_tensor(value, dtype=None, name=None, as_ref=False):

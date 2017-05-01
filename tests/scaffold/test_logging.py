@@ -10,9 +10,10 @@ import tensorflow as tf
 
 from mlcomp.utils import TemporaryDirectory
 from tfsnippet.scaffold import TrainLogger
+from tests.helper import TestCase
 
 
-class LoggingTestCase(unittest.TestCase):
+class TrainLoggerTestCase(TestCase):
 
     def _assertMatch(self, pattern, value):
         self.assertTrue(
@@ -20,7 +21,7 @@ class LoggingTestCase(unittest.TestCase):
             msg='%r does not match %r' % (value, pattern)
         )
 
-    def test_TrainLogger(self):
+    def test_default_patterns(self):
         # test default patterns of TrainLogger
         logger = TrainLogger()
         for prefix, name in itertools.product(['', 'xxx_', '/', 'xxx/yyy_'],
@@ -46,6 +47,7 @@ class LoggingTestCase(unittest.TestCase):
             self.assertFalse(logger._get_best_tracker(prefix + name).
                              smaller_is_better)
 
+    def test_customized_patterns(self):
         # test customized patterns of TrainLogger
         logger = TrainLogger(
             summary_exclude_metrics=['loss',
@@ -82,7 +84,7 @@ class LoggingTestCase(unittest.TestCase):
             self.assertTrue(logger._get_best_tracker(prefix + name).
                             smaller_is_better)
 
-        # test step logs of TrainLogger
+    def test_step_logs(self):
         logs = []
         logger = TrainLogger(max_epoch=2, max_step=6)
         epoch_counter = 1
@@ -127,10 +129,9 @@ class LoggingTestCase(unittest.TestCase):
             logs[2]
         )
 
-        # test epoch logs of TrainLogger
+    def test_epoch_logs(self):
         logs = []
-        # logger = TrainLogger(max_epoch=2, max_step=6)
-        logger.reset()      # this is expected to have the same effect as above
+        logger = TrainLogger(max_epoch=2, max_step=6)
         for epoch in logger.iter_epochs():
             s_data = 0.
             s_count = 0
@@ -184,7 +185,7 @@ class LoggingTestCase(unittest.TestCase):
                 logger.get_epoch_log()
             )
 
-        # test timers
+    def test_timers(self):
         logs = []
         logger = TrainLogger(max_epoch=2)
         for epoch in logger.iter_epochs():
@@ -207,7 +208,7 @@ class LoggingTestCase(unittest.TestCase):
             logs[1]
         )
 
-        # test writing TensorFlow summary with TrainLogger
+    def test_tensorflow_summary(self):
         with TemporaryDirectory() as tempdir:
             # generate the metric summary
             sw = tf.summary.FileWriter(tempdir)

@@ -10,14 +10,15 @@ from tests.distributions._helper import (get_distribution_samples,
                                          compute_distribution_prob,
                                          compute_analytic_kld,
                                          N_SAMPLES)
+from tests.helper import TestCase
 
 
-class NormalTestCase(unittest.TestCase):
+class NormalTestCase(TestCase):
     TOL = dict(rtol=1e-3, atol=1e-5)
     MEAN = np.asarray([0.0, 1.0, -2.0])
     STDDEV = np.asarray([1.0, 2.0, 5.0])
 
-    def test_Normal_construction_error(self):
+    def test_construction_error(self):
         with tf.Graph().as_default(), tf.Session().as_default():
             # test construction due to no std specified
             with self.assertRaises(ValueError) as cm:
@@ -44,7 +45,7 @@ class NormalTestCase(unittest.TestCase):
                 str(cm.exception)
             )
 
-    def test_Normal_attributes(self):
+    def test_attributes(self):
         tol, mean, stddev = self.TOL, self.MEAN, self.STDDEV
 
         with tf.Graph().as_default(), tf.Session().as_default():
@@ -108,7 +109,7 @@ class NormalTestCase(unittest.TestCase):
         np.testing.assert_allclose(x_log_precision, -2. * np.log(stddev),
                                    **tol)
 
-    def test_Normal_sampling_and_prob(self):
+    def test_sampling_and_prob(self):
         tol, mean, stddev = self.TOL, self.MEAN, self.STDDEV
 
         def likelihood(x, mu, std, group_event_ndims=None):
@@ -242,7 +243,7 @@ class NormalTestCase(unittest.TestCase):
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
-    def test_Normal_analytic_kld(self):
+    def test_analytic_kld(self):
         tol, mean, stddev = self.TOL, self.MEAN, self.STDDEV
 
         # test KL-divergence defined by stddev
@@ -288,3 +289,7 @@ class NormalTestCase(unittest.TestCase):
             ),
             **tol
         )
+
+
+if __name__ == '__main__':
+    unittest.main()

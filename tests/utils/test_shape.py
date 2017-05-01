@@ -7,10 +7,12 @@ import tensorflow as tf
 from tfsnippet.utils import (get_dimension_size,
                              is_deterministic_shape,
                              repeat_tensor_for_samples,
-                             ReshapeHelper, get_dynamic_tensor_shape)
+                             ReshapeHelper,
+                             get_dynamic_tensor_shape)
+from tests.helper import TestCase
 
 
-class ShapeTestCase(unittest.TestCase):
+class ShapeTestCase(TestCase):
 
     def test_get_dimension_size(self):
         with tf.Graph().as_default(), tf.Session().as_default():

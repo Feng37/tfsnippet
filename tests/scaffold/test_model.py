@@ -4,9 +4,10 @@ import unittest
 import tensorflow as tf
 
 from tfsnippet.scaffold import Model
+from tests.helper import TestCase
 
 
-class MyModel(Model):
+class _MyModel(Model):
 
     def _build(self):
         self.model_var = tf.get_variable(
@@ -33,9 +34,9 @@ class MyModel(Model):
             )
 
 
-class ModelTestCase(unittest.TestCase):
+class ModelTestCase(TestCase):
 
-    def test_basic(self):
+    def test_Model(self):
         with tf.Graph().as_default():
             # the variable out of model scope
             out_var = tf.get_variable(
@@ -47,7 +48,7 @@ class ModelTestCase(unittest.TestCase):
             )
 
             # test build
-            model = MyModel()
+            model = _MyModel()
             self.assertFalse(model.has_built)
             model.build()
             self.assertTrue(model.has_built)
@@ -99,6 +100,10 @@ class ModelTestCase(unittest.TestCase):
                 )
 
             # test name de-duplication
-            self.assertEqual(MyModel().variable_scope.name, 'my_model_1')
-            self.assertEqual(MyModel('the_model').variable_scope.name,
+            self.assertEqual(_MyModel().variable_scope.name, 'my_model_1')
+            self.assertEqual(_MyModel('the_model').variable_scope.name,
                              'the_model')
+
+
+if __name__ == '__main__':
+    unittest.main()
