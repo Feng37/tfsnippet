@@ -4,7 +4,6 @@ import tensorflow as tf
 from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (VarScopeObject,
                              is_integer,
-                             instance_reuse,
                              open_variable_scope,
                              TensorArithmeticMixin)
 
@@ -12,7 +11,20 @@ __all__ = ['StochasticTensor']
 
 
 class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
-    """Tensor-like object that represents a random variable in graph.
+    """Tensor-like object that represents a stochastic variable.
+    
+    A `StochasticTensor` should be constructed from a `distribution`,
+    and represents a stochastic variable in the model.  Although it
+    stands for a random variable, it is actually a standard tensor
+    in TensorFlow graph, where the randomness is achieved by random
+    sampling.  That is to say, every `StochasticTensor` is equivalent
+    to a set of random samples from the given `distribution`.
+    The samples are stored so that every stochastic tensor should
+    always represent the same set of samples.
+    
+    Number of samples are controlled by `sample_num` argument.
+    Sometimes a stochastic tensor need to be fixed using a set of
+    observations.  This could be achieved by `observed` argument.
 
     Parameters
     ----------
@@ -111,7 +123,6 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         return self._observed_tensor
 
     @property
-    @instance_reuse
     def computed_tensor(self):
         """Get the observed or sampled tensor."""
         if self._computed_tensor is None:
@@ -130,10 +141,12 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         return 'StochasticTensor(%r)' % (self.computed_tensor,)
 
     def __hash__(self):
-        return hash(self.computed_tensor)
+        # Necessary to support Python's collection membership operators
+        return id(self)
 
-    def __getitem__(self, item):
-        return self.computed_tensor[item]
+    def __eq__(self, other):
+        # Necessary to support Python's collection membership operators
+        return id(self) == id(other)
 
 
 def _stochastic_to_tensor(value, dtype=None, name=None, as_ref=False):

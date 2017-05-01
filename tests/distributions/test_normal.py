@@ -5,9 +5,11 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.distributions import Normal
-from .helper import (get_distribution_samples, big_number_verify,
-                     compute_distribution_prob, compute_analytic_kld,
-                     N_SAMPLES)
+from tests.distributions._helper import (get_distribution_samples,
+                                         big_number_verify,
+                                         compute_distribution_prob,
+                                         compute_analytic_kld,
+                                         N_SAMPLES)
 
 
 class NormalTestCase(unittest.TestCase):

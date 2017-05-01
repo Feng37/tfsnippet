@@ -5,7 +5,11 @@ __all__ = ['TensorArithmeticMixin']
 
 
 class TensorArithmeticMixin(object):
-    """Mixin class for implementing tensor arithmetic operations."""
+    """Mixin class for implementing tensor arithmetic operations.
+    
+    The derived class must support `tf.convert_to_tensor`, in order to
+    inherit from this mixin class.
+    """
 
     # overloading arithmetic operations
     def __abs__(self):
@@ -13,9 +17,6 @@ class TensorArithmeticMixin(object):
 
     def __neg__(self):
         return tf.negative(self)
-
-    def __pos__(self):
-        return self
 
     def __add__(self, other):
         return tf.add(self, other)
@@ -100,28 +101,28 @@ class TensorArithmeticMixin(object):
     def __ge__(self, other):
         return tf.greater_equal(self, other)
 
-    def __eq__(self, other):
-        return tf.equal(self, other)
+    # slicing and indexing
+    def __getitem__(self, item):
+        return (tf.convert_to_tensor(self))[item]
 
-    def __ne__(self, other):
-        return tf.not_equal(self, other)
-
-    # forbidden override operators
+    # disallowed operators
     def __iter__(self):
-        raise TypeError("'Tensor' object is not iterable.")
+        raise TypeError("Tensor object is not iterable.")
 
     def __bool__(self):
         raise TypeError(
-            "Using a `tf.Tensor` as a Python `bool` is not allowed. "
+            "Using a tensor as a Python `bool` is not allowed. "
             "Use `if t is not None:` instead of `if t:` to test if a "
             "tensor is defined, and use TensorFlow ops such as "
             "tf.cond to execute subgraphs conditioned on the value of "
-            "a tensor.")
+            "a tensor."
+        )
 
     def __nonzero__(self):
         raise TypeError(
-            "Using a `tf.Tensor` as a Python `bool` is not allowed. "
+            "Using a tensor as a Python `bool` is not allowed. "
             "Use `if t is not None:` instead of `if t:` to test if a "
             "tensor is defined, and use TensorFlow ops such as "
             "tf.cond to execute subgraphs conditioned on the value of "
-            "a tensor.")
+            "a tensor."
+        )
