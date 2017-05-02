@@ -102,7 +102,7 @@ class TrainLoggerTestCase(TestCase):
                     logs.append(logger.get_step_log())
 
         self._assertMatch(
-            re.compile(r'^Step 2/6: avg [^ ]+ sec for every step; '
+            re.compile(r'^Epoch 1/2, step 2/6: [^ ]+ sec/step; '
                        r'valid time: [^ ]+ sec; '
                        r'avg loss: -1\.5; '
                        r'valid loss: -2 \(\*\); '
@@ -111,7 +111,7 @@ class TrainLoggerTestCase(TestCase):
             logs[0]
         )
         self._assertMatch(
-            re.compile(r'^Step 4/6: avg [^ ]+ sec for every step; '
+            re.compile(r'^Epoch 1/2, step 4/6: [^ ]+ sec/step; '
                        r'valid time: [^ ]+ sec; '
                        r'avg loss: -3\.5; '
                        r'valid loss: -4 \(\*\); '
@@ -120,7 +120,7 @@ class TrainLoggerTestCase(TestCase):
             logs[1]
         )
         self._assertMatch(
-            re.compile(r'^Step 6/6: avg [^ ]+ sec for every step; '
+            re.compile(r'^Epoch 2/2, step 6/6: [^ ]+ sec/step; '
                        r'valid time: [^ ]+ sec; '
                        r'avg loss: -1\.5; '
                        r'valid loss: -6 \(\*\); '
@@ -174,7 +174,7 @@ class TrainLoggerTestCase(TestCase):
             with logger.enter_step():
                 logger.add_metrics(loss=1.)
                 self._assertMatch(
-                    re.compile(r'^Step 1: finished in [^ ]+ sec; '
+                    re.compile(r'^Epoch 1, step 1: finished in [^ ]+ sec; '
                                r'loss: 1 \(\*\)$'),
                     logger.get_step_log()
                 )

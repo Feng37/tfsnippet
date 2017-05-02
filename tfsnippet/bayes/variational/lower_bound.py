@@ -6,10 +6,6 @@ The variational lower bound is a certain kind of estimators using variational
 methods.  It is mainly used to compute the approximated log-likelihood of
 a Bayesian network, given the observed variables, as well as the prior and
 posterior of latent variables.
-
-Note that variational lower bound estimators are just special cases of
-variational estimators, thus we may adopt the much more general ways to
-do estimation, once it is possible.
 """
 
 import tensorflow as tf
@@ -23,12 +19,12 @@ __all__ = [
 
 def sgvb(model, variational, axis=None, name=None):
     """SGVB estimator for the variational lower bound.
-    
+
     The SGVB estimator, if given observed variable `x` and latent variable
     `z`, where the posterior of `x` is represented by `p(x|z)`, the prior of
     `z` is represented by `p(z)` and the approximated posterior of `z` is
     represented by `q(z|x)`, then it computes the variational lower bound by:
-    
+
         .. math::
             \\log p(x) 
                 &\geq \\log p(x) - \\text{KL} \\left(q(z|x) \| p(z|x) \\right)
@@ -37,17 +33,17 @@ def sgvb(model, variational, axis=None, name=None):
                         \\log p(x) + \\log p(z|x) - \\log q(z|x) \\right] \\\\
                 &= \\mathop{\\mathbb{E}_{q(z|x)}} \\left[
                         \\log p(x,z) - \\log q(z|x) \\right]
-                    
+
     Parameters
     ----------
     model : collections.Iterable[StochasticTensor]
         List of stochastic tensors, representing the posterior of observed
         variables and the priors of latent variables.
-        
+
     variational : collections.Iterable[StochasticTensor]
         List of stochastic tensors, representing the approximated posteriors
         of latent variables.
-        
+
     axis : int | list[int] | tf.Tensor
         The dimension(s) of samples, which should be averaged in order
         to compute the expectation of variational lower bound.
@@ -56,7 +52,7 @@ def sgvb(model, variational, axis=None, name=None):
 
     name : str
         Optional name of this operation.
-        
+
     Returns
     -------
     tf.Tensor

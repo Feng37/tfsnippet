@@ -535,23 +535,17 @@ class TrainLogger(VarScopeObject):
                     )
         return ret
 
-    def _get_messages(self, time_metric, name, counter, max_counter,
-                      step_only=False):
-        ret = []
-        cap_name = name.capitalize()
-        if max_counter is not None:
-            ret.append('%s %d/%d' % (cap_name, counter, max_counter))
-        else:
-            ret.append('%s %d' % (cap_name, counter,))
+    def _get_messages(self, time_metric, name, counter_tag, step_only=False):
 
         def best_mark(b):
             return ' (*)' if b else ''
 
+        ret = [counter_tag]
         metrics = self._sorted_metrics()
         if time_metric in metrics:
             timer, formatted, is_best = metrics.pop(time_metric)
             if timer.counter > 1:
-                fmt = ': avg %%s for every %s' % name
+                fmt = ': %%s/%s' % name
             else:
                 fmt = ': finished in %s'
             ret[-1] += fmt % formatted
@@ -573,6 +567,13 @@ class TrainLogger(VarScopeObject):
             ))
         return '; '.join(ret)
 
+    @property
+    def _epoch_counter_tag(self):
+        if self.max_epoch is None:
+            return 'epoch %d' % (self.epoch,)
+        else:
+            return 'epoch %d/%d' % (self.epoch, self.max_epoch)
+
     def get_epoch_log(self):
         """Get epoch(s) log messages.
         
@@ -580,8 +581,8 @@ class TrainLogger(VarScopeObject):
         It will also clear all the metrics afterwards.
         """
         self._commit_epoch_time()
-        ret = self._get_messages(
-            _EPOCH_TIME, 'epoch', self.epoch, self.max_epoch)
+        counter_tag = self._epoch_counter_tag.capitalize()
+        ret = self._get_messages(_EPOCH_TIME, 'epoch', counter_tag)
         self._clear_metrics()
         return ret
 
@@ -593,6 +594,13 @@ class TrainLogger(VarScopeObject):
         """
         self._print_function(self.get_epoch_log())
 
+    @property
+    def _step_counter_tag(self):
+        if self.max_step is None:
+            return 'step %d' % (self.step,)
+        else:
+            return 'step %d/%d' % (self.step, self.max_step)
+
     def get_step_log(self):
         """Get step(s) log messages.
         
@@ -600,8 +608,10 @@ class TrainLogger(VarScopeObject):
         It will also clear all the metrics afterwards.
         """
         self._commit_step_time()
-        ret = self._get_messages(
-            _STEP_TIME, 'step', self.step, self.max_step, step_only=True)
+        counter_tag = '%s, %s' % (
+            self._epoch_counter_tag.capitalize(), self._step_counter_tag)
+        ret = self._get_messages(_STEP_TIME, 'step', counter_tag,
+                                 step_only=True)
         self._clear_metrics(step_only=True)
         return ret
 
