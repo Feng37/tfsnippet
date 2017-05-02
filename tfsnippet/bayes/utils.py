@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from .layers import StochasticTensor
+from .tensors import StochasticTensor
 
 __all__ = ['local_log_prob']
 

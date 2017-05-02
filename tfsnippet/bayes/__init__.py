@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
 
-from .layers import *
+from .tensors import *
 from .utils import *
