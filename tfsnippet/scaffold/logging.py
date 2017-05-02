@@ -425,9 +425,29 @@ class TrainLogger(VarScopeObject):
     def iter_epochs(self):
         """Iterate through epochs.
         
-        This method will yield the epoch counters.  If `max_epoch`
-        is configured, it will stop at `max_epoch` (exclusive).
-        
+        This method will yield the epoch counters.  If `max_epoch` is
+        configured, it will stop at `max_epoch` (exclusive).
+        Note that this method is not necessary, where the following
+        two loops are equivalent:
+
+            # Suppose we have a train logger with `max_epoch` set to 3. 
+            # Without it the logger cannot show the max epoch information
+            # in log messages
+            logger = TrainLogger(max_epoch=3)
+
+            # The first approach: to iterate through epochs via logger.
+            for epoch in logger.iter_epochs():
+                ...
+
+            # The second approach: to iterate through epochs by hand.
+            for epoch in range(1, 4):
+                with logger.enter_epoch():
+                    ...
+
+        The latter loop will do the exact thing as the first loop.
+        Note that the context ``with logger.enter_epoch()`` is necessary
+        for the logger to record training time for an epoch.
+
         Yields
         ------
         int
@@ -464,6 +484,9 @@ class TrainLogger(VarScopeObject):
         This method will yield the step counters, as well as the data
         batches in an epoch.  It will stop at `max_step`, or when
         `data_iterator` has been exhausted.
+        
+        Note that this method is not necessary, just using `enter_step`
+        will be enough.  See `iter_epochs` for more details.
         
         Parameters
         ----------

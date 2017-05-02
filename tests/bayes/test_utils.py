@@ -12,6 +12,7 @@ class UtilsTestCase(TestCase):
 
     def test_local_log_prob(self):
         with tf.Graph().as_default(), tf.Session().as_default() as sess:
+            # test regular
             a = bayes.Normal(0., [1., 2., 3.], sample_num=16,
                              group_event_ndims=1)
             b = bayes.Normal(1., 2., sample_num=16)
@@ -32,6 +33,9 @@ class UtilsTestCase(TestCase):
                 b.distribution.log_prob(b, group_event_ndims=0)
             ])
             np.testing.assert_almost_equal(res, ans)
+
+            # test local_log_prob on empty list
+            self.assertEqual(bayes.local_log_prob([]), ())
 
 if __name__ == '__main__':
     unittest.main()

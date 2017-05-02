@@ -109,15 +109,9 @@ class DistributionTestCase(TestCase):
             )
 
             # assert bad shapes
-            with self.assertRaises(ValueError) as cm:
-                dist.log_prob(x_data, group_event_ndims=3)
-            self.assertIn('`group_event_ndims` cannot be 3',
-                          str(cm.exception))
-
-            with self.assertRaises(ValueError) as cm:
+            with self.assertRaisesRegex(
+                    Exception, '.*Dimensions must be equal, but are 2 and 3.*'):
                 dist.log_prob(x_data[:, :, :2, :])
-            self.assertIn('`x` should match `batch_shape + value_shape`',
-                          str(cm.exception))
 
             log_prob = dist.log_prob(x_data, group_event_ndims=2)
             self.assertEqual(log_prob.get_shape().as_list(), [5])

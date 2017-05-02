@@ -38,10 +38,12 @@ class LossValidator(VarScopeObject):
     global_step : tf.Tensor | tf.Variable
         Tensor to track the global step.
         
-    managed_vars : dict[str, tf.Variable]
-        Dict of variables regularized by best validation loss.
-        The keys of the dict would be used as serialization keys.
+    managed_vars : list[tf.Variable] | dict[str, tf.Variable]
+        List or dict of variables regularized by best validation loss.
         
+        If dict is specified, the keys of the dict would be used as
+        serialization keys.
+
     name : str
         Name of this loss validator.
         
@@ -58,11 +60,14 @@ class LossValidator(VarScopeObject):
             raise TypeError('`valid_loss` is expected to be a scalar tensor, '
                             'but got %r.' % (valid_loss,))
         if managed_vars is not None:
-            if self.BEST_LOSS_SAVE_KEY in managed_vars:
-                raise KeyError(
-                    'Variable name %r is reserved.' %
-                    self.BEST_LOSS_SAVE_KEY
-                )
+            if isinstance(managed_vars, dict):
+                if self.BEST_LOSS_SAVE_KEY in managed_vars:
+                    raise KeyError(
+                        'Variable name %r is reserved.' %
+                        self.BEST_LOSS_SAVE_KEY
+                    )
+            else:
+                managed_vars = list(managed_vars)
         super(LossValidator, self).__init__(name, default_name)
 
         # memorize the arguments
@@ -95,7 +100,10 @@ class LossValidator(VarScopeObject):
 
         if self._managed_vars is not None:
             self._managed_vars = copy.copy(self._managed_vars)
-            self._managed_vars[self.BEST_LOSS_SAVE_KEY] = self._best_loss
+            if isinstance(self._managed_vars, dict):
+                self._managed_vars[self.BEST_LOSS_SAVE_KEY] = self._best_loss
+            else:
+                self._managed_vars.append(self._best_loss)
 
         # saver to track the variables for best validation loss,
         # as well as the best validation loss value
