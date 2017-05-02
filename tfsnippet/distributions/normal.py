@@ -58,60 +58,61 @@ class Normal(Distribution):
                                      name=name,
                                      default_name=default_name)
 
-        with open_variable_scope(self.variable_scope), tf.name_scope('init'):
-            # obtain parameter tensors
-            mean = tf.convert_to_tensor(mean, dtype=dtype)
-            if stddev is not None:
-                stddev = tf.convert_to_tensor(stddev, dtype=dtype)
-                self._stdx = stddev
-                self._stdx_is_log = False
-            else:
-                logstd = tf.convert_to_tensor(logstd, dtype=dtype)
-                self._stdx = logstd
-                self._stdx_is_log = True
+        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+            with tf.name_scope('init'):
+                # obtain parameter tensors
+                mean = tf.convert_to_tensor(mean, dtype=dtype)
+                if stddev is not None:
+                    stddev = tf.convert_to_tensor(stddev, dtype=dtype)
+                    self._stdx = stddev
+                    self._stdx_is_log = False
+                else:
+                    logstd = tf.convert_to_tensor(logstd, dtype=dtype)
+                    self._stdx = logstd
+                    self._stdx_is_log = True
 
-            # check the shape and data types of parameters
-            self._mean = mean
-            try:
-                self._static_batch_shape = tf.broadcast_static_shape(
-                    self._mean.get_shape(),
-                    self._stdx.get_shape()
+                # check the shape and data types of parameters
+                self._mean = mean
+                try:
+                    self._static_batch_shape = tf.broadcast_static_shape(
+                        self._mean.get_shape(),
+                        self._stdx.get_shape()
+                    )
+                except ValueError:
+                    raise ValueError(
+                        '`mean` and `stddev`/`logstd` should be '
+                        'broadcastable to match each other (%r vs %r).' %
+                        (self._mean.get_shape(), self._stdx.get_shape())
+                    )
+                self._dynamic_batch_shape = tf.broadcast_dynamic_shape(
+                    tf.shape(self._mean), tf.shape(self._stdx)
                 )
-            except ValueError:
-                raise ValueError(
-                    '`mean` and `stddev`/`logstd` should be '
-                    'broadcastable to match each other (%r vs %r).' %
-                    (self._mean.get_shape(), self._stdx.get_shape())
-                )
-            self._dynamic_batch_shape = tf.broadcast_dynamic_shape(
-                tf.shape(self._mean), tf.shape(self._stdx)
-            )
 
-            # derive the attributes of this Normal distribution
-            if self._stdx_is_log:
-                self._stddev = tf.exp(self._stdx, name='stddev')
-                self._logstd = tf.identity(self._stdx, name='logstd')
-                self._var = tf.exp(
-                    tf.constant(2., dtype=dtype) * self._logstd,
-                    name='variance'
+                # derive the attributes of this Normal distribution
+                if self._stdx_is_log:
+                    self._stddev = tf.exp(self._stdx, name='stddev')
+                    self._logstd = tf.identity(self._stdx, name='logstd')
+                    self._var = tf.exp(
+                        tf.constant(2., dtype=dtype) * self._logstd,
+                        name='variance'
+                    )
+                    self._precision = tf.exp(
+                        tf.constant(-2., dtype=dtype) * self._logstd,
+                        name='precision'
+                    )
+                else:
+                    self._stddev = tf.identity(self._stdx, name='stddev')
+                    self._logstd = tf.log(self._stdx, name='logstd')
+                    self._var = tf.square(self._stddev, name='variance')
+                    self._precision = tf.divide(
+                        tf.constant(1., dtype=dtype), self._var,
+                        name='precision'
+                    )
+                self._logvar = tf.multiply(
+                    tf.constant(2., dtype=dtype), self._logstd,
+                    name='logvar'
                 )
-                self._precision = tf.exp(
-                    tf.constant(-2., dtype=dtype) * self._logstd,
-                    name='precision'
-                )
-            else:
-                self._stddev = tf.identity(self._stdx, name='stddev')
-                self._logstd = tf.log(self._stdx, name='logstd')
-                self._var = tf.square(self._stddev, name='variance')
-                self._precision = tf.divide(
-                    tf.constant(1., dtype=dtype), self._var,
-                    name='precision'
-                )
-            self._logvar = tf.multiply(
-                tf.constant(2., dtype=dtype), self._logstd,
-                name='logvar'
-            )
-            self._log_prec = tf.negative(self._logvar, name='log_precision')
+                self._log_prec = tf.negative(self._logvar, name='log_precision')
 
     @property
     def dtype(self):

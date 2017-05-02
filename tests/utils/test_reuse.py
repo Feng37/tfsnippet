@@ -60,14 +60,14 @@ class ReuseTestCase(TestCase):
     def test_auto_reuse_variables(self):
         with tf.Graph().as_default():
             # test reuse == False at the first time
-            with auto_reuse_variables('a') as vs:
+            with auto_reuse_variables('a', unique_name_scope=False) as vs:
                 self.assertEqual(vs.name, 'a')
                 v1 = _get_var('v1')
                 self.assertEqual(v1.name, 'a/v1:0')
                 self.assertEqual(_get_op('op1').name, 'a/op1:0')
 
             # test reuse == True at the second time
-            with auto_reuse_variables('a') as vs:
+            with auto_reuse_variables('a', unique_name_scope=False) as vs:
                 self.assertEqual(vs.name, 'a')
                 self.assertIs(_get_var('v1'), v1)
                 self.assertEqual(_get_var('v1').name, 'a/v1:0')
@@ -76,7 +76,7 @@ class ReuseTestCase(TestCase):
 
             # test reuse the variable scope at different name
             with tf.variable_scope('b'):
-                with auto_reuse_variables('a') as vs:
+                with auto_reuse_variables('a', unique_name_scope=False) as vs:
                     scope_b_a = vs
                     self.assertEqual(vs.name, 'b/a')
                     b_v1 = _get_var('v1')
@@ -85,7 +85,7 @@ class ReuseTestCase(TestCase):
                     self.assertEqual(_get_op('op1').name, 'b/a/op1:0')
 
             # test to open the variable scope using scope object
-            with auto_reuse_variables(scope_b_a) as vs:
+            with auto_reuse_variables(scope_b_a, unique_name_scope=False) as vs:
                 self.assertEqual(vs.name, 'b/a')
                 self.assertIs(_get_var('v1'), b_v1)
                 self.assertEqual(_get_var('v1').name, 'b/a/v1:0')
@@ -111,7 +111,7 @@ class ReuseTestCase(TestCase):
 
         with tf.Graph().as_default():
             # test reuse the variable scope at different graph
-            with auto_reuse_variables('a') as vs:
+            with auto_reuse_variables('a', unique_name_scope=False) as vs:
                 self.assertEqual(vs.name, 'a')
                 g2_v1 = _get_var('v1')
                 self.assertIsNot(g2_v1, v1)

@@ -74,7 +74,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
             default_name=default_name
         )
 
-        with open_variable_scope(self.variable_scope):
+        with open_variable_scope(self.variable_scope, unique_name_scope=False):
             if not isinstance(distribution, Distribution) and \
                     callable(distribution):
                 # we support the factory of distributions, so that
@@ -86,62 +86,64 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
             raise TypeError(
                 'Expected a Distribution but got %r.' % (distribution,))
 
-        with open_variable_scope(self.variable_scope), tf.name_scope('init'):
-            if group_event_ndims is not None:
-                if not is_integer(group_event_ndims) or group_event_ndims < 0:
-                    raise TypeError(
-                        '`group_event_ndims` must be a non-negative integer '
-                        'constant.'
-                    )
-            else:
-                group_event_ndims = distribution.group_event_ndims
-
-            if sample_num is not None:
-                if is_integer(sample_num):
-                    if sample_num < 1:
-                        raise ValueError('`sample_num` must be at least 1.')
-                    sample_shape = (sample_num,)
-                    static_sample_shape = (sample_num,)
+        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+            with tf.name_scope('init'):
+                if group_event_ndims is not None:
+                    if not is_integer(group_event_ndims) or \
+                            group_event_ndims < 0:
+                        raise TypeError(
+                            '`group_event_ndims` must be a non-negative '
+                            'integer constant.'
+                        )
                 else:
-                    sample_num = tf.convert_to_tensor(sample_num)
-                    sample_num_shape = sample_num.get_shape()
-                    if not sample_num.dtype.is_integer or (
-                                    sample_num_shape.ndims is not None and
-                                    sample_num_shape.ndims != 0):
-                        raise ValueError('`sample_num` must be an integer '
-                                         'scalar.')
-                    sample_shape = tf.stack([sample_num])
-                    static_sample_shape = (None,)
-            else:
-                sample_shape = ()
-                static_sample_shape = ()
+                    group_event_ndims = distribution.group_event_ndims
 
-            static_shape = (
-                tf.TensorShape(list(static_sample_shape)).
-                    concatenate(distribution.static_batch_shape).
-                    concatenate(distribution.static_value_shape)
-            )
-            if observed is not None:
-                observed = tf.convert_to_tensor(
-                    observed,
-                    dtype=distribution.dtype
+                if sample_num is not None:
+                    if is_integer(sample_num):
+                        if sample_num < 1:
+                            raise ValueError('`sample_num` must be at least 1.')
+                        sample_shape = (sample_num,)
+                        static_sample_shape = (sample_num,)
+                    else:
+                        sample_num = tf.convert_to_tensor(sample_num)
+                        sample_num_shape = sample_num.get_shape()
+                        if not sample_num.dtype.is_integer or (
+                                        sample_num_shape.ndims is not None and
+                                        sample_num_shape.ndims != 0):
+                            raise ValueError('`sample_num` must be an integer '
+                                             'scalar.')
+                        sample_shape = tf.stack([sample_num])
+                        static_sample_shape = (None,)
+                else:
+                    sample_shape = ()
+                    static_sample_shape = ()
+
+                static_shape = (
+                    tf.TensorShape(list(static_sample_shape)).
+                        concatenate(distribution.static_batch_shape).
+                        concatenate(distribution.static_value_shape)
                 )
-                observed_shape = observed.get_shape()
-                if validate_observed_shape and \
-                        not static_shape.is_compatible_with(observed_shape):
-                    raise ValueError('The shape of observed is %r, which is '
-                                     'not compatible with the shape %r of the '
-                                     'StochasticTensor.' %
-                                     (observed_shape, static_shape))
-                static_shape = observed_shape
+                if observed is not None:
+                    observed = tf.convert_to_tensor(
+                        observed,
+                        dtype=distribution.dtype
+                    )
+                    observed_shape = observed.get_shape()
+                    if validate_observed_shape and \
+                            not static_shape.is_compatible_with(observed_shape):
+                        raise ValueError('The shape of observed is %r, which '
+                                         'is not compatible with the shape %r '
+                                         'of the StochasticTensor.' %
+                                         (observed_shape, static_shape))
+                    static_shape = observed_shape
 
-            self._distrib = distribution
-            self._sample_num = sample_num
-            self._group_event_ndims = group_event_ndims
-            self._sample_shape = sample_shape
-            self._static_shape = static_shape
-            self._observed_tensor = observed
-            self._computed_tensor = None
+                self._distrib = distribution
+                self._sample_num = sample_num
+                self._group_event_ndims = group_event_ndims
+                self._sample_shape = sample_shape
+                self._static_shape = static_shape
+                self._observed_tensor = observed
+                self._computed_tensor = None
 
     def __repr__(self):
         return 'StochasticTensor(%r)' % (self.computed_tensor,)

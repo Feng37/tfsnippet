@@ -60,25 +60,26 @@ class ScopeTestCase(TestCase):
 
         with tf.Graph().as_default():
             # test to enter and re-enter sub scopes normally
-            with open_variable_scope('a') as a:
+            with open_variable_scope('a', unique_name_scope=False) as a:
                 self.assertEqual(a.name, 'a')
                 self.assertEqual(a.original_name_scope, 'a/')
                 self.assertEqual(_get_var('v1').name, 'a/v1:0')
                 self.assertEqual(_get_op('o1').name, 'a/o1:0')
 
-                with open_variable_scope('b') as b:
+                with open_variable_scope('b', unique_name_scope=False) as b:
                     self.assertEqual(b.name, 'a/b')
                     self.assertEqual(b.original_name_scope, 'a/b/')
                     self.assertEqual(_get_var('v1').name, 'a/b/v1:0')
                     self.assertEqual(_get_op('o1').name, 'a/b/o1:0')
 
-                    with open_variable_scope(a) as a2:
+                    with open_variable_scope(a, unique_name_scope=False) as a2:
                         self.assertEqual(a2.name, 'a')
                         self.assertEqual(a2.original_name_scope, 'a/')
                         self.assertEqual(_get_var('v2').name, 'a/v2:0')
                         self.assertEqual(_get_op('o2').name, 'a/o2:0')
 
-                        with open_variable_scope('c') as c:
+                        with open_variable_scope('c',
+                                                 unique_name_scope=False) as c:
                             self.assertEqual(c.name, 'a/c')
                             self.assertEqual(c.original_name_scope, 'a/c/')
                             self.assertEqual(_get_var('v1').name, 'a/c/v1:0')
@@ -91,14 +92,14 @@ class ScopeTestCase(TestCase):
                 self.assertEqual(_get_op('o3').name, 'a/o3:0')
 
             # test to enter sub scope with path
-            with open_variable_scope('x/y/z') as xyz:
+            with open_variable_scope('x/y/z', unique_name_scope=False) as xyz:
                 self.assertEqual(xyz.name, 'x/y/z')
                 self.assertEqual(xyz.original_name_scope, 'x/y/z/')
                 xyz_v1 = _get_var('v1')
                 self.assertEqual(xyz_v1.name, 'x/y/z/v1:0')
                 self.assertEqual(_get_op('o1').name, 'x/y/z/o1:0')
 
-            with open_variable_scope('x/y/w') as xyw:
+            with open_variable_scope('x/y/w', unique_name_scope=False) as xyw:
                 self.assertEqual(xyw.name, 'x/y/w')
                 self.assertEqual(xyw.original_name_scope, 'x/y/w/')
                 xyw_v1 = _get_var('v1')
@@ -129,17 +130,18 @@ class ScopeTestCase(TestCase):
             self.assertEqual(_get_var('v1').name, 'v1:0')
             self.assertEqual(_get_op('o1').name, 'o1:0')
 
-            with open_variable_scope(xyz) as s:
+            with open_variable_scope(xyz, unique_name_scope=False) as s:
                 self.assertEqual(s.name, 'x/y/z')
                 self.assertEqual(s.original_name_scope, 'x/y/z/')
 
-                with open_variable_scope(root) as ss:
+                with open_variable_scope(root, unique_name_scope=False) as ss:
                     self.assertEqual(ss.name, '')
                     self.assertEqual(ss.original_name_scope, '')
                     self.assertEqual(_get_var('v2').name, 'v2:0')
                     self.assertEqual(_get_op('o2').name, 'o2:0')
 
-                    with open_variable_scope(xyw) as sss:
+                    with open_variable_scope(xyw,
+                                             unique_name_scope=False) as sss:
                         self.assertEqual(sss.name, 'x/y/w')
                         self.assertEqual(sss.original_name_scope, 'x/y/w/')
                         self.assertEqual(_get_var('v2').name, 'x/y/w/v2:0')
@@ -154,11 +156,11 @@ class ScopeTestCase(TestCase):
                 self.assertEqual(s.original_name_scope, 'x/y/z/')
 
             # test to re-enter a deep scope.
-            with open_variable_scope(c) as s:
+            with open_variable_scope(c, unique_name_scope=False) as s:
                 self.assertEqual(s.name, 'a/c')
                 self.assertEqual(s.original_name_scope, 'a/c/')
 
-                with open_variable_scope(xyz) as ss:
+                with open_variable_scope(xyz, unique_name_scope=False) as ss:
                     self.assertEqual(ss.name, 'x/y/z')
                     self.assertEqual(ss.original_name_scope, 'x/y/z/')
                     self.assertEqual(_get_var('v2').name, 'x/y/z/v2:0')
@@ -168,13 +170,14 @@ class ScopeTestCase(TestCase):
                 self.assertEqual(s.original_name_scope, 'a/c/')
 
             # test to overwrite the scope settings.
-            with open_variable_scope(c) as s:
+            with open_variable_scope(c, unique_name_scope=False) as s:
                 self.assertEqual(s.name, 'a/c')
                 self.assertEqual(s.original_name_scope, 'a/c/')
                 self._assert_var_exists('v1')
                 self.assertEqual(_get_op('o1').name, 'a/c/o1_1:0')
 
-                with open_variable_scope(s, reuse=True):
+                with open_variable_scope(s, unique_name_scope=False,
+                                         reuse=True):
                     self.assertEqual(_get_var('v1').name, 'a/c/v1:0')
                     self.assertEqual(_get_op('o1').name, 'a/c/o1_2:0')
                     self._assert_reuse_var('v1')
@@ -194,7 +197,7 @@ class ScopeTestCase(TestCase):
                 self.assertEqual(_get_var('v4').name, 'a/c/v4:0')
                 self.assertEqual(_get_op('o1').name, 'a/c_1/o1:0')
 
-            with open_variable_scope('a'):
+            with open_variable_scope('a', unique_name_scope=False):
                 with open_variable_scope('c', unique_name_scope=True) as s:
                     self.assertEqual(s.name, 'a/c')
                     self.assertEqual(s.original_name_scope, 'a/c/')
@@ -212,11 +215,11 @@ class ScopeTestCase(TestCase):
 
             with self.assertRaises(ValueError):
                 # root name scope cannot be opened via `unique_name_scope`.
-                with open_variable_scope('', unique_name_scope=True) as s:
+                with open_variable_scope('', unique_name_scope=True):
                     pass
 
             # test to open a pure variable scope
-            with open_variable_scope(a) as s:
+            with open_variable_scope(a, unique_name_scope=False):
                 with open_variable_scope('c', pure_variable_scope=True) as s:
                     self.assertEqual(s.name, 'a/c')
                     self.assertEqual(s.original_name_scope, 'a/c/')

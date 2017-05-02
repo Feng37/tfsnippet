@@ -62,26 +62,29 @@ class Bernoulli(Distribution):
             default_name=default_name,
         )
 
-        with open_variable_scope(self.variable_scope), tf.name_scope('init'):
-            # obtain parameter tensors
-            logits = tf.convert_to_tensor(logits, dtype=param_dtype)
-            logits_shape = logits.get_shape()
+        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+            with tf.name_scope('init'):
+                # obtain parameter tensors
+                logits = tf.convert_to_tensor(logits, dtype=param_dtype)
+                logits_shape = logits.get_shape()
 
-            # derive the shape and data types of parameters
-            self._logits = logits
-            self._static_batch_shape = logits_shape
-            if is_deterministic_shape(logits_shape):
-                self._dynamic_batch_shape = \
-                    tf.convert_to_tensor(logits_shape.as_list(), dtype=tf.int32)
-            else:
-                self._dynamic_batch_shape = tf.shape(logits)
+                # derive the shape and data types of parameters
+                self._logits = logits
+                self._static_batch_shape = logits_shape
+                if is_deterministic_shape(logits_shape):
+                    self._dynamic_batch_shape = tf.convert_to_tensor(
+                        logits_shape.as_list(),
+                        dtype=tf.int32
+                    )
+                else:
+                    self._dynamic_batch_shape = tf.shape(logits)
 
-            # derive various distribution attributes
-            self._p = tf.nn.sigmoid(logits, 'p')
-            self._one_minus_p = tf.nn.sigmoid(-logits, 'one_minus_p')
+                # derive various distribution attributes
+                self._p = tf.nn.sigmoid(logits, 'p')
+                self._one_minus_p = tf.nn.sigmoid(-logits, 'one_minus_p')
 
-            # set other attributes
-            self._dtype = dtype
+                # set other attributes
+                self._dtype = dtype
 
     @property
     def dtype(self):

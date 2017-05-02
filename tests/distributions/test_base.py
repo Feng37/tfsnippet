@@ -17,7 +17,7 @@ class _MyDistribution(Distribution):
         super(_MyDistribution, self).__init__(
             group_event_ndims=group_event_ndims)
 
-        with open_variable_scope(self.variable_scope):
+        with open_variable_scope(self.variable_scope, unique_name_scope=False):
             self.p = p = tf.convert_to_tensor(
                 p, dtype=get_preferred_tensor_dtype(p))
 

@@ -19,7 +19,7 @@ __all__ = [
 @contextmanager
 def open_variable_scope(name_or_scope,
                         pure_variable_scope=False,
-                        unique_name_scope=False,
+                        unique_name_scope=True,
                         reuse=None,
                         initializer=None,
                         regularizer=None,
@@ -59,7 +59,7 @@ def open_variable_scope(name_or_scope,
 
         If set to True, a unique name scope will be opened.
         Otherwise the original name scope of the variable scope will be
-        reopened. (default is False)
+        reopened. (default is True)
                   
     reuse : None | bool
         Whether or not to reuse the variables in opened scope?

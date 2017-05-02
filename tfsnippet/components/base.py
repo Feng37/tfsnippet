@@ -34,5 +34,5 @@ class Component(VarScopeObject):
         raise NotImplementedError()
 
     def __call__(self, *args, **kwargs):
-        with auto_reuse_variables(self.variable_scope, unique_name_scope=True):
+        with auto_reuse_variables(self.variable_scope):
             return self._build(*args, **kwargs)

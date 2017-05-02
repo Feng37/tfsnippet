@@ -16,7 +16,7 @@ __all__ = [
 
 @contextmanager
 def auto_reuse_variables(name_or_scope,
-                         unique_name_scope=False,
+                         unique_name_scope=True,
                          **kwargs):
     """Open a variable scope, while automatically choosing `reuse` flag.
     
@@ -34,7 +34,7 @@ def auto_reuse_variables(name_or_scope,
 
         If True, a unique name scope will be opened.
         Otherwise the original name scope of the variable scope will be
-        reopened. (default is False)
+        reopened. (default is True)
 
     **kwargs
         Other parameters for opening the variable scope.
@@ -49,7 +49,9 @@ def auto_reuse_variables(name_or_scope,
             '`reuse` is not an argument of `auto_reuse_variables`.')
 
     # open the variable scope temporarily to capture the actual scope
-    with open_variable_scope(name_or_scope, pure_variable_scope=True) as vs:
+    with open_variable_scope(name_or_scope,
+                             unique_name_scope=False,
+                             pure_variable_scope=True) as vs:
         variable_scope = vs
 
     # check whether or not the variable scope has been initialized
