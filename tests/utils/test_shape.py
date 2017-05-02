@@ -625,8 +625,7 @@ class ShapeTestCase(TestCase):
             xx, yy = maybe_explicit_broadcast(x, y)
             x_data = np.arange(3).reshape((1, 3))
             y_data = np.arange(3, 7).reshape((2, 2))
-            with self.assertRaisesRegex(
-                    Exception, r'.*Incompatible shapes: \[2,2\] vs. \[2,3\].*'):
+            with self.assertRaisesRegex(Exception, r'.*Incompatible shapes.*'):
                 session.run([xx, yy], feed_dict={x: x_data, y: y_data})
 
 if __name__ == '__main__':
