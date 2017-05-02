@@ -96,7 +96,7 @@ def get_dynamic_tensor_shape(x, slice_func=None, name=None):
         return dynamic_shape
 
 
-def is_deterministic_shape(x, name=None):
+def is_deterministic_shape(x):
     """Test whether or not shape `x` is deterministic.
 
     A deterministic shape should be a tuple or a list of integers.
@@ -106,7 +106,6 @@ def is_deterministic_shape(x, name=None):
 
     If `x` is not any of the above listed types, a TypeError will be raised.
     """
-
     def delegated():
         if isinstance(x, (tuple, list)):
             for i in x:
@@ -355,6 +354,79 @@ class ReshapeHelper(NameScopeObject):
             if neg_one_count > 0:
                 raise ValueError('"-1" is not allowed.')
 
+    def _add_with_hint(self, shape_or_dim, static_shape_hint=None):
+        # pre-translate a dimension object into integer, or raise ValueError
+        if isinstance(shape_or_dim, tf.Dimension):
+            if shape_or_dim.value is None:
+                raise ValueError(
+                    '%r is an undetermined `tf.Dimension`, which is '
+                    'not supported.  You should use `add_template` '
+                    'instead.' % (shape_or_dim,)
+                )
+            shape_or_dim = shape_or_dim.value
+
+        # main routines
+        if is_integer(shape_or_dim):
+            shape_or_dim = int(shape_or_dim)
+            self._check_negative_one(shape_or_dim)
+            self._pieces[-1].append(shape_or_dim)
+            if static_shape_hint is None:
+                self._static_dims.append(shape_or_dim)
+
+        elif is_dynamic_tensor_like(shape_or_dim) and \
+                shape_or_dim.get_shape().ndims == 0:
+            shape_or_dim = tf.convert_to_tensor(shape_or_dim)
+            self._pieces[-1].append(shape_or_dim)
+            if static_shape_hint is None:
+                self._static_dims.append(None)
+
+        else:
+            if is_deterministic_shape(shape_or_dim):
+                if isinstance(shape_or_dim, tf.TensorShape):
+                    shape_or_dim = [int(v) for v in shape_or_dim.as_list()]
+                self._check_negative_one(*shape_or_dim)
+                self._pieces[-1].extend(shape_or_dim)
+                if static_shape_hint is None:
+                    self._static_dims.extend(shape_or_dim)
+            else:
+                if isinstance(shape_or_dim, tf.TensorShape):
+                    raise ValueError(
+                        '%r is an undetermined `tf.TensorShape`, which is '
+                        'not supported.  You should use `add_template` '
+                        'instead.' % (shape_or_dim,)
+                    )
+                elif isinstance(shape_or_dim, (tuple, list)):
+                    for dim in shape_or_dim:
+                        if is_integer(dim):
+                            dim = int(dim)
+                            self._check_negative_one(dim)
+                            if static_shape_hint is None:
+                                self._static_dims.append(dim)
+                        else:
+                            if static_shape_hint is None:
+                                self._static_dims.append(None)
+                        self._pieces[-1].append(dim)
+                else:
+                    assert (is_dynamic_tensor_like(shape_or_dim))
+                    assert (shape_or_dim.get_shape().ndims == 1)
+                    # require at least the shape of the shape tensor is fixed
+                    if not shape_or_dim.get_shape().is_fully_defined():
+                        raise ValueError(
+                            'The shape of component in %r is not '
+                            'deterministic, which is not supported.'
+                            % (shape_or_dim,)
+                        )
+                    shape_or_dim = tf.convert_to_tensor(shape_or_dim)
+                    self._pieces.append(shape_or_dim)
+                    self._pieces.append([])
+                    if static_shape_hint is None:
+                        for i in range(shape_or_dim.get_shape()[0].value):
+                            self._static_dims.append(None)
+
+        # use static_shape_hint to fill the static dimensions if available
+        if static_shape_hint is not None:
+            self._static_dims.extend(static_shape_hint)
+
     def add(self, shape_or_dim):
         """Add a piece of shape or a dimension.
         
@@ -373,68 +445,7 @@ class ReshapeHelper(NameScopeObject):
         -------
         self
         """
-        # pre-translate a dimension object into integer, or raise ValueError
-        if isinstance(shape_or_dim, tf.Dimension):
-            if shape_or_dim.value is None:
-                raise ValueError(
-                    '%r is an undetermined `tf.Dimension`, which is '
-                    'not supported.  You should use `add_template` '
-                    'instead.' % (shape_or_dim,)
-                )
-            shape_or_dim = shape_or_dim.value
-
-        # main routines
-        if is_integer(shape_or_dim):
-            shape_or_dim = int(shape_or_dim)
-            self._check_negative_one(shape_or_dim)
-            self._pieces[-1].append(shape_or_dim)
-            self._static_dims.append(shape_or_dim)
-
-        elif is_dynamic_tensor_like(shape_or_dim) and \
-                shape_or_dim.get_shape().ndims == 0:
-            shape_or_dim = tf.convert_to_tensor(shape_or_dim)
-            self._pieces[-1].append(shape_or_dim)
-            self._static_dims.append(None)
-
-        else:
-            if is_deterministic_shape(shape_or_dim):
-                if isinstance(shape_or_dim, tf.TensorShape):
-                    shape_or_dim = [int(v) for v in shape_or_dim.as_list()]
-                self._check_negative_one(*shape_or_dim)
-                self._pieces[-1].extend(shape_or_dim)
-                self._static_dims.extend(shape_or_dim)
-            else:
-                if isinstance(shape_or_dim, tf.TensorShape):
-                    raise ValueError(
-                        '%r is an undetermined `tf.TensorShape`, which is '
-                        'not supported.  You should use `add_template` '
-                        'instead.' % (shape_or_dim,)
-                    )
-                elif isinstance(shape_or_dim, (tuple, list)):
-                    for dim in shape_or_dim:
-                        if is_integer(dim):
-                            dim = int(dim)
-                            self._check_negative_one(dim)
-                            self._static_dims.append(dim)
-                        else:
-                            self._static_dims.append(None)
-                        self._pieces[-1].append(dim)
-                else:
-                    assert (is_dynamic_tensor_like(shape_or_dim))
-                    assert (shape_or_dim.get_shape().ndims == 1)
-                    # require at least the shape of the shape tensor is fixed
-                    if not shape_or_dim.get_shape().is_fully_defined():
-                        raise ValueError(
-                            'The shape of component in %r is not '
-                            'deterministic, which is not supported.'
-                            % (shape_or_dim,)
-                        )
-                    shape_or_dim = tf.convert_to_tensor(shape_or_dim)
-                    self._pieces.append(shape_or_dim)
-                    self._pieces.append([])
-                    for i in range(shape_or_dim.get_shape()[0].value):
-                        self._static_dims.append(None)
-
+        self._add_with_hint(shape_or_dim)
         return self
 
     @instance_name_scope
@@ -454,13 +465,13 @@ class ReshapeHelper(NameScopeObject):
         self
         """
         # attempt to get the deterministic shape
-        shape = x.get_shape()
+        static_shape = x.get_shape()
         if slice_func is not None:
-            shape = slice_func(shape)
+            static_shape = slice_func(static_shape)
 
-        if isinstance(shape, tf.TensorShape):
-            shape = shape.as_list()
-            if any(v is None for v in shape):
+        if isinstance(static_shape, tf.TensorShape):
+            static_shape = static_shape.as_list()
+            if any(v is None for v in static_shape):
                 dynamic_shape = tf.shape(x)
                 if slice_func is not None:
                     dynamic_shape = slice_func(dynamic_shape)
@@ -471,30 +482,31 @@ class ReshapeHelper(NameScopeObject):
                         'object %r, which is not a shape tensor.' %
                         (dynamic_shape,)
                     )
-                for i, v in enumerate(shape):
-                    if v is None:
-                        shape[i] = dynamic_shape[i]
-            return self.add(shape)
+                self._add_with_hint(dynamic_shape, static_shape)
+            else:
+                self._add_with_hint(static_shape)
+            return self
 
-        elif isinstance(shape, tf.Dimension):
+        elif isinstance(static_shape, tf.Dimension):
             assert (slice_func is not None)
-            shape = shape.value
-            if shape is None:
-                dynamic_shape = slice_func(tf.shape(x))
-                if not isinstance(dynamic_shape, tf.Tensor) or \
-                        dynamic_shape.get_shape().ndims != 0:
+            static_dim = static_shape.value
+            if static_dim is None:
+                dynamic_dim = slice_func(tf.shape(x))
+                if not isinstance(dynamic_dim, tf.Tensor) or \
+                        dynamic_dim.get_shape().ndims != 0:
                     raise TypeError(
                         '`slice_func` transforms shape tensor into '
                         'object %r, which is not a shape dimension.' %
-                        (dynamic_shape,)
+                        (dynamic_dim,)
                     )
-                shape = dynamic_shape
-            return self.add(shape)
+                self._add_with_hint(dynamic_dim)
+            else:
+                self._add_with_hint(static_dim)
 
         else:
             raise TypeError(
                 '`slice_func` transforms shape into object %r, which is '
-                'neither shape nor dimension.' % (shape,)
+                'neither shape nor dimension.' % (static_shape,)
             )
 
 
