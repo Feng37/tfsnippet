@@ -13,8 +13,6 @@ class Component(VarScopeObject):
     
     For example, one may implement a reusable neural network component
     as follows:
-    
-        from tensorflow.contrib import layers
 
         class MyComponent(BaseComponent):
         
