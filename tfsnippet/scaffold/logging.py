@@ -17,7 +17,8 @@ from tfsnippet.utils import (get_default_session_or_error,
 
 __all__ = [
     'TrainLogger',
-    'get_training_summary',
+    'get_parameters_summary',
+    'print_parameters_summary',
 ]
 
 _NOT_SET = object()
@@ -626,8 +627,8 @@ class TrainLogger(VarScopeObject):
         self._print_function(self.get_step_log())
 
 
-def get_training_summary(variables):
-    """Get a formatted summary about the training.
+def get_parameters_summary(variables):
+    """Get a formatted summary about the parameters.
     
     Parameters
     ----------
@@ -653,15 +654,37 @@ def get_training_summary(variables):
     var_shape = [str(s) for s in var_shape]
     var_table = pd.DataFrame(
         data=OrderedDict([
-            ('', var_name),
-            ('shape', var_shape),
-            ('count', np.asarray(var_count, dtype=np.int32))
+            ('a', var_name),
+            ('b', var_shape),
+            ('c', np.asarray(var_count, dtype=np.int32))
         ])
     )
 
     if len(var_count) > 0:
+        var_table_str = '\n'.join([
+            s.rstrip() for s in var_table.to_string(index=False).split('\n')
+        ][1:])
+        max_line_length = max(
+            len(s.rstrip()) for s in var_table_str.split('\n'))
         buf.append('Trainable Parameters (%d in total)\n' % sum(var_count))
-        buf.append(('-' * (len(buf[-1]) - 1)) + '\n')
-        buf.append(var_table.to_string(index=False, header=False) + '\n')
+        max_line_length = max(max_line_length, len(buf[-1]) - 1)
+        buf[-1] = (' ' * (max_line_length - len(buf[-1]) + 1) + buf[-1])
+        buf.append('-' * max_line_length + '\n')
+        buf.append(var_table_str)
 
     return buf
+
+
+def print_parameters_summary(variables, print_function=_print_function):
+    """Print formatted summary about the parameters.
+    
+    Parameters
+    ----------
+    variables : list[tf.Variable] | dict[str, tf.Variable]
+        List or dict of variables, which should be optimized during training.
+
+    print_function : (message) -> None
+        Function to print the training logs.
+    """
+    summary = get_parameters_summary(variables)
+    print_function(''.join(summary))

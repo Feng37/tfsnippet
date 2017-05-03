@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from mlcomp.utils import TemporaryDirectory
-from tfsnippet.scaffold import TrainLogger, get_training_summary
+from tfsnippet.scaffold import TrainLogger, get_parameters_summary
 from tests.helper import TestCase
 
 
@@ -254,7 +254,7 @@ class TrainLoggerTestCase(TestCase):
 
 class LoggingUtilsTestCase(TestCase):
 
-    def test_get_training_summary(self):
+    def test_get_parameters_summary(self):
         with tf.Graph().as_default():
             # test variable summaries
             a = tf.get_variable('a', dtype=tf.int32, shape=[2])
@@ -262,22 +262,22 @@ class LoggingUtilsTestCase(TestCase):
                 b = tf.get_variable('b', dtype=tf.float32, shape=(3, 4, 5))
             c = tf.get_variable('c', dtype=tf.float32, shape=())
 
-            self.assertEqual(get_training_summary([]), [])
-            self.assertEqual(get_training_summary([a]), [
+            self.assertEqual(get_parameters_summary([]), [])
+            self.assertEqual(get_parameters_summary([a]), [
                 'Trainable Parameters (2 in total)\n',
                 '---------------------------------\n',
-                'a  (2,)  2\n',
+                'a  (2,)  2',
             ])
-            self.assertEqual(get_training_summary([a, b, c]), [
+            self.assertEqual(get_parameters_summary([a, b, c]), [
                 'Trainable Parameters (63 in total)\n',
                 '----------------------------------\n',
-                'a       (2,)   2\n       c         ()   1\n'
-                'nested/b  (3, 4, 5)  60\n',
+                '       a       (2,)   2\n       c         ()   1\n'
+                'nested/b  (3, 4, 5)  60',
             ])
-            self.assertEqual(get_training_summary({'a': a, 'b': b, 'c': c}), [
+            self.assertEqual(get_parameters_summary({'a': a, 'b': b, 'c': c}), [
                 'Trainable Parameters (63 in total)\n',
                 '----------------------------------\n',
-                'a       (2,)   2\nb  (3, 4, 5)  60\nc         ()   1\n',
+                'a       (2,)   2\nb  (3, 4, 5)  60\nc         ()   1',
             ])
 
 
