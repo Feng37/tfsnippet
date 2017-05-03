@@ -5,8 +5,7 @@ import six
 import tensorflow as tf
 from logging import getLogger
 
-from .scope import VarScopeObject
-from .reuse import auto_reuse_variables
+from .scope import VarScopeObject, open_variable_scope
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
@@ -228,7 +227,7 @@ class VariableSaver(VarScopeObject):
         self.max_versions = max_versions
         self.latest_file = latest_file
         self.save_meta = save_meta
-        with auto_reuse_variables(self.variable_scope):
+        with open_variable_scope(self.variable_scope):
             self._saver = tf.train.Saver(
                 var_list=self.variables, max_to_keep=self.max_versions,
                 name='saver'
@@ -257,13 +256,23 @@ class VariableSaver(VarScopeObject):
             write_meta_graph=self.save_meta
         )
 
-    def restore(self):
-        """Restore the checkpoint from file if it exists."""
+    def restore(self, ignore_non_exist=True):
+        """Restore the checkpoint from file if it exists.
+        
+        Parameters
+        ----------
+        ignore_non_exist : bool
+            Whether or not to ignore error if the saved file does not exist?
+            (default True)
+        """
         file_path = self.get_latest_file()
         if file_path:
             sess = get_default_session_or_error()
-            getLogger(__name__).info(
-                'Restore from checkpoint file %r.',
-                file_path
-            )
             self._saver.restore(sess, file_path)
+            getLogger(__name__).debug(
+                'Restored from checkpoint file %r.', file_path)
+        elif not ignore_non_exist:
+            raise IOError(
+                'Checkpoint file does not exist at directory %r.' %
+                (self.save_dir,)
+            )

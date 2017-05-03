@@ -19,15 +19,7 @@ class Component(VarScopeObject):
         class MyComponent(BaseComponent):
         
             def _build(self, inputs):
-                return layers.fully_connected(
-                    inputs, 
-                    num_outputs=2,
-                    scope='fully_connected'
-                )
-
-    Note that the `scope` argument in the above example is necessary,
-    in which it enables the fully connected layer to use the same set
-    of parameters every time when `_build` is called.
+                return layers.fully_connected(inputs, num_outputs=2)
     """
 
     def _build(self, *args, **kwargs):

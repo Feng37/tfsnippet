@@ -3,10 +3,10 @@
 from mlcomp.utils import (AutoReprObject, ContextStack, TemporaryDirectory,
                           camel_to_underscore, minibatch_iterator,
                           minibatch_slices_iterator, deprecated,
-                          makedirs)
+                          makedirs, TemporaryDirectory)
 
 __all__ = [
     'AutoReprObject', 'ContextStack', 'TemporaryDirectory',
     'camel_to_underscore', 'minibatch_iterator', 'minibatch_slices_iterator',
-    'deprecated', 'makedirs',
+    'deprecated', 'makedirs', 'TemporaryDirectory',
 ]

@@ -1,37 +1,36 @@
 # -*- coding: utf-8 -*-
+import os
 import unittest
 
 import tensorflow as tf
 
 from tfsnippet.scaffold import Model
+from tfsnippet.utils import (TemporaryDirectory, set_variable_values,
+                             get_variable_values)
 from tests.helper import TestCase
 
 
 class _MyModel(Model):
 
     def _build(self):
-        self.model_var = tf.get_variable(
-            'model_var',
-            initializer=1,
-            dtype=tf.int32,
-            collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                         tf.GraphKeys.MODEL_VARIABLES]
-        )
+        with tf.variable_scope('model'):
+            self.model_var = tf.get_variable(
+                'model_var',
+                initializer=1,
+                dtype=tf.int32
+            )
+            with tf.variable_scope('nested'):
+                self.nested_var = tf.get_variable(
+                    'nested_var',
+                    initializer=3,
+                    dtype=tf.int32,
+                    trainable=False
+                )
         self.other_var = tf.get_variable(
             'other_var',
             initializer=2,
-            dtype=tf.int32,
-            collections=[tf.GraphKeys.GLOBAL_VARIABLES]
+            dtype=tf.int32
         )
-        with tf.variable_scope('nested'):
-            self.nested_var = tf.get_variable(
-                'nested_var',
-                initializer=3,
-                dtype=tf.int32,
-                collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                             tf.GraphKeys.MODEL_VARIABLES],
-                trainable=False
-            )
 
 
 class ModelTestCase(TestCase):
@@ -42,9 +41,7 @@ class ModelTestCase(TestCase):
             out_var = tf.get_variable(
                 'out_var',
                 initializer=-1,
-                dtype=tf.int32,
-                collections=[tf.GraphKeys.GLOBAL_VARIABLES,
-                             tf.GraphKeys.MODEL_VARIABLES]
+                dtype=tf.int32
             )
 
             # test build
@@ -58,9 +55,9 @@ class ModelTestCase(TestCase):
             self.assertEqual(
                 model.get_variables(),
                 {
-                    'model_var': model.model_var,
+                    'model/model_var': model.model_var,
+                    'model/nested/nested_var': model.nested_var,
                     'other_var': model.other_var,
-                    'nested/nested_var': model.nested_var,
                     'global_step': model.get_global_step()
                 }
             )
@@ -68,36 +65,63 @@ class ModelTestCase(TestCase):
             # test get parameter variables
             self.assertEqual(
                 model.get_param_variables(),
-                {'model_var': model.model_var,
-                 'nested/nested_var': model.nested_var}
+                {'model/model_var': model.model_var,
+                 'model/nested/nested_var': model.nested_var}
             )
             self.assertEqual(
-                model.get_param_variables(trainable=True),
-                {'model_var': model.model_var}
+                model.get_param_variables(tf.GraphKeys.TRAINABLE_VARIABLES),
+                {'model/model_var': model.model_var}
             )
 
-            # test get parameter values and set parameter values
+            # test save and load model
             init_op = tf.global_variables_initializer()
-            with tf.Session() as session:
+            with tf.Session() as session, TemporaryDirectory() as tempdir:
                 session.run(init_op)
+                model.save_model(tempdir)
+                model.save_model(os.path.join(tempdir, '1'))
+
+                with self.assertRaisesRegex(IOError, '.*already exists.'):
+                    model.save_model(tempdir)
+
                 self.assertEqual(
-                    model.get_param_values(),
-                    {'model_var': 1, 'nested/nested_var': 3}
+                    get_variable_values([model.model_var, model.nested_var]),
+                    [1, 3]
                 )
-                model.set_param_values(
-                    {'model_var': 10, 'nested/nested_var': 30})
+
+                # test load from tempdir
+                set_variable_values(
+                    [model.model_var, model.nested_var],
+                    [10, 30]
+                )
                 self.assertEqual(
-                    model.get_param_values(),
-                    {'model_var': 10, 'nested/nested_var': 30}
+                    get_variable_values([model.model_var, model.nested_var]),
+                    [10, 30]
                 )
-                with self.assertRaises(KeyError):
-                    model.set_param_values({'model_var': 10})
-                model.set_param_values(
-                    {'model_var': 100}, partial_set=True)
+                model.load_model(tempdir)
                 self.assertEqual(
-                    model.get_param_values(),
-                    {'model_var': 100, 'nested/nested_var': 30}
+                    get_variable_values([model.model_var, model.nested_var]),
+                    [1, 3]
                 )
+
+                # test load from tempdir + '/1'
+                set_variable_values(
+                    [model.model_var, model.nested_var],
+                    [10, 30]
+                )
+                self.assertEqual(
+                    get_variable_values([model.model_var, model.nested_var]),
+                    [10, 30]
+                )
+                model.load_model(os.path.join(tempdir, '1'))
+                self.assertEqual(
+                    get_variable_values([model.model_var, model.nested_var]),
+                    [1, 3]
+                )
+
+                # test load from non-exist
+                with self.assertRaisesRegex(
+                        IOError, 'Checkpoint file does not exist.*'):
+                    model.load_model(os.path.join(tempdir, '2'))
 
             # test name de-duplication
             self.assertEqual(_MyModel().variable_scope.name, 'my_model_1')

@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
+import os
+import shutil
+
 import numpy as np
 import six
 import tensorflow as tf
 
-from tfsnippet.utils import (get_default_session_or_error,
-                             ensure_variables_initialized,
+from tfsnippet.utils import (ensure_variables_initialized,
+                             open_variable_scope,
                              VarScopeObject,
-                             deprecated,
-                             auto_reuse_variables)
-from .defaults import get_option_defaults, OptionDefaults
+                             get_variables_as_dict, VariableSaver)
 
 __all__ = ['Model']
 
@@ -20,10 +21,6 @@ class Model(VarScopeObject):
     It settles a common practice for organizing the variables of parameters,
     as well as variables for training and prediction
 
-    Furthermore, it also provides a set of methods to export and import model
-    parameters as numpy arrays.  It might be useful for reusing part of the
-    model parameters in a customized way.
-
     Parameters
     ----------
     name : str
@@ -33,7 +30,7 @@ class Model(VarScopeObject):
         model will take exactly this name, even if another model has already
         taken such name.  That is to say, these two models will share the same
         variable scope.
-        
+
     default_name : str
         Default name of the model.
         
@@ -41,14 +38,11 @@ class Model(VarScopeObject):
         with unique name, according to the name suggested by `default_name`.
         If `default_name` is also not specified, it will use the underscored
         class name as the default name.
-        
+
     global_step : tf.Variable
         Manually specify a `global_step` variable instead of using the one
         which is created inside the model variable scope.
     """
-
-    #: default options of this model
-    OPTION_DEFAULTS = None      # type: OptionDefaults
 
     def __init__(self, name=None, default_name=None, global_step=None):
         super(Model, self).__init__(name=name, default_name=default_name)
@@ -59,43 +53,6 @@ class Model(VarScopeObject):
         # the global step variable of this model.
         self._global_step = global_step     # type: tf.Variable
 
-        # the placeholders and operations for set parameter values
-        self._set_param_value_ph_op = {}
-        self._set_all_param_values_op = None
-
-        # memorize the default parameter values at construction time
-        option_defaults = get_option_defaults()
-        if self.OPTION_DEFAULTS:
-            option_defaults = self.OPTION_DEFAULTS.merge(option_defaults)
-        self._option_defaults_at_construction = option_defaults
-        self._cached_option_defaults = [None, None]
-
-    @property
-    def option_defaults(self):
-        """Get the default options.
-         
-        The returned default parameters would be merged from current 
-        active context and from those specified at construction time.
-
-        Returns
-        -------
-        OptionDefaults
-            The default parameters.
-        """
-        defaults = get_option_defaults()
-        if defaults is self._option_defaults_at_construction:
-            return defaults
-        if defaults is not self._cached_option_defaults[0]:
-            self._cached_option_defaults[1] = \
-                defaults.merge(self._option_defaults_at_construction)
-            self._cached_option_defaults[0] = defaults
-        return self._cached_option_defaults[1]
-
-    @property
-    @deprecated
-    def model_variable_scope(self):
-        return self.variable_scope
-
     @property
     def has_built(self):
         """Whether or not the model has been built?"""
@@ -103,15 +60,15 @@ class Model(VarScopeObject):
 
     def set_global_step(self, global_step):
         """Manually set a variable as global step.
-        
+
         This method must be called before `build` or any other method
         that will cause the model to be built has been called.
-        
+
         Parameters
         ----------
         global_step : tf.Variable
             The global step variable to use.
-            
+
         Raises
         ------
         RuntimeError
@@ -138,7 +95,7 @@ class Model(VarScopeObject):
             return
         self._has_built = True
 
-        with auto_reuse_variables(self.variable_scope):
+        with open_variable_scope(self.variable_scope):
             # create the global step variable if there's none
             if self._global_step is None:
                 self._global_step = tf.get_variable(
@@ -146,38 +103,39 @@ class Model(VarScopeObject):
                     initializer=np.asarray(0, dtype=np.int64)
                 )
 
-            # build the model objects
+            # build the model
             self._build()
 
-            # build the placeholders and operation to set parameter values
-            with tf.name_scope('set_param_values'):
-                for name, var in six.iteritems(self.get_param_variables()):
-                    ph_dtype = var.dtype.base_dtype
-                    ph_name = 'assign_ph'
-                    op_name = 'assign_op'
-                    ph = tf.placeholder(ph_dtype, var.get_shape(), ph_name)
-                    op = tf.assign(var, ph, name=op_name)
-                    self._set_param_value_ph_op[name] = (ph, op)
-                self._set_all_param_values_op = tf.group(*(
-                    v[1] for v in six.itervalues(self._set_param_value_ph_op)
-                ))
-
     def _build(self):
-        """Build the model.
+        """Build the main part of the model.
 
-        Derived class should override this method to actually establish
-        all TensorFlow graph nodes for training and evaluating this model.
-
-        All the variables defined in this method will be added to `scope`,
-        so they can be retrieved by `tf.get_collection` according to this
-        scope.  However, for model parameter variables, they should also
-        be added to `tf.GraphKeys.MODEL_VARIABLES` collection, in order to
-        be distinguished from auxiliary variables used for training or
-        evaluation.
+        Derived classes should override this to actually build the model.
+        Note that all the variables to be considered as parameters must
+        be created within the "model" sub-scope, which will be saved and
+        restored via the interfaces of this class.
         
-        Note that the derived classes should use the parameter values defined
-        in `option_defaults`, so that the behavior of `build()` can follow
-        the context at construction time.
+        For example, one may override the `_build` method as follows:
+        
+            class MyModel(Model):
+            
+                def _build(self):
+                    with tf.variable_scope('model'):
+                        hidden_layer = layers.fully_connected(
+                            self.input_x, num_outputs=100
+                        )
+                        self.output = layers.fully_connected(
+                            hidden_layer, num_outputs=1
+                        )
+                    with tf.variable_scope('train'):
+                        loss = tf.reduce_mean(
+                            tf.square(self.output - self.label)
+                        )
+                        self.train_op = tf.AdamOptimizer().minimize(loss)
+
+        In this way, any variables introduced by the trainer will not be
+        collected as parameter variables (although they will still be
+        considered as model variables, and can be collected by the method
+        `get_variables`).
         """
         raise NotImplementedError()
 
@@ -201,101 +159,34 @@ class Model(VarScopeObject):
             Dict which maps from relative names to variable objects.
         """
         self.build()
-        scope_name = self.variable_scope.name + '/'
-        scope_name_len = len(scope_name)
-        return {
-            var.name[scope_name_len:].rsplit(':', 1)[0]: var
-            for var in tf.get_collection(collection, scope_name)
-        }
+        return get_variables_as_dict(self.variable_scope, collection=collection)
 
-    @deprecated('use `get_variables` instead.')
-    def get_model_variables(self, collection=tf.GraphKeys.GLOBAL_VARIABLES):
-        """Get the model variables."""
-        return self.get_variables(collection=collection)
+    def get_param_variables(self, collection=tf.GraphKeys.GLOBAL_VARIABLES):
+        """Get the parameter variables.
 
-    def get_param_variables(self, trainable=None):
-        """Get the model parameter variables.
-
-        The parameter variables are the variables in `_variable_scope`
-        and `tf.GraphKeys.MODEL_VARIABLES` collection.
-
-        It is possible to override this method to provide an alternative
-        strategy of organizing model variables.
+        The parameter variables are the variables defined in "model"
+        sub-scope within the model's variable scope.
 
         Parameters
         ----------
-        trainable : bool
-            If set to True, will only get the trainable parameters.
+        collection : str
+            The name of the variable collection.
+            If not specified, will use `tf.GraphKeys.GLOBAL_VARIABLES`.
 
         Returns
         -------
         dict[str, tf.Variable]
             Dict which maps from relative names to variable objects.
         """
-        model_vars = self.get_variables(tf.GraphKeys.MODEL_VARIABLES)
-        if trainable:
-            collection = tf.GraphKeys.TRAINABLE_VARIABLES
-            train_vars = self.get_variables(collection)
-            model_vars = {k: v for k, v in six.iteritems(model_vars)
-                          if k in train_vars}
-        return model_vars
-
-    def get_param_values(self):
-        """Get the model parameter values as numpy arrays.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Dict which maps from relative names to parameter values.
-        """
-        session = get_default_session_or_error()
-        param_vars = self.get_param_variables()
-        param_names = list(param_vars.keys())
-        param_values = session.run([param_vars[n] for n in param_names])
-        return {n: v for n, v in zip(param_names, param_values)}
-
-    def set_param_values(self, param_values, partial_set=False):
-        """Set the model parameter values as numpy arrays.
-
-        Parameters
-        ----------
-        param_values : dict[str, np.ndarray]
-            The parameter values, map from relative names to numpy arrays.
-
-        partial_set : bool
-            If not set to True, a KeyError will be raised if any of the
-            model parameter variables are not specified in `param_values`.
-        """
-        session = get_default_session_or_error()
-
-        # check the specified values
-        param_vars = self.get_param_variables()
-        param_names = list(param_vars.keys())
-        all_variables_set = True
-        for n in param_names:
-            if n not in param_values:
-                if not partial_set:
-                    raise KeyError(
-                        'Value of parameter %r is not specified.' % (n,))
-                else:
-                    all_variables_set = False
-                    break
-
-        # assign values to variables
-        if all_variables_set:
-            feed_dict = {
-                self._set_param_value_ph_op[n][0]: param_values[n]
-                for n in param_names
-            }
-            session.run(self._set_all_param_values_op, feed_dict=feed_dict)
-        else:
-            for n, value in six.iteritems(param_values):
-                if n in param_vars:
-                    ph, op = self._set_param_value_ph_op[n]
-                    session.run(op, feed_dict={ph: value})
+        vs_name = self.variable_scope.name + '/'
+        if vs_name and not vs_name.endswith('/'):
+            vs_name += '/'
+        vs_name += 'model/'
+        variables = get_variables_as_dict(vs_name, collection=collection)
+        return {'model/' + k: v for k, v in six.iteritems(variables)}
 
     def ensure_variables_initialized(self):
-        """Initialize all uninitialized model variables.
+        """Initialize all uninitialized variables within model's scope.
         
         If the `global_step` is created by the model itself, then it will
         also be initialized.  Otherwise the `global_step` must be manually
@@ -303,3 +194,38 @@ class Model(VarScopeObject):
         """
         var_list = list(six.itervalues(self.get_variables()))
         ensure_variables_initialized(var_list)
+
+    def save_model(self, save_dir, overwrite=False):
+        """Save the model parameters onto disk.
+        
+        Parameters
+        ----------
+        save_dir : str
+            Directory where to place the saved variables.
+            
+        overwrite : bool
+            Whether or not to overwrite the existing directory?
+        """
+        path = os.path.abspath(save_dir)
+        if os.path.exists(path):
+            if overwrite:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+            elif not os.path.isdir(path) or len(os.listdir(path)) > 0:
+                raise IOError('%r already exists.' % save_dir)
+        saver = VariableSaver(self.get_param_variables(), path)
+        saver.save()
+
+    def load_model(self, save_dir):
+        """Load the model parameters from disk.
+        
+        Parameters
+        ----------
+        save_dir : str
+            Directory where the saved variables are placed.
+        """
+        path = os.path.abspath(save_dir)
+        saver = VariableSaver(self.get_param_variables(), path)
+        saver.restore(ignore_non_exist=False)
