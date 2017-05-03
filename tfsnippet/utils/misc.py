@@ -37,7 +37,7 @@ __FLOATING_TYPES = (
 
 def is_dynamic_tensor_like(x):
     """Check whether or not `x` should be converted by `tf.convert_to_tensor`.
-    
+
     Parameters
     ----------
     x
@@ -49,12 +49,12 @@ def is_dynamic_tensor_like(x):
 
 def convert_to_tensor_if_dynamic(x, name=None):
     """Convert `x` to tensor if it is dynamic.
-    
+
     Parameters
     ----------
     x
         The object to be converted.
-        
+
     name : str
         Optional name of this operation.
     """
@@ -65,12 +65,12 @@ def convert_to_tensor_if_dynamic(x, name=None):
 
 def get_preferred_tensor_dtype(x):
     """Get the preferred dtype for specified tensor `x`.
-    
+
     Parameters
     ----------
     x : tf.Tensor | tf.Variable | np.ndarray | int | float
         The tensor or scalar whose dtype should be inferred.
-        
+
         If `x` is a TensorFlow tensor or variable, returns its base dtype.
         If `x` is a NumPy array, returns the dtype of array.
         If `x` is of other types, the corresponding dtype for a numpy array

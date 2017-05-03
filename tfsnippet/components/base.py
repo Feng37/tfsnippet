@@ -6,16 +6,16 @@ __all__ = ['Component']
 
 class Component(VarScopeObject):
     """Base class for neural network components.
-    
+
     A neural network component is basically a reusable object that
     could derive outputs for inputs, using the same, fixed set of
     parameters every time.
-    
+
     For example, one may implement a reusable neural network component
     as follows:
 
         class MyComponent(Component):
-        
+
             def _build(self, inputs):
                 return layers.fully_connected(inputs, num_outputs=2)
     """

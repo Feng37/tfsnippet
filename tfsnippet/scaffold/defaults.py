@@ -51,10 +51,10 @@ class OptionDefaults(AutoReprObject):
         When both of `gradient_clip_by_norm` and `gradient_clip_by_value`
         are specified, the gradient should be clipped first by norm, then
         by value at each dimension.
-        
+
     weights_regularizer : (list[tf.Tensor]) -> tf.Tensor
         Function to compute the weights regularizer.
-        
+
     biases_regularizer : (list[tf.Tensor]) -> tf.Tensor
         Function to compute the biases regularizer.
     """
@@ -106,10 +106,10 @@ class OptionDefaults(AutoReprObject):
 
     def as_dict(self):
         """Get the default parameters as dict.
-        
+
         Only the configured parameters (whose values are not None) will be
         included in the returned dict.
-        
+
         Returns
         -------
         dict[str, any]
@@ -139,15 +139,15 @@ class OptionDefaults(AutoReprObject):
 
     def merge(self, other):
         """Merge the parameters with another `OptionDefaults` instance.
-        
+
         The parameters will take values first from `other`, and then those
         not configured in `other` will take values from this instance.
-        
+
         Parameters
         ----------
         other : OptionDefaults
             The other default parameters object.
-        
+
         Returns
         -------
         OptionDefaults
@@ -159,10 +159,10 @@ class OptionDefaults(AutoReprObject):
 
     def get_optimizer(self):
         """Get an optimizer according to default parameters.
-        
+
         If the `optimizer_factory` has not been set, return an instance
         of `tf.train.AdamOptimizer` with default arguments.
-        
+
         Returns
         -------
         tf.train.Optimizer
@@ -205,10 +205,10 @@ class OptionDefaults(AutoReprObject):
 @contextmanager
 def option_defaults(**kwargs):
     """Open a scoped context with default parameters.
-    
+
     The specified default parameters will be merged with the default
     parameters in current context.
-    
+
     Parameters
     ----------
     **kwargs
@@ -220,7 +220,7 @@ def option_defaults(**kwargs):
 
 def get_option_defaults():
     """Get the default parameters object.
-    
+
     Returns
     -------
     OptionDefaults

@@ -26,7 +26,7 @@ class Distribution(VarScopeObject):
     When the `batch_shape` of specified parameters have more than 1 dimension,
     it might contain groups of events, whose probabilities should be accounted
     together.  Such requirement can be achieved by `group_event_ndims` argument
-    of the constructor, as well as the `prob(x)` and `log_prob(x)` method. 
+    of the constructor, as well as the `prob(x)` and `log_prob(x)` method.
 
     Parameters
     ----------
@@ -69,11 +69,11 @@ class Distribution(VarScopeObject):
     @property
     def group_event_ndims(self):
         """Get the number of dimensions to be considered as events group.
-        
+
         Returns
         -------
         int | None
-            The number of dimensions.  If `group_event_ndims` is not 
+            The number of dimensions.  If `group_event_ndims` is not
             specified in the constructor, will return None.
         """
         return self._group_event_ndims
@@ -132,7 +132,7 @@ class Distribution(VarScopeObject):
         sample_shape : tuple[int | tf.Tensor] | tf.Tensor
             The shape of the samples, as a tuple of integers / 0-d tensors,
             or a 1-d tensor.
-            
+
         name : str
             Optional name of this operation.
 
@@ -149,7 +149,7 @@ class Distribution(VarScopeObject):
 
     def log_prob(self, x, group_event_ndims=None, name=None):
         """Compute the log-probability of `x` against the distribution.
-        
+
         If `group_event_ndims` is configured, then the likelihoods of
         one group of events will be summed together.
 
@@ -157,11 +157,11 @@ class Distribution(VarScopeObject):
         ----------
         x : tf.Tensor
             The samples to be tested.
-            
+
         group_event_ndims : int
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
-            
+
         name : str
             Optional name of this operation.
 
@@ -204,7 +204,7 @@ class Distribution(VarScopeObject):
         The extra dimensions at the front of `x` will be regarded as
         different samples, and the likelihood will be computed along
         these dimensions.
-        
+
         If `group_event_ndims` is configured, then the likelihoods of
         one group of events will be multiplied together.
 
@@ -212,11 +212,11 @@ class Distribution(VarScopeObject):
         ----------
         x : tf.Tensor
             The samples to be tested.
-            
+
         group_event_ndims : int
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
-            
+
         name : str
             Optional name of this operation.
 
@@ -238,13 +238,13 @@ class Distribution(VarScopeObject):
 
         name : str
             Optional name of this operation.
-        
+
         Raises
         ------
         NotImplementedError
             If the KL-divergence of this distribution and `other` cannot be
             computed analytically.
-    
+
         Returns
         -------
         tf.Tensor

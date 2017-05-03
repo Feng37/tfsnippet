@@ -10,7 +10,7 @@ __all__ = [
 
 class Normal(StochasticTensor):
     """Stochastic tensor for Normal distribution.
-    
+
     Parameters
     ----------
     mean : tf.Tensor | np.ndarray | float
@@ -26,19 +26,19 @@ class Normal(StochasticTensor):
         Should be broadcastable to match `mean`.
 
         If `stddev` is specified, then `logstd` will be ignored.
-        
+
     sample_num : int | tf.Tensor | tf.Variable
         Optional number of samples to take. (default None)
-        
+
     observed : tf.Tensor
         If specified, random sampling will not take place.
         Instead this tensor will be regarded as sampled tensor.
         (default None)
-        
+
     validate_observed_shape : bool
         Whether or not to validate the shape of `observed`? (default False)
 
-        If set to True, the shape of `observed` must match that returned 
+        If set to True, the shape of `observed` must match that returned
         by `get_shape()`, given `sample_num` argument.
 
     group_event_ndims : int
@@ -48,7 +48,7 @@ class Normal(StochasticTensor):
 
     name : str
         Name of this normal distribution.
-        
+
     default_name : str
         Default name of this normal distribution.
     """
@@ -81,13 +81,13 @@ class Bernoulli(StochasticTensor):
         A float tensor, which is the log-odds of probabilities of being 1.
 
         The relationship between Bernoulli `p` and `logits` are:
-        
+
             .. math::
                 \\begin{aligned}
                     \\text{logits} &= \\log \\frac{p}{1-p} \\\\
-                                 p &= \\frac{1}{1 + \\exp(-\\text{logits})} 
+                                 p &= \\frac{1}{1 + \\exp(-\\text{logits})}
                 \\end{aligned}
-                
+
         Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
 
     dtype : tf.DType | np.dtype | str
@@ -100,11 +100,11 @@ class Bernoulli(StochasticTensor):
         If specified, random sampling will not take place.
         Instead this tensor will be regarded as sampled tensor.
         (default None)
-        
+
     validate_observed_shape : bool
         Whether or not to validate the shape of `observed`? (default False)
 
-        If set to True, the shape of `observed` must match that returned 
+        If set to True, the shape of `observed` must match that returned
         by `get_shape()`, given `sample_num` argument.
 
     group_event_ndims : int

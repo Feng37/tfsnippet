@@ -18,13 +18,13 @@ class Bernoulli(Distribution):
         A float tensor, which is the log-odds of probabilities of being 1.
 
         The relationship between Bernoulli `p` and `logits` are:
-        
+
             .. math::
                 \\begin{aligned}
                     \\text{logits} &= \\log \\frac{p}{1-p} \\\\
-                                 p &= \\frac{1}{1 + \\exp(-\\text{logits})} 
+                                 p &= \\frac{1}{1 + \\exp(-\\text{logits})}
                 \\end{aligned}
-                
+
         Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
 
     dtype : tf.DType | np.dtype | str
@@ -34,10 +34,10 @@ class Bernoulli(Distribution):
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
-        
+
     name : str
         Name of this normal distribution.
-        
+
     default_name : str
         Default name of this normal distribution.
     """

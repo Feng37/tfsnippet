@@ -26,27 +26,27 @@ __all__ = ['LossValidator']
 
 class LossValidator(VarScopeObject):
     """Class to help do validation on loss in training process.
-    
+
     Parameters
     ----------
     inputs : collections.Iterable[tf.Tensor]
         The input tensors for evaluating the validation loss.
-        
+
     valid_loss : tf.Tensor
         The validation loss tensor.  It must be a scalar tensor.
 
     global_step : tf.Tensor | tf.Variable
         Tensor to track the global step.
-        
+
     managed_vars : list[tf.Variable] | dict[str, tf.Variable]
         List or dict of variables regularized by best validation loss.
-        
+
         If dict is specified, the keys of the dict would be used as
         serialization keys.
 
     name : str
         Name of this loss validator.
-        
+
     default_name : str
         Default name of this loss validator.
     """
@@ -192,7 +192,7 @@ class LossValidator(VarScopeObject):
 
     def run(self, data, batch_size=None, feed_dict=None):
         """Do validation with specified `data`.
-        
+
         If there's any `keep_best` context open, then this method will
         save the managed variables if best validation loss is updated.
 
@@ -203,14 +203,14 @@ class LossValidator(VarScopeObject):
 
         batch_size : int
             If specified, will compute the validation loss in mini-batches.
-        
+
         feed_dict : dict[tf.Tensor, any]
             Additional feed dict other than those specified by `data`.
 
         Returns
         -------
         float
-            The averaged validation loss for given data. 
+            The averaged validation loss for given data.
         """
         loss = self._compute_loss(data, batch_size, feed_dict)
         if self._best_loss_val is None or loss < self._best_loss_val:
@@ -220,16 +220,16 @@ class LossValidator(VarScopeObject):
     @contextmanager
     def keep_best(self, save_dir=None, cleanup=True):
         """Open a scoped context to memorize variables at best validation loss.
-        
+
         Parameters
         ----------
         save_dir : str
             The directory where to save the variable values.
             If not specified, will use a temporary directory.
-            
+
         cleanup : bool
             Whether or not to cleanup the saving directory on exit?
-            
+
             This argument will be ignored if `save_dir` is None, while
             the temporary directory will always be deleted on exit.
         """

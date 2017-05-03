@@ -19,18 +19,18 @@ __all__ = [
 
 def get_dimension_size(x, dim, name=None):
     """Get the dimension size of `x` at specified `dim`.
-    
+
     Parameters
     ----------
     x : tf.Tensor
         The tensor whose dimension size should be queried.
-        
+
     dim : int | tf.Tensor | tf.Variable
         The dimension index.
-        
+
     name : str
         Optional name of this operation.
-        
+
     Returns
     -------
     int | tf.Tensor
@@ -53,25 +53,25 @@ def get_dimension_size(x, dim, name=None):
 
 def get_dynamic_tensor_shape(x, slice_func=None, name=None):
     """Get the dynamic tensor shape of `x`.
-    
+
     This method will return a tuple of integers (i.e., fully defined shape)
     if it is possible, despite of the method name `get_dynamic_tensor_shape`.
-    
+
     Parameters
     ----------
     x : tf.Tensor
         The tensor whose shape should be queried.
-        
+
     slice_func
         Optional function to slice on the dynamic shape of `x`.
 
         Given this argument, a tuple of integers will be returned
         whenever it is possible, even if some dimension of `x`
         discarded by `slice_func` is not deterministic.
-        
+
     name : str
         Optional name of this operation.
-    
+
     Returns
     -------
     tuple[int] | tf.Tensor
@@ -133,21 +133,21 @@ def is_deterministic_shape(x):
 
 
 def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
-    """Repeat the tensor `x` whose first-dimension should be 1 or 
-    `sample_size` or `batch_size` to a repeated tensor whose first-dimension 
+    """Repeat the tensor `x` whose first-dimension should be 1 or
+    `sample_size` or `batch_size` to a repeated tensor whose first-dimension
     will be `sample_size` * `batch_size`.
-    
+
     Parameters
     ----------
     x: tf.Tensor | tf.Variable
-        The tensor or variable need to be repeated. 
-        
+        The tensor or variable need to be repeated.
+
     sample_size: int | tf.Tensor | tf.Variable
         The size of samples, which should be an integer scalar.
-        
+
     batch_size: int | tf.Tensor | tf.Variable
         The size of batch, which should be an integer scalar.
-        
+
     name : str
         Optional name of this operation.
 
@@ -246,7 +246,7 @@ def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
 
 class ReshapeHelper(NameScopeObject):
     """Class to help build the argument for `tf.reshape`.
-    
+
     It is often the case we need to reshape a tensor with dynamic shape
     argument, while the simple `-1` trick no longer applies.
     With the help of this class, it is easy to do dynamic reshaping with
@@ -261,18 +261,18 @@ class ReshapeHelper(NameScopeObject):
                 add_template(x, lambda s: s[1:]).
                 reshape(x)
         )
-        
+
     Will result in a 5-d tensor `x_reshaped`, with static shape (1, ?, ?, ?, 2),
     and corresponding dynamic shape.
-    
-    Note that this reshape helper only supports to build shapes with 
+
+    Note that this reshape helper only supports to build shapes with
     determined number of dimensions.
 
     Parameters
     ----------
     allow_negative_one : bool
         Whether or not to allow `-1` as dimension? (default True)
-        
+
     name : str
         Optional name of this reshape helper.
     """
@@ -291,7 +291,7 @@ class ReshapeHelper(NameScopeObject):
     @property
     def is_deterministic(self):
         """Whether or not the `shape` is deterministic (composed of integers)?
-        
+
         Note that even if `-1` is specified in the shape, it will be regarded
         as deterministic shape, since the whole shape does not depend on
         dynamic tensors.
@@ -301,7 +301,7 @@ class ReshapeHelper(NameScopeObject):
     @instance_name_scope
     def get_dynamic_shape(self):
         """Get static tuple of int if deterministic, or dynamic shape tensor.
-        
+
         Returns
         -------
         tuple[int] | tf.Tensor
@@ -315,14 +315,14 @@ class ReshapeHelper(NameScopeObject):
 
     def get_static_shape(self):
         """Get the static tensor shape.
-        
+
         The returned tensor shape object could be used to fix the reshaped
-        tensor's static shape after calling `tf.reshape`, if any dynamic 
+        tensor's static shape after calling `tf.reshape`, if any dynamic
         tensors are used to build the shape.
-        
+
         Note that this method will translate `-1` as undetermined dimension,
         so it is not recommended to use this if `is_deterministic` is True.
-        
+
         Returns
         -------
         tf.TensorShape
@@ -334,7 +334,7 @@ class ReshapeHelper(NameScopeObject):
     @instance_name_scope
     def reshape(self, x):
         """Reshape `x` into desired shape.
-        
+
         Parameters
         ----------
         x : tf.Tensor | tf.Variable
@@ -429,18 +429,18 @@ class ReshapeHelper(NameScopeObject):
 
     def add(self, shape_or_dim):
         """Add a piece of shape or a dimension.
-        
+
         Parameters
         ----------
         shape_or_dim
             One of these types: int, tuple[int], list[int], tf.TensorShape,
             tf.Dimension, tf.Tensor, tf.Variable.
-            
+
             If it is a constant integer or a scalar tensor, it will be
             treated as a dimension.  Otherwise it will be treated as a
             piece of shape.  In both cases, it will be appended to the
             end of the shape being built.
-            
+
         Returns
         -------
         self
@@ -451,15 +451,15 @@ class ReshapeHelper(NameScopeObject):
     @instance_name_scope
     def add_template(self, x, slice_func=None):
         """Add a piece of shape or a dimension, according to the shape of `x`.
-        
+
         Parameters
         ----------
         x : tf.Tensor | tf.Variable
             The tensor whose shape will be used as template.
-            
+
         slice_func
             Optional slicing function to slice a static or dynamic shape.
-            
+
         Returns
         -------
         self
@@ -517,13 +517,13 @@ def explicit_broadcast(x, y, name=None):
     ----------
     x, y : tf.Tensor
         The tensors to broadcast.
-        
+
     name : str
         Optional name of this operation.
 
     Returns
     -------
-    (tf.Tensor, tf.Tensor)  
+    (tf.Tensor, tf.Tensor)
         The tensors after broadcast.
     """
     try:
@@ -540,18 +540,18 @@ def explicit_broadcast(x, y, name=None):
 
 def maybe_explicit_broadcast(x, y, name=None):
     """Explicit broadcast two tensors to have the same shape if necessary.
-    
+
     Parameters
     ----------
     x, y : tf.Tensor
         The tensors to broadcast.
-        
+
     name : str
         Optional name of this operation.
 
     Returns
     -------
-    (tf.Tensor, tf.Tensor)  
+    (tf.Tensor, tf.Tensor)
         The tensors after broadcast.
     """
     if not (x.get_shape() and y.get_shape()):

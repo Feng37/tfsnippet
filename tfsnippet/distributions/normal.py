@@ -21,8 +21,8 @@ class Normal(Distribution):
     stddev : tf.Tensor | np.ndarray | float
         The standard derivation of the Normal distribution.
         Should be broadcastable to match `mean`.
-        
-        Note that the range of `stddev` is :math:`(0, \\infty)`. 
+
+        Note that the range of `stddev` is :math:`(0, \\infty)`.
 
     logstd : tf.Tensor | np.ndarray | float
         The log standard derivation of the Normal distribution.
@@ -30,15 +30,15 @@ class Normal(Distribution):
 
         If `stddev` is specified, then `logstd` will be ignored.
         Note that the range of `logstd` is :math:`(-\\infty, \\infty)`.
-        
+
     group_event_ndims : int
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
-        
+
     name : str
         Name of this normal distribution.
-        
+
     default_name : str
         Default name of this normal distribution.
     """
