@@ -264,20 +264,23 @@ class LoggingUtilsTestCase(TestCase):
 
             self.assertEqual(get_parameters_summary([]), [])
             self.assertEqual(get_parameters_summary([a]), [
-                'Trainable Parameters (2 in total)\n',
-                '---------------------------------\n',
+                'Trainable Parameters (2 in total)',
+                '---------------------------------',
                 'a  (2,)  2',
             ])
             self.assertEqual(get_parameters_summary([a, b, c]), [
-                'Trainable Parameters (63 in total)\n',
-                '----------------------------------\n',
-                '       a       (2,)   2\n       c         ()   1\n'
+                'Trainable Parameters (63 in total)',
+                '----------------------------------',
+                'a         (2,)       2',
+                'c         ()         1',
                 'nested/b  (3, 4, 5)  60',
             ])
             self.assertEqual(get_parameters_summary({'a': a, 'b': b, 'c': c}), [
-                'Trainable Parameters (63 in total)\n',
-                '----------------------------------\n',
-                'a       (2,)   2\nb  (3, 4, 5)  60\nc         ()   1',
+                'Trainable Parameters (63 in total)',
+                '----------------------------------',
+                'a  (2,)       2',
+                'b  (3, 4, 5)  60',
+                'c  ()         1',
             ])
 
 

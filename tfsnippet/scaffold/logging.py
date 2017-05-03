@@ -8,7 +8,6 @@ from contextlib import contextmanager
 import six
 import numpy as np
 import tensorflow as tf
-import pandas as pd
 
 from tfsnippet.utils import (get_default_session_or_error,
                              is_integer,
@@ -638,7 +637,7 @@ def get_parameters_summary(variables):
     Returns
     -------
     list[str]
-        Formatted message lines (including line endings) about the training.
+        Formatted message lines (excluding line endings) about the training.
     """
     buf = []
 
@@ -650,27 +649,25 @@ def get_parameters_summary(variables):
         variables = sorted(variables, key=lambda v: v.name)
         var_name = [v.name.rsplit(':', 1)[0] for v in variables]
         var_shape = [v.get_shape() for v in variables]
-    var_count = [np.prod(s.as_list()) for s in var_shape]
+    var_count = [int(np.prod(s.as_list(), dtype=np.int32)) for s in var_shape]
+    var_count_total = sum(var_count)
     var_shape = [str(s) for s in var_shape]
-    var_table = pd.DataFrame(
-        data=OrderedDict([
-            ('a', var_name),
-            ('b', var_shape),
-            ('c', np.asarray(var_count, dtype=np.int32))
-        ])
-    )
+    var_count = [str(s) for s in var_count]
 
     if len(var_count) > 0:
-        var_table_str = '\n'.join([
-            s.rstrip() for s in var_table.to_string(index=False).split('\n')
-        ][1:])
-        max_line_length = max(
-            len(s.rstrip()) for s in var_table_str.split('\n'))
-        buf.append('Trainable Parameters (%d in total)\n' % sum(var_count))
-        max_line_length = max(max_line_length, len(buf[-1]) - 1)
-        buf[-1] = (' ' * (max_line_length - len(buf[-1]) + 1) + buf[-1])
-        buf.append('-' * max_line_length + '\n')
-        buf.append(var_table_str)
+        var_title = 'Trainable Parameters (%d in total)' % (var_count_total,)
+
+        x, y, z = (max(map(len, var_name)), max(map(len, var_shape)),
+                   max(map(len, var_count)))
+        var_format = '%%-%ds  %%-%ds  %%s' % (x, y)
+        var_table = []
+        for name, shape, count in zip(var_name, var_shape, var_count):
+            var_table.append(var_format % (name, shape, count))
+
+        max_line_length = max(x + y + z + 4, len(var_title))
+        buf.append(var_title)
+        buf.append('-' * max_line_length)
+        buf.extend(var_table)
 
     return buf
 
@@ -687,4 +684,4 @@ def print_parameters_summary(variables, print_function=_print_function):
         Function to print the training logs.
     """
     summary = get_parameters_summary(variables)
-    print_function(''.join(summary))
+    print_function('\n'.join(summary))
