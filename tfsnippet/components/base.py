@@ -14,7 +14,7 @@ class Component(VarScopeObject):
     For example, one may implement a reusable neural network component
     as follows:
 
-        class MyComponent(BaseComponent):
+        class MyComponent(Component):
         
             def _build(self, inputs):
                 return layers.fully_connected(inputs, num_outputs=2)
