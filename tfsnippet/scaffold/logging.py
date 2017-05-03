@@ -8,6 +8,7 @@ from contextlib import contextmanager
 import six
 import numpy as np
 import tensorflow as tf
+import pandas as pd
 
 from tfsnippet.utils import (get_default_session_or_error,
                              is_integer,
@@ -16,6 +17,7 @@ from tfsnippet.utils import (get_default_session_or_error,
 
 __all__ = [
     'TrainLogger',
+    'get_training_summary',
 ]
 
 _NOT_SET = object()
@@ -622,3 +624,44 @@ class TrainLogger(VarScopeObject):
         It will also clear all the metrics afterwards.
         """
         self._print_function(self.get_step_log())
+
+
+def get_training_summary(variables):
+    """Get a formatted summary about the training.
+    
+    Parameters
+    ----------
+    variables : list[tf.Variable] | dict[str, tf.Variable]
+        List or dict of variables, which should be optimized during training.
+        
+    Returns
+    -------
+    list[str]
+        Formatted message lines (including line endings) about the training.
+    """
+    buf = []
+
+    # collect trainable variable summaries
+    if isinstance(variables, dict):
+        var_name, var_shape = list(zip(*sorted(six.iteritems(variables))))
+        var_shape = [s.get_shape() for s in var_shape]
+    else:
+        variables = sorted(variables, key=lambda v: v.name)
+        var_name = [v.name.rsplit(':', 1)[0] for v in variables]
+        var_shape = [v.get_shape() for v in variables]
+    var_count = [np.prod(s.as_list()) for s in var_shape]
+    var_shape = [str(s) for s in var_shape]
+    var_table = pd.DataFrame(
+        data=OrderedDict([
+            ('', var_name),
+            ('shape', var_shape),
+            ('count', np.asarray(var_count, dtype=np.int32))
+        ])
+    )
+
+    if len(var_count) > 0:
+        buf.append('Trainable Parameters (%d in total)\n' % sum(var_count))
+        buf.append(('-' * (len(buf[-1]) - 1)) + '\n')
+        buf.append(var_table.to_string(index=False, header=False) + '\n')
+
+    return buf

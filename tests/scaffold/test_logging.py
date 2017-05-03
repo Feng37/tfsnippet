@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from mlcomp.utils import TemporaryDirectory
-from tfsnippet.scaffold import TrainLogger
+from tfsnippet.scaffold import TrainLogger, get_training_summary
 from tests.helper import TestCase
 
 
@@ -250,6 +250,35 @@ class TrainLoggerTestCase(TestCase):
                 valid_loss_values,
                 [-1, -2]
             )
+
+
+class LoggingUtilsTestCase(TestCase):
+
+    def test_get_training_summary(self):
+        with tf.Graph().as_default():
+            # test variable summaries
+            a = tf.get_variable('a', dtype=tf.int32, shape=[2])
+            with tf.variable_scope('nested'):
+                b = tf.get_variable('b', dtype=tf.float32, shape=(3, 4, 5))
+            c = tf.get_variable('c', dtype=tf.float32, shape=())
+
+            self.assertEqual(get_training_summary([]), [])
+            self.assertEqual(get_training_summary([a]), [
+                'Trainable Parameters (2 in total)\n',
+                '---------------------------------\n',
+                'a  (2,)  2\n',
+            ])
+            self.assertEqual(get_training_summary([a, b, c]), [
+                'Trainable Parameters (63 in total)\n',
+                '----------------------------------\n',
+                'a       (2,)   2\n       c         ()   1\n'
+                'nested/b  (3, 4, 5)  60\n',
+            ])
+            self.assertEqual(get_training_summary({'a': a, 'b': b, 'c': c}), [
+                'Trainable Parameters (63 in total)\n',
+                '----------------------------------\n',
+                'a       (2,)   2\nb  (3, 4, 5)  60\nc         ()   1\n',
+            ])
 
 
 if __name__ == '__main__':
