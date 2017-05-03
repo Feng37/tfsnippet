@@ -143,7 +143,7 @@ def open_variable_scope(name_or_scope,
 
 
 class VarScopeObject(object):
-    """Base class for all objects owns a variable scope.
+    """Base class for object that owns a variable scope.
     
     Such an object is compatible with the use patterns of `instance_reuse`.
 
