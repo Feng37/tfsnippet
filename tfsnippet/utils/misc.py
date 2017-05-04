@@ -5,8 +5,8 @@ import tensorflow as tf
 
 __all__ = [
     'is_integer', 'is_float', 'is_dynamic_tensor_like',
-    'convert_to_tensor_if_dynamic',
-    'get_preferred_tensor_dtype',
+    'convert_to_tensor_if_dynamic', 'get_preferred_tensor_dtype',
+    'MetricAccumulator',
 ]
 
 
@@ -86,3 +86,66 @@ def get_preferred_tensor_dtype(x):
         return tf.as_dtype(dtype).base_dtype
     else:
         return tf.as_dtype(np.array([x]).dtype)
+
+
+class MetricAccumulator(object):
+    """Accumulator to compute the average of certain metric.
+
+    Parameters
+    ----------
+    initial_value : float
+        The initial value of this accumulator (default 0.)
+
+    initial_weight : float
+        The initial weight of this accumulator (default 0.)
+    """
+
+    def __init__(self, initial_value=0., initial_weight=0.):
+        if initial_weight < 0:
+            raise ValueError('`initial_weight` must be greater or equal to 0.')
+        self._initial_value = float(initial_value)
+        self._initial_weight = float(initial_weight)
+        self._value = initial_value
+        self._weight = initial_weight
+        self._counter = 0
+
+    @property
+    def weight(self):
+        """Get the weight of accumulated values."""
+        return self._weight
+
+    @property
+    def value(self):
+        """Get the average value, or None if no value has been collected."""
+        return self._value
+
+    @property
+    def has_value(self):
+        """Whether or not any value has been collected?"""
+        return self._counter > 0
+
+    @property
+    def counter(self):
+        """Get the counter of added values."""
+        return self._counter
+
+    def reset(self):
+        """Reset the accumulator to initial state."""
+        self._value = self._initial_value
+        self._weight = self._initial_weight
+        self._counter = 0
+
+    def add(self, value, weight=1.):
+        """Add a value to this accumulator.
+
+        Parameters
+        ----------
+        value : float
+            The value to be collected.
+            
+        weight : float
+            Optional weight of this value (default 1.)
+        """
+        self._weight += weight
+        self._value += (value - self._value) * (weight / self._weight)
+        self._counter += 1

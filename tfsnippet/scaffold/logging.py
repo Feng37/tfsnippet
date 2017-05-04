@@ -12,7 +12,8 @@ import tensorflow as tf
 from tfsnippet.utils import (get_default_session_or_error,
                              is_integer,
                              is_float,
-                             VarScopeObject)
+                             VarScopeObject,
+                             MetricAccumulator)
 
 __all__ = [
     'TrainLogger',
@@ -28,33 +29,6 @@ _LOSS_METRICS = re.compile(r'(^|.*[_/])loss$')
 _ACC_METRICS = re.compile(r'(^|.*[_/])acc(uracy)?$')
 _TIME_METRICS = re.compile(r'(^|.*[_/])timer?$')
 _EPOCH_RELATED_METRICS = [_EPOCH_TIME]
-
-
-class _MetricAccumulator(object):
-    """Accumulator to compute the average of certain metric."""
-
-    def __init__(self, initial_value=0., initial_counter=0):
-        if initial_counter < 0:
-            raise ValueError('`initial_counter` must be greater or equal to 0.')
-        self.initial_value = initial_value
-        self.initial_counter = initial_counter
-        self.value = initial_value
-        self.counter = initial_counter
-
-    @property
-    def has_value(self):
-        return self.counter > self.initial_counter
-
-    def get_value(self):
-        return None if not self.has_value else self.value
-
-    def reset(self):
-        self.value = self.initial_value
-        self.counter = self.initial_counter
-
-    def submit(self, metric):
-        self.counter += 1
-        self.value += (metric - self.value) / float(self.counter)
 
 
 class _MetricBestTracker(object):
@@ -236,7 +210,7 @@ class TrainLogger(VarScopeObject):
         self._larger_better_metrics = tuple(larger_better_metrics or ())
 
         # accumulators for various metrics
-        self._metrics = defaultdict(_MetricAccumulator)
+        self._metrics = defaultdict(MetricAccumulator)
 
         # best value trackers
         self._best_tracker = {}
@@ -253,9 +227,7 @@ class TrainLogger(VarScopeObject):
     def reset(self):
         """Reset all internal states.
         
-        Note that `summary_writer` is not managed by this object, thus
-        cannot be reset.  Reset a `TrainLogger` instance with an external
-        `summary_writer` should make no sense.
+        This method will set `summary_writer` to None.
         """
         self.epoch = self.initial_epoch
         self.step = self.initial_step
@@ -264,6 +236,18 @@ class TrainLogger(VarScopeObject):
         self._summary_exclude_test.clear()
         self._epoch_start_time = self._step_start_time = None
         self._within_epoch = self._within_step = False
+
+    @property
+    def summary_writer(self):
+        """Get the summary writer."""
+        return self._summary_writer
+
+    def set_summary_writer(self, summary_writer):
+        """Set the summary writer."""
+        if not isinstance(summary_writer, tf.summary.FileWriter):
+            raise TypeError('`summary_writer` is expected to be a FileWriter, '
+                            'but got %r.' % (summary_writer,))
+        self._summary_writer = summary_writer
 
     def get_metric(self, name):
         """Get the accumulated average metric value.
@@ -279,7 +263,9 @@ class TrainLogger(VarScopeObject):
             Average value of the metric, or None if the metric does not exist.             
         """
         if name in self._metrics:
-            return self._metrics[name].get_value()
+            m = self._metrics[name]
+            if m.has_value:
+                return m.value
 
     def is_best_metric(self, name, value):
         """Check whether or not `value` for metric `name` is the best value.
@@ -335,7 +321,7 @@ class TrainLogger(VarScopeObject):
 
     def _add_metrics(self, metrics):
         for k, v in metrics:
-            self._metrics[k].submit(v)
+            self._metrics[k].add(v)
             best_tracker = self._get_best_tracker(k)
             if best_tracker is not None:
                 best_tracker.submit(v)
