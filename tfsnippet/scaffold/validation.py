@@ -12,15 +12,15 @@ __all__ = ['early_stopping']
 
 class _EarlyStopping(object):
     """Class to hold the best loss within an early-stopping context.
-    
+
     Parameters
     ----------
     saver : VariableSaver
         The variable saver for early-stopping.
-        
+
     best_loss : float
         The initial best loss (default None).
-    
+
     smaller_is_better : bool
         Whether or not the less, the better loss? (default True)
     """
@@ -32,12 +32,12 @@ class _EarlyStopping(object):
 
     def update(self, loss, global_step=None):
         """Update the best loss.
-        
+
         Parameters
         ----------
         loss : float
             New loss value.
-            
+
         global_step : int
             Optional global step counter.
         """
@@ -52,45 +52,45 @@ class _EarlyStopping(object):
 def early_stopping(param_vars, save_dir=None, smaller_is_better=False,
                    restore_on_error=False, cleanup=True, name=None):
     """Open a context to memorize the values of parameters at best loss.
-    
+
     An example of using this early-stopping context is:
-    
+
         with early_stopping(param_vars) as es:
             ...
             es.update(valid_loss, step)
             ...
-    
+
     Parameters
     ----------
     param_vars : list[tf.Variable] | dict[str, tf.Variable]
         List or dict of variables to be memorized.
-        
+
         If a dict is specified, the keys of the dict would be used as the
         serializations keys via `VariableSaver`.
-        
+
     save_dir : str
         The directory where to save the variable values.
         If not specified, will use a temporary directory.
-        
+
     smaller_is_better : bool
         Whether or not the less, the better loss? (default True)
-        
+
     restore_on_error : bool
         Whether or not to restore the memorized parameters even on error?
         (default False)
-            
+
     cleanup : bool
         Whether or not to cleanup the saving directory on exit?
-        
+
         This argument will be ignored if `save_dir` is None, while
         the temporary directory will always be deleted on exit.
-        
+
     name : str
         Optional name of this scope.
-        
+
     Yields
     ------
-    _EarlyStopping 
+    _EarlyStopping
         The object to receive loss during early-stopping context.
     """
     if save_dir is None:

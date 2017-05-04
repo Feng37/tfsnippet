@@ -226,7 +226,7 @@ class TrainLogger(VarScopeObject):
 
     def reset(self):
         """Reset all internal states.
-        
+
         This method will set `summary_writer` to None.
         """
         self.epoch = self.initial_epoch

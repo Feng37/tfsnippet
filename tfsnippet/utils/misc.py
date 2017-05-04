@@ -142,7 +142,7 @@ class MetricAccumulator(object):
         ----------
         value : float
             The value to be collected.
-            
+
         weight : float
             Optional weight of this value (default 1.)
         """
