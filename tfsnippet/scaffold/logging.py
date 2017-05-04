@@ -253,17 +253,28 @@ class TrainLogger(VarScopeObject):
     def reset(self):
         """Reset all internal states.
 
-        Note that `summary_writer` is not managed by this object, thus
-        cannot be reset.  Reset a `TrainLogger` instance with an external
-        `summary_writer` should make no sense.
+        Note that this method will set the `summary_writer` to None,
+        so that a `TrainLogger` could be safely reused among training
+        sessions.
         """
         self.epoch = self.initial_epoch
         self.step = self.initial_step
+        self._summary_writer = None
         self._metrics.clear()
         self._best_tracker.clear()
         self._summary_exclude_test.clear()
         self._epoch_start_time = self._step_start_time = None
         self._within_epoch = self._within_step = False
+
+    @property
+    def summary_writer(self):
+        return self._summary_writer
+
+    @summary_writer.setter
+    def summary_writer(self, writer):
+        if not isinstance(writer, tf.summary.FileWriter):
+            raise TypeError('Expected a FileWriter, but got %r.' % (writer,))
+        self._summary_writer = writer
 
     def get_metric(self, name):
         """Get the accumulated average metric value.
@@ -428,7 +439,7 @@ class TrainLogger(VarScopeObject):
         """Iterate through epochs.
 
         This method will yield the epoch counters.  If `max_epoch` is
-        configured, it will stop at `max_epoch` (exclusive).
+        configured, it will stop at `max_epoch`.
         Note that this method is not necessary, where the following
         two loops are equivalent:
 
@@ -442,7 +453,7 @@ class TrainLogger(VarScopeObject):
                 ...
 
             # The second approach: to iterate through epochs by hand.
-            for epoch in range(1, 4):
+            for epoch in range(1, logger.max_epoch + 1):
                 with logger.enter_epoch():
                     ...
 

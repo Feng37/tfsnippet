@@ -27,14 +27,14 @@ def open_variable_scope(name_or_scope,
                         partitioner=None,
                         custom_getter=None,
                         dtype=tf.float32):
-    """Open or re-open a variable scope, ensuring to open `original_name_scope`.
+    """Open or re-open a variable scope.
 
     When using `tf.variable_scope` to re-open an existing variable scope, the
     original name scope will not be open.  Instead a different name scope will
     be opened under the current name scope.
 
     This method thus fixes this issue, by ensuring to open the original name
-    scope if a variable scope is re-opened, if `keep_name_scope` is required.
+    scope if a variable scope is re-opened, if `unique_name_scope` is False.
 
     Notes
     -----

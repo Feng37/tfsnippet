@@ -18,8 +18,7 @@ from tfsnippet.utils import (get_default_session_or_error,
                              try_get_variable_value,
                              VarScopeObject,
                              makedirs,
-                             is_dynamic_tensor_like,
-                             open_variable_scope)
+                             is_dynamic_tensor_like)
 
 __all__ = ['LossValidator']
 
@@ -83,7 +82,7 @@ class LossValidator(VarScopeObject):
 
         # create the variable, the tensors and the operations to track
         # best validation loss
-        with open_variable_scope(self.variable_scope):
+        with tf.variable_scope(self.variable_scope):
             self._best_loss = tf.get_variable(
                 'best_loss',
                 initializer=np.nan,
@@ -259,7 +258,7 @@ class LossValidator(VarScopeObject):
                 if self._best_loss_val is not None and \
                         np.isnan(self._best_loss_val):
                     self._best_loss_val = None
-                with open_variable_scope(self.variable_scope):
+                with tf.variable_scope(self.variable_scope):
                     self._saver = VariableSaver(
                         self._managed_vars, save_dir, save_meta=False)
 

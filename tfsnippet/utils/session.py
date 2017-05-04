@@ -5,7 +5,7 @@ import six
 import tensorflow as tf
 from logging import getLogger
 
-from .scope import VarScopeObject, open_variable_scope
+from .scope import VarScopeObject
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
@@ -227,7 +227,7 @@ class VariableSaver(VarScopeObject):
         self.max_versions = max_versions
         self.latest_file = latest_file
         self.save_meta = save_meta
-        with open_variable_scope(self.variable_scope):
+        with tf.variable_scope(self.variable_scope):
             self._saver = tf.train.Saver(
                 var_list=self.variables, max_to_keep=self.max_versions,
                 name='saver'
