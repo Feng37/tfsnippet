@@ -121,25 +121,25 @@ class TrainLogger(VarScopeObject):
     Parameters
     ----------
     initial_epoch : int | tf.Tensor | tf.Variable
-        Specify the initial epoch of the training process. 
+        Specify the initial epoch of the training process.
         It should be one less than the first logged epoch (default 0).
-        
+
     initial_step : int | tf.Tensor | tf.Variable
-        Specify the initial step of the training process. 
+        Specify the initial step of the training process.
         It should be one less than the first logged step (default 0).
-        
+
     max_epoch : int
         Specify the maximum epoch of the training process. (default None)
-        
+
     max_step : int
         Specify the maximum step of the training process. (default None)
 
     metric_formatter : (str, any) -> str
         String formatter for metrics, accept two arguments (name, value),
         and return the formatted metric as string.
-        
+
         (default formatter should format `time`, `timer` or the metrics
-         with `_time` or `_timer` as name suffix into human readable 
+         with `_time` or `_timer` as name suffix into human readable
          time duration, and other metrics as numbers of up to 6 effective
          digits, i.e., formatting via '%.6g').
 
@@ -148,27 +148,27 @@ class TrainLogger(VarScopeObject):
 
     summary_writer : tf.summary.FileWriter
         TensorFlow summary writer, if specified, will write metric summaries.
-        
+
     summary_exclude_metrics : collections.Iterable[str | re.__Regex]
         Specify the metric patterns excluded from TensorFlow summary.
-        (default: `time`, `timer`, or the metrics with `_time` or 
+        (default: `time`, `timer`, or the metrics with `_time` or
          `_timer` as name suffix)
-        
+
     smaller_better_metrics : collections.Iterable[str | re.__Regex]
         Specify the metric patterns whose smallest values should be tracked.
         (default: `loss`, or the metrics with `_loss` as name suffix)
-    
+
     larger_better_metrics : collections.Iterable[str | re.__Regex]
         Specify the metric patterns whose largest values should be tracked.
-        (default: `accuracy`, `acc`, or the metrics with `_acc` or 
+        (default: `accuracy`, `acc`, or the metrics with `_acc` or
          `_accuracy` as name suffix)
-        
+
         If a metric is also specified in `smaller_better_metrics`, it will
-        be ignored by `larger_better_metrics`. 
-    
+        be ignored by `larger_better_metrics`.
+
     name : str
         Name of this TrainLogger.
-        
+
     default_name : str
         Default name of this TrainLogger.
     """
@@ -231,6 +231,7 @@ class TrainLogger(VarScopeObject):
         """
         self.epoch = self.initial_epoch
         self.step = self.initial_step
+        self._summary_writer = None
         self._metrics.clear()
         self._best_tracker.clear()
         self._summary_exclude_test.clear()
@@ -251,16 +252,16 @@ class TrainLogger(VarScopeObject):
 
     def get_metric(self, name):
         """Get the accumulated average metric value.
-        
+
         Parameters
         ----------
         name : str
             Name of the metric.
-            
+
         Returns
         -------
         float | None
-            Average value of the metric, or None if the metric does not exist.             
+            Average value of the metric, or None if the metric does not exist.
         """
         if name in self._metrics:
             m = self._metrics[name]
@@ -269,15 +270,15 @@ class TrainLogger(VarScopeObject):
 
     def is_best_metric(self, name, value):
         """Check whether or not `value` for metric `name` is the best value.
-        
+
         Parameters
         ----------
         name : str
             Name of the metric.
-            
+
         value : value
             Value of the metric.
-        
+
         Returns
         -------
         bool | None
@@ -338,10 +339,10 @@ class TrainLogger(VarScopeObject):
 
     def add_metrics(self, metrics=None, **kwargs):
         """Add one-step metric values.
-        
+
         This method will compose TensorFlow summary objects from
         these metrics, and write to disk with these summaries.
-        
+
         Parameters
         ----------
         metrics, **kwargs
@@ -394,7 +395,7 @@ class TrainLogger(VarScopeObject):
     @contextmanager
     def enter_epoch(self):
         """Enter a training epoch context.
-        
+
         Yields
         ------
         int
@@ -412,13 +413,13 @@ class TrainLogger(VarScopeObject):
 
     def iter_epochs(self):
         """Iterate through epochs.
-        
+
         This method will yield the epoch counters.  If `max_epoch` is
-        configured, it will stop at `max_epoch` (exclusive).
+        configured, it will stop at `max_epoch`.
         Note that this method is not necessary, where the following
         two loops are equivalent:
 
-            # Suppose we have a train logger with `max_epoch` set to 3. 
+            # Suppose we have a train logger with `max_epoch` set to 3.
             # Without it the logger cannot show the max epoch information
             # in log messages
             logger = TrainLogger(max_epoch=3)
@@ -428,7 +429,7 @@ class TrainLogger(VarScopeObject):
                 ...
 
             # The second approach: to iterate through epochs by hand.
-            for epoch in range(1, 4):
+            for epoch in range(1, logger.max_epoch + 1):
                 with logger.enter_epoch():
                     ...
 
@@ -450,7 +451,7 @@ class TrainLogger(VarScopeObject):
     @contextmanager
     def enter_step(self):
         """Enter a training step context.
-        
+
         Returns
         -------
         int
@@ -468,19 +469,19 @@ class TrainLogger(VarScopeObject):
 
     def iter_steps(self, data_iterator):
         """Iterate through steps and epoch data batches.
-        
+
         This method will yield the step counters, as well as the data
         batches in an epoch.  It will stop at `max_step`, or when
         `data_iterator` has been exhausted.
-        
+
         Note that this method is not necessary, just using `enter_step`
         will be enough.  See `iter_epochs` for more details.
-        
+
         Parameters
         ----------
         data_iterator
             The batch data iterator.
-            
+
         Yields
         ------
         (int, any)
@@ -564,7 +565,7 @@ class TrainLogger(VarScopeObject):
 
     def get_epoch_log(self):
         """Get epoch(s) log messages.
-        
+
         This method will commit and clear the timer of current epoch.
         It will also clear all the metrics afterwards.
         """
@@ -576,7 +577,7 @@ class TrainLogger(VarScopeObject):
 
     def print_epoch_log(self):
         """Print epoch(s) log messages.
-        
+
         This method will commit and clear the timer of current epoch.
         It will also clear all the metrics afterwards.
         """
@@ -591,7 +592,7 @@ class TrainLogger(VarScopeObject):
 
     def get_step_log(self):
         """Get step(s) log messages.
-        
+
         This method will commit and clear the timer of current step.
         It will also clear all the metrics afterwards.
         """
@@ -605,7 +606,7 @@ class TrainLogger(VarScopeObject):
 
     def print_step_log(self):
         """Print step(s) log messages.
-        
+
         This method will commit and clear the timer of current step.
         It will also clear all the metrics afterwards.
         """
@@ -614,12 +615,12 @@ class TrainLogger(VarScopeObject):
 
 def get_parameters_summary(variables):
     """Get a formatted summary about the parameters.
-    
+
     Parameters
     ----------
     variables : list[tf.Variable] | dict[str, tf.Variable]
         List or dict of variables, which should be optimized during training.
-        
+
     Returns
     -------
     list[str]
@@ -660,7 +661,7 @@ def get_parameters_summary(variables):
 
 def print_parameters_summary(variables, print_function=_print_function):
     """Print formatted summary about the parameters.
-    
+
     Parameters
     ----------
     variables : list[tf.Variable] | dict[str, tf.Variable]

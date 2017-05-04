@@ -26,7 +26,7 @@ def sgvb(model, variational, axis=None, name=None):
     represented by `q(z|x)`, then it computes the variational lower bound by:
 
         .. math::
-            \\log p(x) 
+            \\log p(x)
                 &\geq \\log p(x) - \\text{KL} \\left(q(z|x) \| p(z|x) \\right)
                       \\\\
                 &= \\mathop{\\mathbb{E}_{q(z|x)}} \\left[

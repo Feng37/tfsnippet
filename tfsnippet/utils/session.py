@@ -5,7 +5,7 @@ import six
 import tensorflow as tf
 from logging import getLogger
 
-from .scope import VarScopeObject, open_variable_scope
+from .scope import VarScopeObject
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
@@ -31,15 +31,15 @@ def get_default_session_or_error():
 
 def try_get_variable_value(v, sess=None):
     """Attempt to get the variable value.
-    
+
     Parameters
     ----------
     v : tf.Variable
         The variable whose value is to be fetched.
-    
+
     sess : tf.Session
         The session.  If not specified, use the active session.
-        
+
     Returns
     -------
     any | None
@@ -62,7 +62,7 @@ def get_uninitialized_variables(variables=None, name=None):
     variables : collections.Iterable[tf.Variable]
         Return only uninitialized variables within this list.
         If not specified, will return all uninitialized global variables.
-        
+
     name : str
         Optional name of this operation.
 
@@ -90,7 +90,7 @@ def ensure_variables_initialized(variables=None, name=None):
     variables : collections.Iterable[tf.Variable]
         Ensure only these variables to be initialized.
         If not specified, will ensure all variables initialized.
-        
+
     name : str
         Optional name of this operation.
     """
@@ -103,12 +103,12 @@ def ensure_variables_initialized(variables=None, name=None):
 
 def get_variable_values(variables):
     """Get the values of variables.
-    
+
     Parameters
     ----------
     variables : list[tf.Variable] | dict[str, tf.Variable]
         A list or a dict of variables.
-        
+
     Returns
     -------
     list[any] | dict[str, any]
@@ -126,21 +126,21 @@ def get_variable_values(variables):
 
 def set_variable_values(variables, values, name=None):
     """Set the values of variables.
-    
+
     Note that this method will create a new set of graph nodes each time
     it is called, thus is not suitable for repeated variable assignments.
-    
+
     Parameters
     ----------
     variables : list[tf.Variable] | dict[str, tf.Variable]
         A list or a dict of variables.
-        
+
     values : list[any] | dict[str, any]
         The list or the dict of values.
-        
+
     name : str
         Optional name of this operation.
-        
+
     Raises
     ------
     KeyError | IndexError
@@ -195,7 +195,7 @@ class VariableSaver(VarScopeObject):
 
         At least 2 versions should be kept, in order to prevent corrupted
         checkpoint files caused by IO failure.
-        
+
     filename : str
         Name of the files of variable values (default is "variables.dat").
 
@@ -208,7 +208,7 @@ class VariableSaver(VarScopeObject):
 
     name : str
         Name of this session restorer.
-        
+
     default_name : str
         Default name of this session restorer.
     """
@@ -227,7 +227,7 @@ class VariableSaver(VarScopeObject):
         self.max_versions = max_versions
         self.latest_file = latest_file
         self.save_meta = save_meta
-        with open_variable_scope(self.variable_scope):
+        with tf.variable_scope(self.variable_scope):
             self._saver = tf.train.Saver(
                 var_list=self.variables, max_to_keep=self.max_versions,
                 name='saver'
@@ -258,7 +258,7 @@ class VariableSaver(VarScopeObject):
 
     def restore(self, ignore_non_exist=True):
         """Restore the checkpoint from file if it exists.
-        
+
         Parameters
         ----------
         ignore_non_exist : bool

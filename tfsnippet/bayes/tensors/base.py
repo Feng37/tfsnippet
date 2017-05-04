@@ -13,7 +13,7 @@ __all__ = ['StochasticTensor']
 
 class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     """Tensor-like object that represents a stochastic variable.
-    
+
     A `StochasticTensor` should be constructed from a `distribution`,
     and represents a stochastic variable in the model.  Although it
     stands for a random variable, it is actually a standard tensor
@@ -22,7 +22,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     to a set of random samples from the given `distribution`.
     The samples are stored so that every stochastic tensor should
     always represent the same set of samples.
-    
+
     Number of samples are controlled by `sample_num` argument.
     Sometimes a stochastic tensor need to be fixed using a set of
     observations.  This could be achieved by `observed` argument.
@@ -50,17 +50,17 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         tensor must be `[?] + batch_shape + value_shape`.
         And if `sample_num` is not specified, its shape must be
         `batch_shape + value_shape`.
-        
+
     validate_observed_shape : bool
         Whether or not to validate the shape of `observed`? (default False)
 
-        If set to True, the shape of `observed` must match that returned 
+        If set to True, the shape of `observed` must match that returned
         by `get_shape()`, given `sample_num` argument.
 
     group_event_ndims : int
         If specify, override the default `group_event_ndims` of `distribution`.
         This argument can further be overrided by `group_event_ndims` argument
-        of `prob` and `log_prob` method. 
+        of `prob` and `log_prob` method.
 
     name, default_name : str
         Optional name or default name of this stochastic tensor.
@@ -158,7 +158,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
 
     def get_shape(self):
         """Get the static shape of this stochastic tensor.
-        
+
         Returns
         -------
         tf.TensorShape
@@ -169,11 +169,11 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     @property
     def group_event_ndims(self):
         """Get the number of dimensions to be considered as events group.
-        
+
         Returns
         -------
         int | None
-            The number of dimensions.  If `group_event_ndims` is not 
+            The number of dimensions.  If `group_event_ndims` is not
             specified in the constructor, will return None.
         """
         return self._group_event_ndims
@@ -201,7 +201,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     @property
     def observed_tensor(self):
         """Get the observed tensor, if specified.
-        
+
         Returns
         -------
         tf.Tensor
@@ -216,7 +216,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
     @property
     def computed_tensor(self):
         """Get the observed or sampled tensor.
-        
+
         Returns
         -------
         tf.Tensor
@@ -237,7 +237,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         group_event_ndims : int
             If specified, will override the `group_event_ndims` configured
             in both this stochastic tensor and the distribution.
-            
+
         name : str
             Optional name of this operation.
 
@@ -261,7 +261,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         group_event_ndims : int
             If specified, will override the `group_event_ndims` configured
             in both this stochastic tensor and the distribution.
-            
+
         name : str
             Optional name of this operation.
 

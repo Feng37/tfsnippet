@@ -27,29 +27,29 @@ def open_variable_scope(name_or_scope,
                         partitioner=None,
                         custom_getter=None,
                         dtype=tf.float32):
-    """Open or re-open a variable scope, ensuring to open `original_name_scope`.
-    
+    """Open or re-open a variable scope.
+
     When using `tf.variable_scope` to re-open an existing variable scope, the
     original name scope will not be open.  Instead a different name scope will
     be opened under the current name scope.
-    
+
     This method thus fixes this issue, by ensuring to open the original name
-    scope if a variable scope is re-opened, if `keep_name_scope` is required.
-    
+    scope if a variable scope is re-opened, if `unique_name_scope` is False.
+
     Notes
     -----
     This method does not support `default_name`, which is used to suggest
     a name template for choosing a unique variable scope name, used in
     `tf.variable_scope`.  It opens exactly `name_or_scope`.
-    
+
     Parameters
     ----------
     name_or_scope : str | tf.VariableScope
         The name of the scope, or the variable scope object.
-        
+
     pure_variable_scope : bool
         Whether or not to open a pure variable scope?
-        
+
         If set to True, a pure variable scope will be opened without
         changing the current name scope. (default is False)
 
@@ -60,10 +60,10 @@ def open_variable_scope(name_or_scope,
         If set to True, a unique name scope will be opened.
         Otherwise the original name scope of the variable scope will be
         reopened. (default is True)
-                  
+
     reuse : None | bool
         Whether or not to reuse the variables in opened scope?
-        
+
     initializer, regularizer, caching_device, partitioner, custom_getter, dtype
         Other parameters for opening the variable scope.
 
@@ -143,23 +143,23 @@ def open_variable_scope(name_or_scope,
 
 
 class VarScopeObject(object):
-    """Base class for all objects owns a variable scope.
-    
+    """Base class for object that owns a variable scope.
+
     Such an object is compatible with the use patterns of `instance_reuse`.
 
     Parameters
     ----------
     name : str
         Name of this object.
-        
+
         Note that if `name` is specified, the variable scope of constructed
         object will take exactly this name, even if another object has already
         taken such name.  That is to say, these two objects will share the same
         variable scope.
-        
+
     default_name : str
         Default name of this object.
-        
+
         When `name` is not specified, the object will obtain a variable scope
         with unique name, according to the name suggested by `default_name`.
         If `default_name` is also not specified, it will use the underscored
@@ -213,7 +213,7 @@ def instance_name_scope(method=None, scope=None):
                     with tf.name_scope('foo'):
                         return tf.add(1, 2, name='add')
 
-    In which the `instance_name_scope` decorator will first re-open the 
+    In which the `instance_name_scope` decorator will first re-open the
     `name_scope` of the instance, then open a new name scope (with unique
     name) according to the method name.
 
@@ -262,12 +262,12 @@ def instance_name_scope(method=None, scope=None):
 
 class NameScopeObject(object):
     """Base class for all objects that owns a name scope.
-    
+
     Unlike `VarScopeObject`, a `NameScopeObject` does not own variable scope.
     A `NameScopeObject` can reuse its name scope as follows:
-    
+
         class MyScopeObject(NameScopeObject):
-            
+
             def f(self):
                 with tf.name_scope(self.name_scope):
                     op1 = tf.add(1, 2, name='op1')
@@ -277,21 +277,21 @@ class NameScopeObject(object):
     In the above example, each `op1` will be directly created in the object
     name scope, while each `op2` will be created in some sub scope within
     the object name scope.
-    
+
     Notes
     -----
     It is better to use `VarScopeObject` instead of `NameScopeObject`
     if the class might be used as a basis for other classes, since the
     designer of the base class may not know whether or not the child
     classes need to create variables ahead of time.
-    
+
     Parameters
     ----------
     name : str
         Default name of this object.
-        
+
         The object will obtain a name scope with unique name, according to the
-        specified `name`.  If `name` is not specified, the underscored class 
+        specified `name`.  If `name` is not specified, the underscored class
         name will be chosen as the name.
     """
 

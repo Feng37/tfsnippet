@@ -7,9 +7,9 @@ import six
 import tensorflow as tf
 
 from tfsnippet.utils import (ensure_variables_initialized,
-                             open_variable_scope,
                              VarScopeObject,
-                             get_variables_as_dict, VariableSaver)
+                             get_variables_as_dict,
+                             VariableSaver)
 
 __all__ = ['Model']
 
@@ -25,7 +25,7 @@ class Model(VarScopeObject):
     ----------
     name : str
         Name of the model.
-        
+
         Note that if `name` is specified, the variable scope of constructed
         model will take exactly this name, even if another model has already
         taken such name.  That is to say, these two models will share the same
@@ -33,7 +33,7 @@ class Model(VarScopeObject):
 
     default_name : str
         Default name of the model.
-        
+
         When `name` is not specified, the model will obtain a variable scope
         with unique name, according to the name suggested by `default_name`.
         If `default_name` is also not specified, it will use the underscored
@@ -95,7 +95,7 @@ class Model(VarScopeObject):
             return
         self._has_built = True
 
-        with open_variable_scope(self.variable_scope):
+        with tf.variable_scope(self.variable_scope):
             # create the global step variable if there's none
             if self._global_step is None:
                 self._global_step = tf.get_variable(
@@ -113,11 +113,11 @@ class Model(VarScopeObject):
         Note that all the variables to be considered as parameters must
         be created within the "model" sub-scope, which will be saved and
         restored via the interfaces of this class.
-        
+
         For example, one may override the `_build` method as follows:
-        
+
             class MyModel(Model):
-            
+
                 def _build(self):
                     with tf.variable_scope('model'):
                         hidden_layer = layers.fully_connected(
@@ -187,7 +187,7 @@ class Model(VarScopeObject):
 
     def ensure_variables_initialized(self):
         """Initialize all uninitialized variables within model's scope.
-        
+
         If the `global_step` is created by the model itself, then it will
         also be initialized.  Otherwise the `global_step` must be manually
         initialized.
@@ -197,12 +197,12 @@ class Model(VarScopeObject):
 
     def save_model(self, save_dir, overwrite=False):
         """Save the model parameters onto disk.
-        
+
         Parameters
         ----------
         save_dir : str
             Directory where to place the saved variables.
-            
+
         overwrite : bool
             Whether or not to overwrite the existing directory?
         """
@@ -220,7 +220,7 @@ class Model(VarScopeObject):
 
     def load_model(self, save_dir):
         """Load the model parameters from disk.
-        
+
         Parameters
         ----------
         save_dir : str
