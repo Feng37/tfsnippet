@@ -40,7 +40,7 @@ class _EarlyStopping(object):
 
         global_step : int
             Optional global step counter.
-            
+
         Returns
         -------
         bool
@@ -111,6 +111,9 @@ def early_stopping(param_vars, save_dir=None, smaller_is_better=True,
     _EarlyStopping
         The object to receive loss during early-stopping context.
     """
+    if not param_vars:
+        raise ValueError('`param_vars` must not be empty.')
+
     if save_dir is None:
         with TemporaryDirectory() as tempdir:
             with early_stopping(param_vars, tempdir, cleanup=False,

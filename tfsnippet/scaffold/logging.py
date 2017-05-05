@@ -34,24 +34,24 @@ def _test_patterns(patterns, value):
 
 class MetricFormatter(object):
     """Default class for training metric formatter.
-    
+
     A training metric formatter should take a set of metrics, placing these
     metrics in pre-defined order, than format these metrics values into texts.
     """
 
     def sort_metrics(self, metrics):
         """Sort the specified `metrics`.
-        
+
         By default this method places metrics ending with "time" or "timer"
         at first, metrics ending with "loss" at second, metrics ending with
         "acc" or "accuracy" at third, and other remaining metrics the last.
         Metrics within the same group will be sorted according to their name.
-        
+
         Parameters
         ----------
         metrics : dict[str, any]
             The metrics to be sorted.
-            
+
         Returns
         -------
         list[(str, any)]
@@ -73,15 +73,15 @@ class MetricFormatter(object):
 
     def format_metric_value(self, name, value):
         """Format the value of specified metric.
-        
+
         Parameters
         ----------
         name : str
             Name of the metric.
-            
+
         value : any
             Value of the metric.
-            
+
         Returns
         -------
         str
@@ -95,12 +95,12 @@ class MetricFormatter(object):
 
 class MetricLogger(object):
     """Training metrics logger.
-    
+
     This class provides convenient methods for logging training metrics,
     and for writing metrics onto disk by TensorFlow summary writer.
 
     An example of using this logger is:
-    
+
         logger = MetricLogger()
         step = 0
         for epoch in range(1, max_epoch+1):
@@ -113,12 +113,12 @@ class MetricLogger(object):
             logger.add_metrics(valid_loss=valid_loss)
             print('Epoch %d: %s' %  (epoch, step, logger.format_logs()))
             logger.clear()
-            
+
     Parameters
     ----------
     formatter : MetricFormatter
         Optional metric formatter for this logger.
-    
+
     summary_writer : tf.summary.FileWriter
         Optional TensorFlow summary writer for the metrics.
 
@@ -160,7 +160,7 @@ class MetricLogger(object):
         ----------
         global_step : int | tf.Variable | tf.Tensor
             The global step counter.
-        
+
         metrics, **kwargs
             One-step metric values.
         """
@@ -192,7 +192,7 @@ class MetricLogger(object):
 
     def format_logs(self):
         """Format the metrics logs.
-        
+
         Returns
         -------
         str

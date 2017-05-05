@@ -26,6 +26,17 @@ class EarlyStoppingTestCase(unittest.TestCase):
             a, b, c = _populate_variables()
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
+            # test: param-vars must not be empty
+            with self.assertRaisesRegex(
+                    ValueError, '`param_vars` must not be empty.'):
+                with early_stopping([]):
+                    pass
+
+            # test: early-stopping context without doing anything
+            with early_stopping([a, b]):
+                pass
+            self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
+
             # test: the first loss will always cause saving
             with early_stopping([a, b]) as es:
                 set_variable_values([a], [10])
