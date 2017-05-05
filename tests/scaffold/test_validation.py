@@ -8,6 +8,7 @@ from tfsnippet.scaffold import early_stopping
 from tfsnippet.utils import (TemporaryDirectory,
                              set_variable_values,
                              get_variable_values)
+from tests.helper import TestCase
 
 
 def _populate_variables():

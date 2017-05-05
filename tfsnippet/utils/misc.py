@@ -6,7 +6,7 @@ import tensorflow as tf
 __all__ = [
     'is_integer', 'is_float', 'is_dynamic_tensor_like',
     'convert_to_tensor_if_dynamic', 'get_preferred_tensor_dtype',
-    'MetricAccumulator',
+    'MetricAccumulator', 'humanize_duration',
 ]
 
 
@@ -149,3 +149,41 @@ class MetricAccumulator(object):
         self._weight += weight
         self._value += (value - self._value) * (weight / self._weight)
         self._counter += 1
+
+
+def humanize_duration(seconds):
+    """Format specified time duration into human readable text.
+
+    Parameters
+    ----------
+    seconds : int | float
+        Number of seconds, as the time duration.
+
+    Returns
+    -------
+    str
+        The formatted time duration.
+    """
+    if seconds < 0:
+        seconds = -seconds
+        suffix = ' ago'
+    else:
+        suffix = ''
+
+    pieces = []
+    for uvalue, uname in [(86400, 'day'),
+                          (3600, 'hr'),
+                          (60, 'min')]:
+        if seconds >= uvalue:
+            val = int(seconds // uvalue)
+            if val > 0:
+                if val > 1:
+                    uname += 's'
+                pieces.append('%d %s' % (val, uname))
+            seconds %= uvalue
+    if seconds > np.finfo(np.float64).eps:
+        pieces.append('%.4g sec%s' % (seconds, 's' if seconds > 1 else ''))
+    elif not pieces:
+        pieces.append('0 sec')
+
+    return ' '.join(pieces) + suffix
