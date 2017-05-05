@@ -40,25 +40,43 @@ class _EarlyStopping(object):
 
         global_step : int
             Optional global step counter.
+            
+        Returns
+        -------
+        bool
+            Whether or not the best loss has been updated?
         """
         if self._best_loss is None or \
                 (self._smaller_is_better and loss < self._best_loss) or \
                 (not self._smaller_is_better and loss > self._best_loss):
             self._saver.save(global_step)
             self._best_loss = loss
+            return True
+        return False
+
+    @property
+    def best_loss(self):
+        """Get the current best loss."""
+        return self._best_loss
 
 
 @contextmanager
-def early_stopping(param_vars, save_dir=None, smaller_is_better=False,
+def early_stopping(param_vars, save_dir=None, smaller_is_better=True,
                    restore_on_error=False, cleanup=True, name=None):
     """Open a context to memorize the values of parameters at best loss.
 
-    An example of using this early-stopping context is:
+    This method will open a context with an object to memorize the best
+    loss for early-stopping.  An example of using this early-stopping
+    context is:
 
         with early_stopping(param_vars) as es:
             ...
-            es.update(valid_loss, step)
+            es.update(loss, global_step)
             ...
+
+    Where ``es.update(loss, global_step)`` should cause the parameters to
+    be saved on disk if `loss` is better than the current best loss.
+    One may also get the best loss via ``es.best_loss``.
 
     Parameters
     ----------
@@ -95,8 +113,9 @@ def early_stopping(param_vars, save_dir=None, smaller_is_better=False,
     """
     if save_dir is None:
         with TemporaryDirectory() as tempdir:
-            with early_stopping(param_vars, tempdir, cleanup=True,
+            with early_stopping(param_vars, tempdir, cleanup=False,
                                 smaller_is_better=smaller_is_better,
+                                restore_on_error=restore_on_error,
                                 name=name) as es:
                 yield es
 
@@ -109,8 +128,8 @@ def early_stopping(param_vars, save_dir=None, smaller_is_better=False,
 
             try:
                 yield es
-            except:
-                if restore_on_error:
+            except Exception as ex:
+                if isinstance(ex, KeyboardInterrupt) or restore_on_error:
                     saver.restore()
                 raise
             else:

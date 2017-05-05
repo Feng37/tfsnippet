@@ -126,13 +126,13 @@ class MiscTestCase(TestCase):
         self.assertAlmostEqual(acc.value, 2.)
         self.assertAlmostEqual(acc.weight, 1.)
 
-        acc.add(1, weight=3.)
+        acc.add(1, weight=3)
         self.assertTrue(acc.has_value)
         self.assertEqual(acc.counter, 2)
         self.assertAlmostEqual(acc.value, 1.25)
         self.assertAlmostEqual(acc.weight, 4.)
 
-        acc.add(7, weight=6.)
+        acc.add(7, weight=6)
         self.assertTrue(acc.has_value)
         self.assertEqual(acc.counter, 3)
         self.assertAlmostEqual(acc.value, 4.7)
@@ -157,7 +157,7 @@ class MiscTestCase(TestCase):
         self.assertAlmostEqual(acc.value, 1.)
         self.assertAlmostEqual(acc.weight, 2.)
 
-        acc.add(1., weight=1.)
+        acc.add(1., weight=1)
         self.assertTrue(acc.has_value)
         self.assertEqual(acc.counter, 1)
         self.assertAlmostEqual(acc.value, 1.)
