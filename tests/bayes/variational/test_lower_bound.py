@@ -6,9 +6,10 @@ import tensorflow as tf
 
 from tfsnippet.bayes import Normal
 from tfsnippet.bayes.variational import sgvb
+from tests.helper import TestCase
 
 
-class LowerBoundTestCase(unittest.TestCase):
+class LowerBoundTestCase(TestCase):
 
     def test_sgvb(self):
         with tf.Graph().as_default(), tf.Session().as_default():

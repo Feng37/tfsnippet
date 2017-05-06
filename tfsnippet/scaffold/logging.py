@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import re
 from collections import defaultdict, OrderedDict
 
 import six
@@ -15,10 +14,6 @@ __all__ = [
     'SummaryWriter',
     'get_parameters_summary',
 ]
-
-_LOSS_METRICS = re.compile(r'(^|.*[_/])loss$')
-_ACC_METRICS = re.compile(r'(^|.*[_/])acc(uracy)?$')
-_TIME_METRICS = re.compile(r'(^|.*[_/])timer?$')
 
 
 class MetricFormatter(object):
@@ -47,11 +42,11 @@ class MetricFormatter(object):
             List of (key, value) of these metrics.
         """
         def sort_key(name):
-            if _TIME_METRICS.match(name):
+            if name.endswith('time') or name.endswith('timer'):
                 return -3, name
-            elif _LOSS_METRICS.match(name):
+            elif name.endswith('loss'):
                 return -2, name
-            elif _ACC_METRICS.match(name):
+            elif name.endswith('acc') or name.endswith('accuracy'):
                 return -1, name
             return 0, name
 
@@ -76,7 +71,7 @@ class MetricFormatter(object):
         str
             Human readable string representation of the metric value.
         """
-        if _TIME_METRICS.match(name):
+        if name.endswith('time') or name.endswith('timer'):
             return humanize_duration(value)
         else:
             return '%.6g' % (value,)
@@ -125,15 +120,12 @@ class MetricLogger(object):
             v.reset()
 
     def add_metrics(self, metrics=None, **kwargs):
-        """Add one-step metric values.
-
-        This method will compose TensorFlow summary objects from
-        these metrics, and write to disk with these summaries.
+        """Add metric values.
 
         Parameters
         ----------
         metrics, **kwargs
-            One-step metric values.
+            Metric values.
         """
         if metrics is not None and not isinstance(metrics, dict):
             raise TypeError('`metrics` should be a dict.')
@@ -155,10 +147,14 @@ class MetricLogger(object):
         buf = []
         for k, m in self._formatter.sort_metrics(self._metrics):
             if m.has_value:
-                pfx = 'avg ' if m.counter > 1 else ''
-                val = self._formatter.format_metric_value(k, m.value)
                 name = k.replace('_', ' ')
-                buf.append('%s%s: %s' % (pfx, name, val))
+                val = self._formatter.format_metric_value(k, m.mean)
+                if m.counter > 1:
+                    std = ' (±%s)' % (
+                        self._formatter.format_metric_value(k, m.stddev))
+                else:
+                    std = ''
+                buf.append('%s: %s%s' % (name, val, std))
         return '; '.join(buf)
 
 

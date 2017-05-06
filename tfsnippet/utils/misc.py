@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import math
+
 import six
 import numpy as np
 import tensorflow as tf
@@ -89,24 +91,12 @@ def get_preferred_tensor_dtype(x):
 
 
 class MetricAccumulator(object):
-    """Accumulator to compute the average of certain metric.
+    """Accumulator to compute the statistics of certain metric."""
 
-    Parameters
-    ----------
-    initial_value : float
-        The initial value of this accumulator (default 0.)
-
-    initial_weight : float
-        The initial weight of this accumulator (default 0.)
-    """
-
-    def __init__(self, initial_value=0., initial_weight=0.):
-        if initial_weight < 0:
-            raise ValueError('`initial_weight` must be greater or equal to 0.')
-        self._initial_value = float(initial_value)
-        self._initial_weight = float(initial_weight)
-        self._value = initial_value
-        self._weight = initial_weight
+    def __init__(self):
+        self._mean = 0.     # E[X]
+        self._square = 0.   # E[X^2]
+        self._weight = 0.
         self._counter = 0
 
     @property
@@ -115,9 +105,24 @@ class MetricAccumulator(object):
         return self._weight
 
     @property
-    def value(self):
-        """Get the average value, or None if no value has been collected."""
-        return self._value
+    def mean(self):
+        """Get the average value, i.e., E[X]."""
+        return self._mean
+
+    @property
+    def square(self):
+        """Get E[X^2]."""
+        return self._square
+
+    @property
+    def var(self):
+        """Get the variance, i.e., E[X^2] - (E[X])^2."""
+        return self._square - self._mean ** 2
+
+    @property
+    def stddev(self):
+        """Get the standard derivation, i.e., sqrt(var)."""
+        return math.sqrt(self.var)
 
     @property
     def has_value(self):
@@ -131,8 +136,9 @@ class MetricAccumulator(object):
 
     def reset(self):
         """Reset the accumulator to initial state."""
-        self._value = self._initial_value
-        self._weight = self._initial_weight
+        self._mean = 0.
+        self._square = 0.
+        self._weight = 0.
         self._counter = 0
 
     def add(self, value, weight=1.):
@@ -147,7 +153,9 @@ class MetricAccumulator(object):
             Optional weight of this value (default 1.)
         """
         self._weight += weight
-        self._value += (value - self._value) * (weight / self._weight)
+        discount = weight / self._weight
+        self._mean += (value - self._mean) * discount
+        self._square += (value ** 2 - self._square) * discount
         self._counter += 1
 
 

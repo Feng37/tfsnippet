@@ -56,8 +56,11 @@ class MetricLoggerTestCase(TestCase):
         logger.add_metrics(loss=6., valid_acc=7., train_time=0.3)
         self.assertEqual(
             logger.format_logs(),
-            'avg train time: 0.25 sec; valid timer: 0.1 sec; avg loss: 3.25; '
-            'valid loss: 3; avg valid acc: 6'
+            'train time: 0.25 sec (±0.05 sec); '
+            'valid timer: 0.1 sec; '
+            'loss: 3.25 (±1.92029); '
+            'valid loss: 3; '
+            'valid acc: 6 (±1)'
         )
 
         logger.clear()

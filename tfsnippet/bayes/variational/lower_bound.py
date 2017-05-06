@@ -27,7 +27,7 @@ def sgvb(model, variational, axis=None, name=None):
 
         .. math::
             \\log p(x)
-                &\geq \\log p(x) - \\text{KL} \\left(q(z|x) \| p(z|x) \\right)
+                &\\geq \\log p(x) - \\text{KL} \\left(q(z|x) \\| p(z|x) \\right)
                       \\\\
                 &= \\mathop{\\mathbb{E}_{q(z|x)}} \\left[
                         \\log p(x) + \\log p(z|x) - \\log q(z|x) \\right] \\\\

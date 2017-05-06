@@ -19,7 +19,7 @@ def _populate_variables():
     return [a, b, c]
 
 
-class EarlyStoppingTestCase(unittest.TestCase):
+class EarlyStoppingTestCase(TestCase):
 
     def test_basic(self):
         with tf.Graph().as_default(), tf.Session().as_default():
@@ -32,9 +32,9 @@ class EarlyStoppingTestCase(unittest.TestCase):
                 with early_stopping([]):
                     pass
 
-            # test: early-stopping context without doing anything
+            # test: early-stopping context without updating loss
             with early_stopping([a, b]):
-                pass
+                set_variable_values([a], [10])
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
             # test: the first loss will always cause saving
@@ -42,7 +42,7 @@ class EarlyStoppingTestCase(unittest.TestCase):
                 set_variable_values([a], [10])
                 self.assertTrue(es.update(1.))
                 set_variable_values([a, b], [100, 20])
-            self.assertAlmostEqual(es.best_loss, 1.)
+            self.assertAlmostEqual(es.best_metric, 1.)
             self.assertEqual(get_variable_values([a, b, c]), [10, 2, 3])
 
             # test: memorize the best loss
@@ -51,15 +51,27 @@ class EarlyStoppingTestCase(unittest.TestCase):
             with early_stopping([a, b]) as es:
                 set_variable_values([a], [10])
                 self.assertTrue(es.update(1.))
-                self.assertAlmostEqual(es.best_loss, 1.)
+                self.assertAlmostEqual(es.best_metric, 1.)
                 set_variable_values([a, b], [100, 20])
                 self.assertTrue(es.update(.5))
-                self.assertAlmostEqual(es.best_loss, .5)
+                self.assertAlmostEqual(es.best_metric, .5)
                 set_variable_values([a, b, c], [1000, 200, 30])
                 self.assertFalse(es.update(.8))
-                self.assertAlmostEqual(es.best_loss, .5)
-            self.assertAlmostEqual(es.best_loss, .5)
+                self.assertAlmostEqual(es.best_metric, .5)
+            self.assertAlmostEqual(es.best_metric, .5)
             self.assertEqual(get_variable_values([a, b, c]), [100, 20, 30])
+
+            # test: initial_loss
+            set_variable_values([a, b, c], [1, 2, 3])
+            self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
+            with early_stopping([a, b], initial_metric=.6) as es:
+                set_variable_values([a], [10])
+                self.assertFalse(es.update(1.))
+                self.assertAlmostEqual(es.best_metric, .6)
+                set_variable_values([a, b], [100, 20])
+                self.assertTrue(es.update(.5))
+                self.assertAlmostEqual(es.best_metric, .5)
+            self.assertEqual(get_variable_values([a, b, c]), [100, 20, 3])
 
     def test_restore_on_error(self):
         with tf.Graph().as_default(), tf.Session().as_default():
@@ -72,7 +84,7 @@ class EarlyStoppingTestCase(unittest.TestCase):
                     self.assertTrue(es.update(1.))
                     set_variable_values([a, b], [10, 20])
                     raise ValueError('value error')
-            self.assertAlmostEqual(es.best_loss, 1.)
+            self.assertAlmostEqual(es.best_metric, 1.)
             self.assertEqual(get_variable_values([a, b, c]), [10, 20, 3])
 
             # test: restore on error
@@ -83,7 +95,7 @@ class EarlyStoppingTestCase(unittest.TestCase):
                     self.assertTrue(es.update(1.))
                     set_variable_values([a, b], [10, 20])
                     raise ValueError('value error')
-            self.assertAlmostEqual(es.best_loss, 1.)
+            self.assertAlmostEqual(es.best_metric, 1.)
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
     def test_bigger_is_better(self):
@@ -97,14 +109,14 @@ class EarlyStoppingTestCase(unittest.TestCase):
             with early_stopping([a, b], smaller_is_better=False) as es:
                 set_variable_values([a], [10])
                 self.assertTrue(es.update(.5))
-                self.assertAlmostEqual(es.best_loss, .5)
+                self.assertAlmostEqual(es.best_metric, .5)
                 set_variable_values([a, b], [100, 20])
                 self.assertTrue(es.update(1.))
-                self.assertAlmostEqual(es.best_loss, 1.)
+                self.assertAlmostEqual(es.best_metric, 1.)
                 set_variable_values([a, b, c], [1000, 200, 30])
                 self.assertFalse(es.update(.8))
-                self.assertAlmostEqual(es.best_loss, 1.)
-            self.assertAlmostEqual(es.best_loss, 1.)
+                self.assertAlmostEqual(es.best_metric, 1.)
+            self.assertAlmostEqual(es.best_metric, 1.)
             self.assertEqual(get_variable_values([a, b, c]), [100, 20, 30])
 
     def test_save_dir(self):
