@@ -8,9 +8,10 @@ import six
 import tensorflow as tf
 
 from .scope import open_variable_scope
+from .imported import deprecated
 
 __all__ = [
-    'auto_reuse_variables', 'static_reuse', 'instance_reuse',
+    'auto_reuse_variables', 'local_reuse', 'instance_reuse',
 ]
 
 
@@ -74,14 +75,14 @@ def auto_reuse_variables(name_or_scope,
 __auto_reuse_variables_graph_dict = weakref.WeakKeyDictionary()
 
 
-def static_reuse(method=None, scope=None, unique_name_scope=True):
-    """Decorate a function or a method within `auto_reuse_variables` scope.
+def local_reuse(method=None, scope=None, unique_name_scope=True):
+    """Decorate a function within `auto_reuse_variables` scope locally.
 
     Any function or method applied with this decorator will be called within
     a variable scope opened by `auto_reuse_variables`. That is, the following
     code:
 
-        @static_reuse
+        @local_reuse
         def foo():
             return tf.get_variable('bar', ...)
 
@@ -109,7 +110,7 @@ def static_reuse(method=None, scope=None, unique_name_scope=True):
     These behaviors can be changed by setting `scope` and `unique_name_scope`
     arguments, for example:
 
-        @static_reuse(scope='dense')
+        @local_reuse(scope='dense')
         def dense_layer(inputs):
             w = tf.get_variable('w', ...)
             b = tf.get_variable('b', ...)
@@ -120,11 +121,11 @@ def static_reuse(method=None, scope=None, unique_name_scope=True):
     with the same name, or with the same `scope` argument, will reuse
     the same set of variables.  For example:
 
-        @static_reuse(scope='foo')
+        @local_reuse(scope='foo')
         def foo_1():
             return tf.get_variable('bar', ...)
 
-        @static_reuse(scope='foo')
+        @local_reuse(scope='foo')
         def foo_2():
             return tf.get_variable('bar', ...)
 
@@ -142,7 +143,7 @@ def static_reuse(method=None, scope=None, unique_name_scope=True):
     """
     if method is None:
         return functools.partial(
-            static_reuse, scope=scope, unique_name_scope=unique_name_scope)
+            local_reuse, scope=scope, unique_name_scope=unique_name_scope)
     scope = scope or method.__name__
 
     @six.wraps(method)
@@ -172,7 +173,7 @@ def instance_reuse(method=None, scope=None, unique_name_scope=True):
 
     The above example is then equivalent to the following code:
 
-        @static_reuse
+        @local_reuse
         def foo():
             return tf.get_variable('bar', ...)
 
@@ -188,11 +189,13 @@ def instance_reuse(method=None, scope=None, unique_name_scope=True):
                                          unique_name_scope=False):
                     return foo()
 
-    In which the `instance_reuse` decorator acts like `static_reuse`,
+    In which the `instance_reuse` decorator acts like `local_reuse`,
     but will open the `variable_scope` of corresponding instance before
-    entering a reused variable scope.
+    calling the decorated method.
 
-    See `static_reuse` and `open_variable_scope` for more details.
+    See Also
+    --------
+    local_reuse, open_variable_scope
 
     Parameters
     ----------

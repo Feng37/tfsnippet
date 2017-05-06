@@ -5,7 +5,7 @@ from contextlib import contextmanager
 
 import tensorflow as tf
 
-from tfsnippet.utils import auto_reuse_variables, static_reuse, instance_reuse
+from tfsnippet.utils import auto_reuse_variables, local_reuse, instance_reuse
 from tests.helper import TestCase
 
 
@@ -118,18 +118,18 @@ class ReuseTestCase(TestCase):
                 self.assertEqual(g2_v1.name, 'a/v1:0')
                 self.assertEqual(_get_op('op1').name, 'a/op1:0')
 
-    def test_static_reuse(self):
-        @static_reuse
+    def test_local_reuse(self):
+        @local_reuse
         def f():
             var = tf.get_variable('var', shape=())
             op = tf.add(1, 2, name='op')
             return var, op
 
-        @static_reuse(scope='f')
+        @local_reuse(scope='f')
         def f_1():
             return tf.get_variable('var', shape=())
 
-        @static_reuse(unique_name_scope=False)
+        @local_reuse(unique_name_scope=False)
         def g():
             var = tf.get_variable('var', shape=())
             op = tf.add(1, 2, name='op')
