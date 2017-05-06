@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-import itertools
+import contextlib
 import os
-import re
 import unittest
 
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.scaffold import get_parameters_summary, MetricLogger
+from tfsnippet.scaffold import (get_parameters_summary, MetricLogger,
+                                SummaryWriter)
 from tfsnippet.utils import TemporaryDirectory
 from tests.helper import TestCase
 
@@ -46,38 +46,14 @@ class LoggingUtilsTestCase(TestCase):
 
 class MetricLoggerTestCase(TestCase):
 
-    def test_summary_exclusion(self):
-        # default patterns
-        logger = MetricLogger()
-        for prefix, name in itertools.product(['', 'xxx_', '/', 'xxx/yyy_'],
-                                              ['time', 'timer', 'loss',
-                                               'acc', 'accuracy']):
-            # test for double times, to check the internal cache for patterns
-            self.assertFalse(logger._is_summary_excluded_metric(prefix + name))
-            self.assertFalse(logger._is_summary_excluded_metric(prefix + name))
-
-        # customized patterns
-        logger = MetricLogger(
-            summary_excluded_metrics=[
-                'loss', 'xxx_loss', re.compile(r'^.*/.*loss$')])
-        for prefix, name in itertools.product(['', 'xxx_', '/', 'xxx/yyy_'],
-                                              ['loss']):
-            self.assertTrue(logger._is_summary_excluded_metric(prefix + name))
-            self.assertTrue(logger._is_summary_excluded_metric(prefix + name))
-        for prefix, name in itertools.product(['', 'xxx_', '/', 'xxx/yyy_'],
-                                              ['acc', 'accuracy', 'time',
-                                               'timer']):
-            self.assertFalse(logger._is_summary_excluded_metric(prefix + name))
-            self.assertFalse(logger._is_summary_excluded_metric(prefix + name))
-
     def test_basic_logging(self):
         logger = MetricLogger()
         self.assertEqual(logger.format_logs(), '')
 
-        logger.add_metrics(1, loss=1.)
-        logger.add_metrics(2, loss=2., valid_loss=3., valid_timer=0.1)
-        logger.add_metrics(3, loss=4., valid_acc=5., train_time=0.2)
-        logger.add_metrics(4, loss=6., valid_acc=7., train_time=0.3)
+        logger.add_metrics(loss=1.)
+        logger.add_metrics(loss=2., valid_loss=3., valid_timer=0.1)
+        logger.add_metrics(loss=4., valid_acc=5., train_time=0.2)
+        logger.add_metrics(loss=6., valid_acc=7., train_time=0.3)
         self.assertEqual(
             logger.format_logs(),
             'avg train time: 0.25 sec; valid timer: 0.1 sec; avg loss: 3.25; '
@@ -88,7 +64,7 @@ class MetricLoggerTestCase(TestCase):
         self.assertEqual(logger.format_logs(), '')
 
         with tf.Graph().as_default(), tf.Session().as_default():
-            logger.add_metrics(tf.constant(1), metrics={'loss': 1.})
+            logger.add_metrics(metrics={'loss': 1.})
             self.assertEqual(logger.format_logs(), 'loss: 1')
 
     def test_errors(self):
@@ -96,21 +72,25 @@ class MetricLoggerTestCase(TestCase):
         with self.assertRaisesRegex(TypeError, '`metrics` should be a dict.'):
             logger.add_metrics(metrics=[])
 
-    def test_tensorflow_summary(self):
+
+class SummaryWriterTestCase(TestCase):
+
+    def test_basic(self):
         with TemporaryDirectory() as tempdir:
             # generate the metric summary
-            sw = tf.summary.FileWriter(tempdir)
-            logger = MetricLogger(summary_writer=sw)
-            step = 0
-            for epoch in range(1, 3):
-                for data in range(10):
-                    step += 1
-                    logger.add_metrics(global_step=step, acc=step * 100 + data)
-                logger.add_metrics(
-                    global_step=step,
-                    metrics={'valid_loss': -epoch}
-                )
-            sw.close()
+            with contextlib.closing(SummaryWriter(
+                    tf.summary.FileWriter(tempdir))) as sw:
+                step = 0
+                for epoch in range(1, 3):
+                    for data in range(10):
+                        step += 1
+                        sw.add_metrics(global_step=step, acc=step * 100 + data)
+
+                    with tf.Graph().as_default(), tf.Session().as_default():
+                        sw.add_metrics(
+                            global_step=tf.constant(step),
+                            metrics={'valid_loss': -epoch}
+                        )
 
             # read the metric summary
             acc_steps = []

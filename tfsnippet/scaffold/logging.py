@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 import six
 import numpy as np
@@ -12,24 +12,13 @@ from tfsnippet.utils import (humanize_duration, MetricAccumulator,
 __all__ = [
     'MetricFormatter',
     'MetricLogger',
+    'SummaryWriter',
     'get_parameters_summary',
 ]
 
 _LOSS_METRICS = re.compile(r'(^|.*[_/])loss$')
 _ACC_METRICS = re.compile(r'(^|.*[_/])acc(uracy)?$')
 _TIME_METRICS = re.compile(r'(^|.*[_/])timer?$')
-
-
-def _test_patterns(patterns, value):
-    if patterns:
-        for pattern in patterns:
-            if isinstance(pattern, six.string_types):
-                if pattern == value:
-                    return True
-            else:
-                if pattern.match(value):
-                    return True
-    return False
 
 
 class MetricFormatter(object):
@@ -118,27 +107,12 @@ class MetricLogger(object):
     ----------
     formatter : MetricFormatter
         Optional metric formatter for this logger.
-
-    summary_writer : tf.summary.FileWriter
-        Optional TensorFlow summary writer for the metrics.
-
-    summary_excluded_metrics : collections.Iterable[str | re.__Regex]
-        Specify the metric patterns excluded from TensorFlow summary.
     """
 
-    def __init__(self,
-                 formatter=None,
-                 summary_writer=None,
-                 summary_excluded_metrics=()):
+    def __init__(self, formatter=None):
         if formatter is None:
             formatter = MetricFormatter()
         self._formatter = formatter
-        self._summary_writer = summary_writer
-        self._summary_excluded_metrics = summary_excluded_metrics
-
-        # cache to store the summary names already tested against
-        # `_summary_excluded_metrics`
-        self._summary_excluded_metrics_cache = {}
 
         # accumulators for various metrics
         self._metrics = defaultdict(MetricAccumulator)
@@ -150,7 +124,7 @@ class MetricLogger(object):
         for k, v in six.iteritems(self._metrics):
             v.reset()
 
-    def add_metrics(self, global_step=None, metrics=None, **kwargs):
+    def add_metrics(self, metrics=None, **kwargs):
         """Add one-step metric values.
 
         This method will compose TensorFlow summary objects from
@@ -158,37 +132,17 @@ class MetricLogger(object):
 
         Parameters
         ----------
-        global_step : int | tf.Variable | tf.Tensor
-            The global step counter.
-
         metrics, **kwargs
             One-step metric values.
         """
         if metrics is not None and not isinstance(metrics, dict):
             raise TypeError('`metrics` should be a dict.')
-        if isinstance(global_step, (tf.Tensor, tf.Variable)):
-            global_step = get_default_session_or_error().run(global_step)
-
         if metrics:
-            self._add_metrics(six.iteritems(metrics))
+            for k, v in six.iteritems(metrics):
+                self._metrics[k].add(v)
         if kwargs:
-            self._add_metrics(six.iteritems(kwargs))
-
-        if self._summary_writer:
-            summary_values = []
-            if metrics:
-                summary_values.extend(
-                    self._create_summary_values(six.iteritems(metrics)))
-            if kwargs:
-                summary_values.extend(
-                    self._create_summary_values(six.iteritems(kwargs)))
-
-            if summary_values:
-                summary_obj = tf.summary.Summary(value=summary_values)
-                self._summary_writer.add_summary(
-                    summary=summary_obj,
-                    global_step=global_step,
-                )
+            for k, v in six.iteritems(kwargs):
+                self._metrics[k].add(v)
 
     def format_logs(self):
         """Format the metrics logs.
@@ -207,26 +161,69 @@ class MetricLogger(object):
                 buf.append('%s%s: %s' % (pfx, name, val))
         return '; '.join(buf)
 
-    def _add_metrics(self, metrics):
-        for k, v in metrics:
-            self._metrics[k].add(v)
 
-    def _is_summary_excluded_metric(self, name):
-        ret = self._summary_excluded_metrics_cache.get(name, None)
-        if ret is None:
-            ret = _test_patterns(self._summary_excluded_metrics, name)
-            self._summary_excluded_metrics_cache[name] = ret
-        return ret
+class SummaryWriter(object):
+    """Wrapper for TensorFlow summary writer.
 
-    def _create_summary_values(self, metrics):
-        return [
-            tf.summary.Summary.Value(
-                tag=name,
-                simple_value=value
-            )
-            for name, value in metrics
-            if not self._is_summary_excluded_metric(name)
-        ]
+    This class wraps the TensorFlow summary writer, providing auxiliary
+    methods for convenience.
+
+    Parameters
+    ----------
+    writer : tf.summary.FileWriter
+        The TensorFlow summary writer instance.
+    """
+
+    def __init__(self, writer):
+        self._writer = writer
+
+    def close(self):
+        """Close the underlying summary writer."""
+        if self._writer is not None:
+            self._writer.close()
+            self._writer = None
+
+    def add_metrics(self, global_step=None, metrics=None, **kwargs):
+        """Add a scalar metric as summary.
+
+        Parameters
+        ----------
+        global_step : int | tf.Tensor | tf.Variable
+            The global step counter. (optional)
+
+        metrics, **kwargs
+            Dict of metric values.
+        """
+        if metrics is not None and not isinstance(metrics, (dict, OrderedDict)):
+            raise TypeError('%r should be a dict.' % (metrics,))
+
+        values = []
+        if metrics:
+            for k, v in six.iteritems(metrics):
+                values.append(tf.summary.Summary.Value(tag=k, simple_value=v))
+        for k, v in six.iteritems(kwargs):
+            values.append(tf.summary.Summary.Value(tag=k, simple_value=v))
+
+        if values:
+            if isinstance(global_step, (tf.Tensor, tf.Variable)):
+                global_step = get_default_session_or_error().run(global_step)
+            summary = tf.summary.Summary(value=values)
+            self._writer.add_summary(summary, global_step=global_step)
+
+    def add_summary(self, summary, global_step=None):
+        """Add a summary object.
+
+        Parameters
+        ----------
+        summary : bytes | tf.summary.Summary
+            The summary object.
+
+        global_step : int | tf.Tensor | tf.Variable
+            The global step counter. (optional)
+        """
+        if isinstance(global_step, (tf.Tensor, tf.Variable)):
+            global_step = get_default_session_or_error().run(global_step)
+        self._writer.add_summary(summary, global_step=global_step)
 
 
 def get_parameters_summary(variables):
