@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import (get_preferred_tensor_dtype, open_variable_scope,
+from tfsnippet.utils import (get_preferred_tensor_dtype, reopen_variable_scope,
                              is_deterministic_shape, ReshapeHelper,
                              maybe_explicit_broadcast)
 from .base import Distribution
@@ -62,7 +62,7 @@ class Bernoulli(Distribution):
             default_name=default_name,
         )
 
-        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+        with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):
                 # obtain parameter tensors
                 logits = tf.convert_to_tensor(logits, dtype=param_dtype)

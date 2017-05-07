@@ -1,233 +1,187 @@
 # -*- coding: utf-8 -*-
-import re
 import unittest
 
 import tensorflow as tf
 
-from tfsnippet.utils import (open_variable_scope, VarScopeObject,
+from tfsnippet.utils import (get_variables_as_dict,
+                             reopen_variable_scope,
+                             root_variable_scope,
+                             VarScopeObject,
                              instance_reuse,
-                             get_variables_as_dict, NameScopeObject,
+                             NameScopeObject,
                              instance_name_scope)
 from tests.helper import TestCase
 
 
-def _get_var(name, **kwargs):
-    kwargs.setdefault('shape', ())
-    return tf.get_variable(name, **kwargs)
+class _VarScopeTestMixin:
+
+    def _check_ns(self, ns, ns_name, op_name):
+        self.assertEqual(ns, ns_name)
+        self.assertEqual(tf.add(1, 2, name='op').name, op_name)
+
+    def _check_vs(self, get_var_name, vs_name, vs_scope, var_name, op_name):
+        vs = tf.get_variable_scope()
+        self.assertEqual(vs.name, vs_name)
+        self.assertEqual(vs.original_name_scope, vs_scope)
+        self.assertEqual(tf.get_variable(get_var_name, shape=()).name, var_name)
+        self.assertEqual(tf.add(1, 2, name='op').name, op_name)
 
 
-def _get_op(name):
-    return tf.add(1, 2, name=name)
+class TensorFlowScopeTestCase(TestCase, _VarScopeTestMixin):
 
-
-class _VarScopeObject(VarScopeObject):
-
-    @instance_reuse
-    def f(self):
-        return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
-
-
-class _NameScopeObject(NameScopeObject):
-
-    def f(self):
-        with tf.name_scope(self.name_scope):
-            return tf.add(1, 2, name='op')
-
-    @instance_name_scope
-    def g(self):
-        return tf.add(1, 2, name='op')
-
-    @instance_name_scope(scope='g')
-    def h(self):
-        return tf.add(1, 2, name='op')
-
-
-class ScopeTestCase(TestCase):
-
-    def _assert_var_exists(self, name):
-        pattern = re.compile(r'^Variable (|.*/)%s already exists.*' % name)
-        with self.assertRaisesRegex(ValueError, pattern):
-            _get_var(name)
-
-    def _assert_reuse_var(self, name):
-        pattern = re.compile(
-            r'^Trying to share variable (|.*/)%s, but specified shape.*' % name)
-        with self.assertRaisesRegex(ValueError, pattern):
-            _get_var(name, shape=(None,))
-
-    def test_open_variable_scope(self):
-        GLOBAL_VARIABLES_KEY = tf.GraphKeys.GLOBAL_VARIABLES
-
+    def test_name_scope(self):
         with tf.Graph().as_default():
-            # test to enter and re-enter sub scopes normally
-            with open_variable_scope('a', unique_name_scope=False) as a:
-                self.assertEqual(a.name, 'a')
-                self.assertEqual(a.original_name_scope, 'a/')
-                self.assertEqual(_get_var('v1').name, 'a/v1:0')
-                self.assertEqual(_get_op('o1').name, 'a/o1:0')
+            with tf.name_scope(None) as root:
+                self._check_ns(root, '', 'op:0')
 
-                with open_variable_scope('b', unique_name_scope=False) as b:
-                    self.assertEqual(b.name, 'a/b')
-                    self.assertEqual(b.original_name_scope, 'a/b/')
-                    self.assertEqual(_get_var('v1').name, 'a/b/v1:0')
-                    self.assertEqual(_get_op('o1').name, 'a/b/o1:0')
+                with tf.name_scope('a') as a:
+                    self._check_ns(a, 'a/', 'a/op:0')
+                    with tf.name_scope('') as ns:
+                        self._check_ns(ns, '', 'op_1:0')
+                        with tf.name_scope('a') as ns:
+                            self._check_ns(ns, 'a_1/', 'a_1/op:0')
 
-                    with open_variable_scope(a, unique_name_scope=False) as a2:
-                        self.assertEqual(a2.name, 'a')
-                        self.assertEqual(a2.original_name_scope, 'a/')
-                        self.assertEqual(_get_var('v2').name, 'a/v2:0')
-                        self.assertEqual(_get_op('o2').name, 'a/o2:0')
+                with tf.name_scope('b/c') as ns:
+                    self._check_ns(ns, 'b/c/', 'b/c/op:0')
 
-                        with open_variable_scope('c',
-                                                 unique_name_scope=False) as c:
-                            self.assertEqual(c.name, 'a/c')
-                            self.assertEqual(c.original_name_scope, 'a/c/')
-                            self.assertEqual(_get_var('v1').name, 'a/c/v1:0')
-                            self.assertEqual(_get_op('o1').name, 'a/c/o1:0')
+                with tf.name_scope('b') as ns:
+                    self._check_ns(ns, 'b/', 'b/op:0')
+                    with tf.name_scope('c') as ns:
+                        self._check_ns(ns, 'b/c_1/', 'b/c_1/op:0')
 
-                a = tf.get_variable_scope()
-                self.assertEqual(a.name, 'a')
-                self.assertEqual(a.original_name_scope, 'a/')
-                self.assertEqual(_get_var('v3').name, 'a/v3:0')
-                self.assertEqual(_get_op('o3').name, 'a/o3:0')
+                with tf.name_scope('b') as ns:
+                    self._check_ns(ns, 'b_1/', 'b_1/op:0')
 
-            # test to enter sub scope with path
-            with open_variable_scope('x/y/z', unique_name_scope=False) as xyz:
-                self.assertEqual(xyz.name, 'x/y/z')
-                self.assertEqual(xyz.original_name_scope, 'x/y/z/')
-                xyz_v1 = _get_var('v1')
-                self.assertEqual(xyz_v1.name, 'x/y/z/v1:0')
-                self.assertEqual(_get_op('o1').name, 'x/y/z/o1:0')
-
-            with open_variable_scope('x/y/w', unique_name_scope=False) as xyw:
-                self.assertEqual(xyw.name, 'x/y/w')
-                self.assertEqual(xyw.original_name_scope, 'x/y/w/')
-                xyw_v1 = _get_var('v1')
-                self.assertEqual(xyw_v1.name, 'x/y/w/v1:0')
-                self.assertEqual(_get_op('o1').name, 'x/y/w/o1:0')
-
-            self.assertEqual(
-                tf.get_collection(GLOBAL_VARIABLES_KEY, scope='x'),
-                [xyz_v1, xyw_v1]
-            )
-            self.assertEqual(
-                tf.get_collection(GLOBAL_VARIABLES_KEY, scope='x/y'),
-                [xyz_v1, xyw_v1]
-            )
-            self.assertEqual(
-                tf.get_collection(GLOBAL_VARIABLES_KEY, scope='x/y/z'),
-                [xyz_v1]
-            )
-            self.assertEqual(
-                tf.get_collection(GLOBAL_VARIABLES_KEY, scope='x/y/w'),
-                [xyw_v1]
-            )
-
-            # test to re-enter the root scope
+    def test_variable_scope(self):
+        with tf.Graph().as_default():
             root = tf.get_variable_scope()
-            self.assertEqual(root.name, '')
-            self.assertEqual(root.original_name_scope, '')
-            self.assertEqual(_get_var('v1').name, 'v1:0')
-            self.assertEqual(_get_op('o1').name, 'o1:0')
 
-            with open_variable_scope(xyz, unique_name_scope=False) as s:
-                self.assertEqual(s.name, 'x/y/z')
-                self.assertEqual(s.original_name_scope, 'x/y/z/')
+            with tf.variable_scope(''):
+                self._check_vs('v0', '', '', 'v0:0', 'op:0')
 
-                with open_variable_scope(root, unique_name_scope=False) as ss:
-                    self.assertEqual(ss.name, '')
-                    self.assertEqual(ss.original_name_scope, '')
-                    self.assertEqual(_get_var('v2').name, 'v2:0')
-                    self.assertEqual(_get_op('o2').name, 'o2:0')
+            with tf.variable_scope('a') as a:
+                self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
 
-                    with open_variable_scope(xyw,
-                                             unique_name_scope=False) as sss:
-                        self.assertEqual(sss.name, 'x/y/w')
-                        self.assertEqual(sss.original_name_scope, 'x/y/w/')
-                        self.assertEqual(_get_var('v2').name, 'x/y/w/v2:0')
-                        self.assertEqual(_get_op('o2').name, 'x/y/w/o2:0')
+                with tf.variable_scope('b'):
+                    self._check_vs('v2', 'a/b', 'a/b/', 'a/b/v2:0', 'a/b/op:0')
 
-                    ss = tf.get_variable_scope()
-                    self.assertEqual(ss.name, '')
-                    self.assertEqual(ss.original_name_scope, '')
+                    with tf.variable_scope(a):
+                        # having the name scope 'a/b/a' is an absurd behavior
+                        # of `tf.variable_scope`, which we may not agree but
+                        # have to follow.
+                        self._check_vs('v3', 'a', 'a/', 'a/v3:0', 'a/b/a/op:0')
 
-                s = tf.get_variable_scope()
-                self.assertEqual(s.name, 'x/y/z')
-                self.assertEqual(s.original_name_scope, 'x/y/z/')
+                with tf.variable_scope('b'):
+                    self._check_vs('v5', 'a/b', 'a/b_1/', 'a/b/v5:0',
+                                   'a/b_1/op:0')
 
-            # test to re-enter a deep scope.
-            with open_variable_scope(c, unique_name_scope=False) as s:
-                self.assertEqual(s.name, 'a/c')
-                self.assertEqual(s.original_name_scope, 'a/c/')
+            with tf.variable_scope('a/b'):
+                    self._check_vs('v9', 'a/b', 'a/b_2/', 'a/b/v9:0',
+                                   'a/b_2/op:0')
 
-                with open_variable_scope(xyz, unique_name_scope=False) as ss:
-                    self.assertEqual(ss.name, 'x/y/z')
-                    self.assertEqual(ss.original_name_scope, 'x/y/z/')
-                    self.assertEqual(_get_var('v2').name, 'x/y/z/v2:0')
-                    self.assertEqual(_get_op('o2').name, 'x/y/z/o2:0')
+            with tf.variable_scope('a'):
+                self._check_vs('v6', 'a', 'a_1/', 'a/v6:0', 'a_1/op:0')
 
-                self.assertEqual(s.name, 'a/c')
-                self.assertEqual(s.original_name_scope, 'a/c/')
+                with tf.variable_scope('b'):
+                    self._check_vs('v7', 'a/b', 'a_1/b/', 'a/b/v7:0',
+                                   'a_1/b/op:0')
 
-            # test to overwrite the scope settings.
-            with open_variable_scope(c, unique_name_scope=False) as s:
-                self.assertEqual(s.name, 'a/c')
-                self.assertEqual(s.original_name_scope, 'a/c/')
-                self._assert_var_exists('v1')
-                self.assertEqual(_get_op('o1').name, 'a/c/o1_1:0')
+                with tf.variable_scope(None, default_name='b'):
+                    self._check_vs('v8', 'a/b_1', 'a_1/b_1/', 'a/b_1/v8:0',
+                                   'a_1/b_1/op:0')
 
-                with open_variable_scope(s, unique_name_scope=False,
-                                         reuse=True):
-                    self.assertEqual(_get_var('v1').name, 'a/c/v1:0')
-                    self.assertEqual(_get_op('o1').name, 'a/c/o1_2:0')
-                    self._assert_reuse_var('v1')
+            with tf.variable_scope(a):
+                self._check_vs('v9', 'a', 'a/', 'a/v9:0', 'a_2/op:0')
 
-            # test open an existing variable scope with unique name scope
-            with open_variable_scope(a, unique_name_scope=True) as s:
-                self.assertEqual(s.name, 'a')
-                self.assertEqual(s.original_name_scope, 'a/')
-                self._assert_var_exists('v1')
-                self.assertEqual(_get_var('v4').name, 'a/v4:0')
-                self.assertEqual(_get_op('o1').name, 'a_1/o1:0')
+                # test return to root scope
+                with tf.variable_scope(root):
+                    self._check_vs('v10', '', '', 'v10:0', 'a_2/op_1:0')
 
-            with open_variable_scope(c, unique_name_scope=True) as s:
-                self.assertEqual(s.name, 'a/c')
-                self.assertEqual(s.original_name_scope, 'a/c/')
-                self._assert_var_exists('v1')
-                self.assertEqual(_get_var('v4').name, 'a/c/v4:0')
-                self.assertEqual(_get_op('o1').name, 'a/c_1/o1:0')
+    def test_reuse(self):
+        with tf.Graph().as_default():
+            root = tf.get_variable_scope()
+            self.assertFalse(root.reuse)
 
-            with open_variable_scope('a', unique_name_scope=False):
-                with open_variable_scope('c', unique_name_scope=True) as s:
-                    self.assertEqual(s.name, 'a/c')
-                    self.assertEqual(s.original_name_scope, 'a/c/')
-                    self._assert_var_exists('v1')
-                    self.assertEqual(_get_var('v5').name, 'a/c/v5:0')
-                    self.assertEqual(_get_op('o1').name, 'a/c_2/o1:0')
+            with tf.variable_scope('a', reuse=True) as a:
+                self.assertTrue(a.reuse)
 
-            with open_variable_scope('d', unique_name_scope=True) as s:
-                self.assertEqual(s.name, 'd')
-                self.assertEqual(_get_op('o1').name, 'd/o1:0')
+                with tf.variable_scope('b') as b:
+                    self.assertTrue(b.reuse)
 
-            with open_variable_scope('d', unique_name_scope=True) as s:
-                self.assertEqual(s.name, 'd')
-                self.assertEqual(_get_op('o1').name, 'd_1/o1:0')
+                # It is absurd where `reuse` flag cannot be cancelled if we
+                # open `b` by name, but can indeed be cancelled if we open
+                # it by stored variable scope instance.
+                with tf.variable_scope('b', reuse=False) as vs:
+                    self.assertTrue(vs.reuse)
 
-            with self.assertRaises(ValueError):
-                # root name scope cannot be opened via `unique_name_scope`.
-                with open_variable_scope('', unique_name_scope=True):
-                    pass
+                with tf.variable_scope(b, reuse=False) as vs:
+                    self.assertFalse(vs.reuse)
 
-            # test to open a pure variable scope
-            with open_variable_scope(a, unique_name_scope=False):
-                with open_variable_scope('c', pure_variable_scope=True) as s:
-                    self.assertEqual(s.name, 'a/c')
-                    self.assertEqual(s.original_name_scope, 'a/c/')
-                    self._assert_var_exists('v1')
-                    self.assertEqual(_get_var('v6').name, 'a/c/v6:0')
-                    self.assertEqual(_get_op('o4').name, 'a/o4:0')
+                with tf.variable_scope(root, reuse=False) as vs:
+                    self.assertFalse(vs.reuse)
+
+
+class ReopenVariableScopeTestCase(TestCase, _VarScopeTestMixin):
+
+    def test_basic(self):
+        with tf.Graph().as_default():
+            root = tf.get_variable_scope()
+
+            with tf.variable_scope('a') as a:
+                self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
+
+                with reopen_variable_scope(root):
+                    self._check_vs('v2', '', '', 'v2:0', 'op:0')
+
+                    with reopen_variable_scope(a):
+                        self._check_vs('v3', 'a', 'a/', 'a/v3:0', 'a/op_1:0')
+
+            with tf.variable_scope('a/b') as b:
+                self._check_vs('v4', 'a/b', 'a/b/', 'a/b/v4:0', 'a/b/op:0')
+
+                with reopen_variable_scope(root):
+                    self._check_vs('v5', '', '', 'v5:0', 'op_1:0')
+
+                with reopen_variable_scope(a):
+                    self._check_vs('v6', 'a', 'a/', 'a/v6:0', 'a/op_2:0')
+
+                    with reopen_variable_scope(a):
+                        self._check_vs('v7', 'a', 'a/', 'a/v7:0', 'a/op_3:0')
+
+            with reopen_variable_scope(b):
+                self._check_vs('v8', 'a/b', 'a/b/', 'a/b/v8:0', 'a/b/op_1:0')
+
+
+class RootVariableScopeTestCase(TestCase, _VarScopeTestMixin):
+
+    def test_root_variable_scope(self):
+        with tf.Graph().as_default():
+            with root_variable_scope() as root:
+                self._check_vs('v1', '', '', 'v1:0', 'op:0')
+                with tf.variable_scope('a'):
+                    self._check_vs('v2', 'a', 'a/', 'a/v2:0', 'a/op:0')
+
+                    with root_variable_scope():
+                        self._check_vs('v3', '', '', 'v3:0', 'op_1:0')
+
+                    self._check_vs('v4', 'a', 'a/', 'a/v4:0', 'a/op_1:0')
+
+            with root_variable_scope():
+                self._check_vs('v5', '', '', 'v5:0', 'op_2:0')
+
+            with tf.variable_scope('b'):
+                with tf.variable_scope(root):
+                    self._check_vs('v6', '', '', 'v6:0', 'b/op:0')
+
+
+class VarScopeObjectTestCase(TestCase):
 
     def test_VarScopeObject(self):
+        class _VarScopeObject(VarScopeObject):
+            @instance_reuse
+            def f(self):
+                return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
         with tf.Graph().as_default():
             o1 = _VarScopeObject(default_name='o')
             self.assertEqual(o1.variable_scope.name, 'o')
@@ -267,7 +221,23 @@ class ScopeTestCase(TestCase):
                 self.assertEqual(var_4.name, 'c/o/f/var:0')
                 self.assertEqual(op_4.name, 'c/o/f/op:0')
 
+
+class NameScopeObjectTestCase(TestCase):
+
     def test_NameScopeObject(self):
+        class _NameScopeObject(NameScopeObject):
+            def f(self):
+                with tf.name_scope(self.name_scope):
+                    return tf.add(1, 2, name='op')
+
+            @instance_name_scope
+            def g(self):
+                return tf.add(1, 2, name='op')
+
+            @instance_name_scope(scope='g')
+            def h(self):
+                return tf.add(1, 2, name='op')
+
         with tf.Graph().as_default():
             o1 = _NameScopeObject(name='o')
             self.assertEqual(o1.name_scope, 'o/')
@@ -288,6 +258,9 @@ class ScopeTestCase(TestCase):
             self.assertEqual(o2.f().name, 'o_1/op:0')
             self.assertEqual(o2.g().name, 'o_1/g/op:0')
             self.assertEqual(o2.h().name, 'o_1/g_1/op:0')
+
+
+class GetVariablesTestCase(TestCase):
 
     def test_get_variables_as_dict(self):
         GLOBAL_VARIABLES = tf.GraphKeys.GLOBAL_VARIABLES

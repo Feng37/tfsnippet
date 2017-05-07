@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import (open_variable_scope, get_preferred_tensor_dtype,
+from tfsnippet.utils import (reopen_variable_scope, get_preferred_tensor_dtype,
                              ReshapeHelper)
 from .base import Distribution
 
@@ -58,7 +58,7 @@ class Normal(Distribution):
                                      name=name,
                                      default_name=default_name)
 
-        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+        with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):
                 # obtain parameter tensors
                 mean = tf.convert_to_tensor(mean, dtype=dtype)

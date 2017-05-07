@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.distributions import Distribution
-from tfsnippet.utils import (open_variable_scope,
+from tfsnippet.utils import (reopen_variable_scope,
                              get_preferred_tensor_dtype,
                              get_dynamic_tensor_shape)
 from tests.helper import TestCase
@@ -17,7 +17,7 @@ class _MyDistribution(Distribution):
         super(_MyDistribution, self).__init__(
             group_event_ndims=group_event_ndims)
 
-        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+        with reopen_variable_scope(self.variable_scope):
             self.p = p = tf.convert_to_tensor(
                 p, dtype=get_preferred_tensor_dtype(p))
 

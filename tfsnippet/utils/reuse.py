@@ -7,18 +7,21 @@ from contextlib import contextmanager
 import six
 import tensorflow as tf
 
-from .scope import open_variable_scope
-from .imported import deprecated
+from .scope import reopen_variable_scope, root_variable_scope
 
 __all__ = [
-    'auto_reuse_variables', 'local_reuse', 'instance_reuse',
+    'auto_reuse_variables', 'local_reuse', 'global_reuse', 'instance_reuse',
 ]
 
 
 @contextmanager
 def auto_reuse_variables(name_or_scope,
-                         unique_name_scope=True,
-                         **kwargs):
+                         initializer=None,
+                         regularizer=None,
+                         caching_device=None,
+                         partitioner=None,
+                         custom_getter=None,
+                         dtype=tf.float32):
     """Open a variable scope, while automatically choosing `reuse` flag.
 
     The `reuse` flag will be set to False if the variable scope is opened
@@ -30,14 +33,7 @@ def auto_reuse_variables(name_or_scope,
     name_or_scope : str | tf.VariableScope
         The name of the variable scope, or the variable scope to open.
 
-    unique_name_scope : bool
-        Whether or not to open a unique name scope?
-
-        If True, a unique name scope will be opened.
-        Otherwise the original name scope of the variable scope will be
-        reopened. (default is True)
-
-    **kwargs
+    initializer, regularizer, caching_device, partitioner, custom_getter, dtype
         Other parameters for opening the variable scope.
 
     Yields
@@ -45,37 +41,41 @@ def auto_reuse_variables(name_or_scope,
     tf.VariableScope
         The opened variable scope.
     """
-    if 'reuse' in kwargs:
-        raise RuntimeError(
-            '`reuse` is not an argument of `auto_reuse_variables`.')
+    if not name_or_scope:
+        raise ValueError('`name_or_scope` cannot be empty.  If you want to '
+                         'auto-reuse variables in root variable scope, you '
+                         'should capture the root variable scope instance '
+                         'and call `auto_reuse_variables` on that, instead '
+                         'of calling with an empty name.')
 
-    # open the variable scope temporarily to capture the actual scope
-    with open_variable_scope(name_or_scope,
-                             unique_name_scope=False,
-                             pure_variable_scope=True) as vs:
-        variable_scope = vs
+    with tf.variable_scope(name_or_scope,
+                           initializer=initializer,
+                           regularizer=regularizer,
+                           caching_device=caching_device,
+                           partitioner=partitioner,
+                           custom_getter=custom_getter,
+                           dtype=dtype) as vs:
+        # check whether or not the variable scope has been initialized
+        graph = tf.get_default_graph()
+        if graph not in __auto_reuse_variables_graph_dict:
+            __auto_reuse_variables_graph_dict[graph] = set([])
+        initialized_scopes = __auto_reuse_variables_graph_dict[graph]
+        reuse = vs.name in initialized_scopes
 
-    # check whether or not the variable scope has been initialized
-    graph = tf.get_default_graph()
-    if graph not in __auto_reuse_variables_graph_dict:
-        __auto_reuse_variables_graph_dict[graph] = set([])
-    initialized_scopes = __auto_reuse_variables_graph_dict[graph]
-    reuse = variable_scope.name in initialized_scopes
-
-    # re-enter the variable scope with proper `reuse` flag
-    with open_variable_scope(variable_scope,
-                             unique_name_scope=unique_name_scope,
-                             reuse=reuse,
-                             **kwargs) as vs:
-        yield vs
-        initialized_scopes.add(vs.name)
+        # if `reuse` is True, set the reuse flag
+        if reuse:
+            vs.reuse_variables()
+            yield vs
+        else:
+            yield vs
+            initialized_scopes.add(vs.name)
 
 #: dict to track the initialization state for each variable scope
 #: belonging to every living graph.
 __auto_reuse_variables_graph_dict = weakref.WeakKeyDictionary()
 
 
-def local_reuse(method=None, scope=None, unique_name_scope=True):
+def local_reuse(method=None, scope=None):
     """Decorate a function within `auto_reuse_variables` scope locally.
 
     Any function or method applied with this decorator will be called within
@@ -90,7 +90,7 @@ def local_reuse(method=None, scope=None, unique_name_scope=True):
 
     is equivalent to:
 
-        with auto_reuse_variables('foo', unique_name_scope=True):
+        with auto_reuse_variables('foo'):
             bar = tf.get_variable('bar', ...)
 
     Note that the scope opened by `auto_reuse_variables` should be child
@@ -107,8 +107,7 @@ def local_reuse(method=None, scope=None, unique_name_scope=True):
     By default the name of the variable scope should be equal to the name
     of the decorated method, and the name scope within the context should
     be equal to the variable scope name, plus some suffix to make it unique.
-    These behaviors can be changed by setting `scope` and `unique_name_scope`
-    arguments, for example:
+    The variable scope name can be set by `scope` argument, for example:
 
         @local_reuse(scope='dense')
         def dense_layer(inputs):
@@ -130,31 +129,101 @@ def local_reuse(method=None, scope=None, unique_name_scope=True):
             return tf.get_variable('bar', ...)
 
     These two functions will return the same `bar` variable.
+    
+    See Also
+    --------
+    global_reuse, instance_reuse, auto_reuse_variables
 
     Parameters
     ----------
     scope : str
         The name of the variable scope.  If not set, will use the name
         of the method as scope name.
-
-    unique_name_scope : bool
-        Whether or not to open a unique name scope each time the method
-        is called?  (default is True)
     """
     if method is None:
-        return functools.partial(
-            local_reuse, scope=scope, unique_name_scope=unique_name_scope)
+        return functools.partial(local_reuse, scope=scope)
     scope = scope or method.__name__
 
     @six.wraps(method)
     def wrapper(*args, **kwargs):
-        with auto_reuse_variables(scope, unique_name_scope=unique_name_scope):
+        with auto_reuse_variables(scope):
             return method(*args, **kwargs)
 
     return wrapper
 
 
-def instance_reuse(method=None, scope=None, unique_name_scope=True):
+def global_reuse(method=None, scope=None):
+    """Decorate a function within `auto_reuse_variables` scope globally.
+
+    Any function or method applied with this decorator will be called within
+    a variable scope opened first by `root_variable_scope`, then by
+    `auto_reuse_variables`. That is, the following code:
+
+        @global_reuse
+        def foo():
+            return tf.get_variable('bar', ...)
+
+        bar = foo()
+
+    is equivalent to:
+
+        with root_variable_scope():
+            with auto_reuse_variables('foo'):
+                bar = tf.get_variable('bar', ...)
+
+    Thus the major difference between `global_reuse` and `local_reuse` is
+    that `global_reuse` will not follow the caller's active variable scope.
+
+    By default the name of the variable scope should be equal to the name
+    of the decorated method, and the name scope within the context should
+    be equal to the variable scope name, plus some suffix to make it unique.
+    The variable scope name can be set by `scope` argument, for example:
+
+        @global_reuse(scope='dense')
+        def dense_layer(inputs):
+            w = tf.get_variable('w', ...)
+            b = tf.get_variable('b', ...)
+            return tf.matmul(w, inputs) + b
+
+    Note that the variable reusing is based on the name of the variable
+    scope, rather than the function object.  As a result, two functions
+    with the same name, or with the same `scope` argument, will reuse
+    the same set of variables.  For example:
+
+        @global_reuse(scope='foo')
+        def foo_1():
+            return tf.get_variable('bar', ...)
+
+        @global_reuse(scope='foo')
+        def foo_2():
+            return tf.get_variable('bar', ...)
+
+    These two functions will return the same `bar` variable.
+    
+    See Also
+    --------
+    local_reuse, instance_reuse,auto_reuse_variables
+
+    Parameters
+    ----------
+    scope : str
+        The name of the variable scope.  If not set, will use the name
+        of the method as scope name.
+    """
+    if method is None:
+        return functools.partial(local_reuse, scope=scope)
+    scope = scope or method.__name__
+
+    @six.wraps(method)
+    def wrapper(*args, **kwargs):
+        with root_variable_scope():
+            with auto_reuse_variables(scope):
+                return method(*args, **kwargs)
+
+    return wrapper
+
+
+def instance_reuse(method=None, scope=None):
     """Decorate an instance method within `auto_reuse_variables` scope.
 
     This decorator should be applied to unbound instance methods, and
@@ -173,11 +242,6 @@ def instance_reuse(method=None, scope=None, unique_name_scope=True):
 
     The above example is then equivalent to the following code:
 
-        @local_reuse
-        def foo():
-            return tf.get_variable('bar', ...)
-
-
         class Foo(object):
 
             def __init__(self, name):
@@ -185,32 +249,28 @@ def instance_reuse(method=None, scope=None, unique_name_scope=True):
                     self.variable_scope = vs
 
             def foo(self):
-                with open_variable_scope(self.variable_scope,
-                                         unique_name_scope=False):
-                    return foo()
+                with reopen_variable_scope(self.variable_scope):
+                    with auto_reuse_variables('foo'):
+                        return tf.get_variable('bar', ...)
 
-    In which the `instance_reuse` decorator acts like `local_reuse`,
-    but will open the `variable_scope` of corresponding instance before
-    calling the decorated method.
+    In which the `instance_reuse` decorator acts like `global_reuse`,
+    but will open the `variable_scope` of corresponding instance instead
+    of opening the root variable scope, before entering the desired
+    auto-reusing variable scope.
 
     See Also
     --------
-    local_reuse, open_variable_scope
+    global_reuse, local_reuse, auto_reuse_variables 
 
     Parameters
     ----------
     scope : str
         The name of the variable scope.  If not set, will use the name
         of the method as scope name.
-
-    unique_name_scope : bool
-        Whether or not to open a unique name scope each time the method
-        is called?  (default is True)
     """
 
     if method is None:
-        return functools.partial(
-            instance_reuse, scope=scope, unique_name_scope=unique_name_scope)
+        return functools.partial(instance_reuse, scope=scope)
 
     # check whether or not `method` looks like an instance method
     if six.PY2:
@@ -237,9 +297,8 @@ def instance_reuse(method=None, scope=None, unique_name_scope=True):
                             'is expected to be a `tf.VariableScope`, but got '
                             '%r.' % (obj, variable_scope,))
 
-        with open_variable_scope(variable_scope, unique_name_scope=False):
-            with auto_reuse_variables(
-                    scope, unique_name_scope=unique_name_scope):
+        with reopen_variable_scope(variable_scope):
+            with auto_reuse_variables(scope):
                 return method(*args, **kwargs)
 
     return wrapper

@@ -4,7 +4,7 @@ import tensorflow as tf
 from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (VarScopeObject,
                              is_integer,
-                             open_variable_scope,
+                             reopen_variable_scope,
                              TensorArithmeticMixin,
                              instance_reuse)
 
@@ -74,7 +74,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
             default_name=default_name
         )
 
-        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+        with reopen_variable_scope(self.variable_scope):
             if not isinstance(distribution, Distribution) and \
                     callable(distribution):
                 # we support the factory of distributions, so that
@@ -86,7 +86,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
             raise TypeError(
                 'Expected a Distribution but got %r.' % (distribution,))
 
-        with open_variable_scope(self.variable_scope, unique_name_scope=False):
+        with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):
                 if group_event_ndims is not None:
                     if not is_integer(group_event_ndims) or \

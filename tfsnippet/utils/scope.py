@@ -10,93 +10,46 @@ from tensorflow.python.ops import variable_scope as variable_scope_ops
 from .imported import camel_to_underscore
 
 __all__ = [
-    'open_variable_scope', 'instance_name_scope',
-    'VarScopeObject', 'NameScopeObject',
     'get_variables_as_dict',
+    'reopen_variable_scope', 'root_variable_scope',
+    'VarScopeObject',
+    'NameScopeObject', 'instance_name_scope',
 ]
 
 
 @contextmanager
-def open_variable_scope(name_or_scope,
-                        pure_variable_scope=False,
-                        unique_name_scope=True,
-                        reuse=None,
-                        initializer=None,
-                        regularizer=None,
-                        caching_device=None,
-                        partitioner=None,
-                        custom_getter=None,
-                        dtype=tf.float32):
-    """Open or re-open a variable scope.
+def reopen_variable_scope(var_scope,
+                          reuse=None,
+                          initializer=None,
+                          regularizer=None,
+                          caching_device=None,
+                          partitioner=None,
+                          custom_getter=None,
+                          dtype=tf.float32):
+    """Reopen the specified `var_scope` and its `original_name_scope`.
 
-    When using `tf.variable_scope` to re-open an existing variable scope, the
-    original name scope will not be open.  Instead a different name scope will
-    be opened under the current name scope.
-
-    This method thus fixes this issue, by ensuring to open the original name
-    scope if a variable scope is re-opened, if `unique_name_scope` is False.
-
-    Notes
-    -----
-    This method does not support `default_name`, which is used to suggest
-    a name template for choosing a unique variable scope name, used in
-    `tf.variable_scope`.  It opens exactly `name_or_scope`.
+    `tf.variable_scope` will not open the original name scope, even if a
+    stored `tf.VariableScope` instance is specified.  This method thus
+    allows to open exactly the same name scope as the original one.
 
     Parameters
     ----------
-    name_or_scope : str | tf.VariableScope
-        The name of the scope, or the variable scope object.
-
-    pure_variable_scope : bool
-        Whether or not to open a pure variable scope?
-
-        If set to True, a pure variable scope will be opened without
-        changing the current name scope. (default is False)
-
-    unique_name_scope : bool
-        Whether or not to open a unique name scope?
-        This argument will be ignored if `pure_variable_scope` is True.
-
-        If set to True, a unique name scope will be opened.
-        Otherwise the original name scope of the variable scope will be
-        reopened. (default is True)
+    var_scope : tf.VariableScope
+        The variable scope instance.
 
     reuse : None | bool
         Whether or not to reuse the variables in opened scope?
 
     initializer, regularizer, caching_device, partitioner, custom_getter, dtype
         Other parameters for opening the variable scope.
-
-    Yields
-    ------
-    tf.VariableScope
-        The opened variable scope.
     """
-    graph = tf.get_default_graph()
-
-    if isinstance(name_or_scope, tf.VariableScope):
-        old_name_scope = name_or_scope.original_name_scope
-    elif isinstance(name_or_scope, six.string_types):
-        old = tf.get_variable_scope()
-        if old and old.original_name_scope:
-            old_name_scope = old.original_name_scope
-            if not old_name_scope.endswith('/'):
-                old_name_scope += '/'
-        else:
-            old_name_scope = ''
-        old_name_scope += name_or_scope
-        if not old_name_scope.endswith('/'):
-            old_name_scope += '/'
-    else:
-        raise TypeError(
-            '`name_or_scope` is neither a tf.VariableScope nor a string.')
-
-    if unique_name_scope and not old_name_scope.strip('/'):
-        raise ValueError('`unique_name_scope` can be set to True only if '
-                         'the variable scope to open is not the root scope.')
+    if not isinstance(var_scope, tf.VariableScope):
+        raise TypeError('`var_scope` is expected to be an instance of '
+                        '`tf.VariableScope`.')
+    old_name_scope = var_scope.original_name_scope
 
     with variable_scope_ops._pure_variable_scope(
-            name_or_scope,
+            var_scope,
             reuse=reuse,
             initializer=initializer,
             regularizer=regularizer,
@@ -105,41 +58,55 @@ def open_variable_scope(name_or_scope,
             custom_getter=custom_getter,
             old_name_scope=old_name_scope,
             dtype=dtype) as vs:
-        if not pure_variable_scope:
-            name_scope = vs.original_name_scope.rstrip('/')
+        name_scope = old_name_scope
+        if name_scope and not name_scope.endswith('/'):
+            name_scope += '/'
 
-            # query whether or not the full name scope has been used
-            # if not, we must open the name scope by unique routine, otherwise
-            # the name scope will not be marked as opened
-            is_first_open = name_scope and (
-                graph.unique_name(name_scope, mark_as_used=False) == name_scope
-            )
-            if is_first_open:
-                unique_name_scope = True
-
-            # open the parent name scope, then open the child by relative name,
-            # so that the child scope will be unique.
-            if unique_name_scope:
-                scope_segments = name_scope.rsplit('/', 1)
-                if len(scope_segments) > 1:
-                    parent_scope = scope_segments[0] + '/'
-                    child_scope = scope_segments[1]
-                else:
-                    parent_scope = ''
-                    child_scope = scope_segments[0]
-
-                with tf.name_scope(parent_scope):
-                    with tf.name_scope(child_scope):
-                        yield vs
-
-            # otherwise open the full name scope directly
-            else:
-                if name_scope:
-                    name_scope += '/'
-                with tf.name_scope(name_scope):
-                    yield vs
-        else:
+        with tf.name_scope(name_scope):
             yield vs
+
+
+@contextmanager
+def root_variable_scope(reuse=None,
+                        initializer=None,
+                        regularizer=None,
+                        caching_device=None,
+                        partitioner=None,
+                        custom_getter=None,
+                        dtype=tf.float32):
+    """Open the root name and variable scope.
+
+    Parameters
+    ----------
+    reuse : None | bool
+        Whether or not to reuse the variables in opened scope?
+
+    initializer, regularizer, caching_device, partitioner, custom_getter, dtype
+        Other parameters for opening the variable scope.
+    """
+    # `tf.variable_scope` does not support opening the root variable scope
+    # from empty name.  It always prepend the name of current variable scope
+    # to the front of opened variable scope.  So we get the current scope,
+    # and pretend it to be the root scope.
+    scope = tf.get_variable_scope()
+    old_name = scope.name
+    try:
+        scope._name = ''
+        with variable_scope_ops._pure_variable_scope(
+                '',
+                reuse=reuse,
+                initializer=initializer,
+                regularizer=regularizer,
+                caching_device=caching_device,
+                partitioner=partitioner,
+                custom_getter=custom_getter,
+                old_name_scope='',
+                dtype=dtype) as vs:
+            scope._name = old_name
+            with tf.name_scope(None):
+                yield vs
+    finally:
+        scope._name = old_name
 
 
 class VarScopeObject(object):
@@ -168,7 +135,9 @@ class VarScopeObject(object):
 
     def __init__(self, name=None, default_name=None):
         # get the TensorFlow variable scope
-        if not default_name:
+        name = name or None
+        default_name = default_name or None
+        if not name and not default_name:
             default_name = camel_to_underscore(self.__class__.__name__)
             default_name = default_name.lstrip('_')
         with tf.variable_scope(name, default_name=default_name) as vs:
@@ -278,6 +247,10 @@ class NameScopeObject(object):
     name scope, while each `op2` will be created in some sub scope within
     the object name scope.
 
+    See Also
+    --------
+    instance_name_scope
+
     Notes
     -----
     It is better to use `VarScopeObject` instead of `NameScopeObject`
@@ -296,10 +269,12 @@ class NameScopeObject(object):
     """
 
     def __init__(self, name=None):
-        self.name = name
-
         # get the TensorFlow name scope
-        default_name = camel_to_underscore(self.__class__.__name__)
+        name = name or None
+        if not name:
+            default_name = camel_to_underscore(self.__class__.__name__)
+        else:
+            default_name = None
         with tf.name_scope(name, default_name=default_name) as ns:
             self._name_scope = ns
 

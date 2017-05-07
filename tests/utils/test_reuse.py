@@ -1,139 +1,165 @@
 # -*- coding: utf-8 -*-
-import re
 import unittest
-from contextlib import contextmanager
 
 import tensorflow as tf
 
-from tfsnippet.utils import auto_reuse_variables, local_reuse, instance_reuse
+from tfsnippet.utils import (auto_reuse_variables, local_reuse, global_reuse,
+                             instance_reuse)
 from tests.helper import TestCase
 
 
-def _get_var(name, **kwargs):
-    kwargs.setdefault('shape', ())
-    return tf.get_variable(name, **kwargs)
+class AutoReuseVariablesTestCase(TestCase):
 
+    def _check_vs(self, get_var_name, vs_name, vs_scope, var_name, op_name):
+        vs = tf.get_variable_scope()
+        self.assertEqual(vs.name, vs_name)
+        self.assertEqual(vs.original_name_scope, vs_scope)
+        var = tf.get_variable(get_var_name, shape=())
+        self.assertEqual(var.name, var_name)
+        self.assertEqual(tf.add(1, 2, name='op').name, op_name)
+        return var
 
-def _get_op(name):
-    return tf.add(1, 2, name=name)
-
-
-class _Reusable(object):
-
-    def __init__(self, name):
-        with tf.variable_scope(None, default_name=name) as vs:
-            self.variable_scope = vs
-
-    @instance_reuse
-    def f(self):
-        return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
-
-    @instance_reuse(scope='f')
-    def f_1(self):
-        return tf.get_variable('var', shape=())
-
-    @instance_reuse(unique_name_scope=False)
-    def g(self):
-        return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
-
-
-class ReuseTestCase(TestCase):
-
-    @contextmanager
-    def _assert_exception(self, exp, msg):
-        with self.assertRaises(exp) as cm:
-            yield
-        got_msg = str(cm.exception)
-        if hasattr(msg, 'match'):
-            self.assertTrue(
-                msg.match(got_msg),
-                msg='expected message %r but got %r' % (msg, got_msg)
-            )
-        else:
-            self.assertEquals(got_msg, msg)
-
-    def _assert_var_not_exists(self, name):
-        pattern = re.compile(r'^Variable (|.*/)%s does not exist.*' % name)
-        with self._assert_exception(ValueError, pattern):
-            _get_var(name)
-
-    def test_auto_reuse_variables(self):
+    def test_basic_reuse(self):
         with tf.Graph().as_default():
-            # test reuse == False at the first time
-            with auto_reuse_variables('a', unique_name_scope=False) as vs:
-                self.assertEqual(vs.name, 'a')
-                v1 = _get_var('v1')
-                self.assertEqual(v1.name, 'a/v1:0')
-                self.assertEqual(_get_op('op1').name, 'a/op1:0')
+            with auto_reuse_variables('a') as a:
+                self.assertFalse(a.reuse)
+                v1 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
 
-            # test reuse == True at the second time
-            with auto_reuse_variables('a', unique_name_scope=False) as vs:
-                self.assertEqual(vs.name, 'a')
-                self.assertIs(_get_var('v1'), v1)
-                self.assertEqual(_get_var('v1').name, 'a/v1:0')
-                self.assertEqual(_get_op('op1').name, 'a/op1_1:0')
-                self._assert_var_not_exists('v2')
+            with auto_reuse_variables('a') as vs:
+                self.assertTrue(vs.reuse)
+                v1_2 = self._check_vs('v1', 'a', 'a_1/', 'a/v1:0', 'a_1/op:0')
+                self.assertIs(v1_2, v1)
 
-            # test reuse the variable scope at different name
-            with tf.variable_scope('b'):
-                with auto_reuse_variables('a', unique_name_scope=False) as vs:
-                    scope_b_a = vs
-                    self.assertEqual(vs.name, 'b/a')
-                    b_v1 = _get_var('v1')
-                    self.assertIsNot(b_v1, v1)
-                    self.assertEqual(b_v1.name, 'b/a/v1:0')
-                    self.assertEqual(_get_op('op1').name, 'b/a/op1:0')
+                with self.assertRaisesRegex(
+                        ValueError, 'Variable a/v2 does not exist, or was not '
+                                    'created with tf.get_variable()'):
+                    tf.get_variable('v2', shape=())
 
-            # test to open the variable scope using scope object
-            with auto_reuse_variables(scope_b_a, unique_name_scope=False) as vs:
-                self.assertEqual(vs.name, 'b/a')
-                self.assertIs(_get_var('v1'), b_v1)
-                self.assertEqual(_get_var('v1').name, 'b/a/v1:0')
-                self.assertEqual(_get_op('op1').name, 'b/a/op1_1:0')
-                self._assert_var_not_exists('v2')
+            with auto_reuse_variables(a):
+                self.assertTrue(vs.reuse)
+                v1_3 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a_2/op:0')
+                self.assertIs(v1_3, v1)
 
-            # test to open the variable scope with unique name scope
-            with auto_reuse_variables(scope_b_a, unique_name_scope=True) as vs:
-                self.assertEqual(vs.name, 'b/a')
-                self.assertIs(_get_var('v1'), b_v1)
-                self.assertEqual(_get_var('v1').name, 'b/a/v1:0')
-                self.assertEqual(_get_op('op1').name, 'b/a_1/op1:0')
+    def test_nested_reuse(self):
+        with tf.Graph().as_default():
+            with auto_reuse_variables('a') as a:
+                self.assertFalse(a.reuse)
 
-            with auto_reuse_variables('c', unique_name_scope=True) as vs:
-                self.assertEqual(vs.name, 'c')
-                self.assertEqual(_get_var('v1').name, 'c/v1:0')
-                self.assertEqual(_get_op('op1').name, 'c/op1:0')
+                with auto_reuse_variables('b') as b:
+                    self.assertFalse(b.reuse)
+                    b1 = self._check_vs('v1', 'a/b', 'a/b/', 'a/b/v1:0',
+                                        'a/b/op:0')
 
-            with auto_reuse_variables('c', unique_name_scope=True) as vs:
-                self.assertEqual(vs.name, 'c')
-                self.assertEqual(_get_var('v1').name, 'c/v1:0')
-                self.assertEqual(_get_op('op1').name, 'c_1/op1:0')
+                with auto_reuse_variables('b') as vs:
+                    self.assertTrue(vs.reuse)
+                    b1_2 = self._check_vs('v1', 'a/b', 'a/b_1/', 'a/b/v1:0',
+                                          'a/b_1/op:0')
+                    self.assertIs(b1_2, b1)
+
+                with auto_reuse_variables(b) as vs:
+                    self.assertTrue(vs.reuse)
+                    b1_3 = self._check_vs('v1', 'a/b', 'a/b/', 'a/b/v1:0',
+                                          'a/b_2/op:0')
+                    self.assertIs(b1_3, b1)
+
+            with auto_reuse_variables('a/b') as vs:
+                self.assertTrue(vs.reuse)
+                b1_4 = self._check_vs('v1', 'a/b', 'a/b_3/', 'a/b/v1:0',
+                                      'a/b_3/op:0')
+                self.assertIs(b1_4, b1)
+
+            with auto_reuse_variables(b) as vs:
+                self.assertTrue(vs.reuse)
+                # having the name scope 'b' is an absurd behavior
+                # of `tf.variable_scope`, which we may not agree but
+                # have to follow.
+                b1_5 = self._check_vs('v1', 'a/b', 'a/b/', 'a/b/v1:0',
+                                      'b/op:0')
+                self.assertIs(b1_5, b1)
+
+    def test_mix_reuse_and_variable_scope(self):
+        with tf.Graph().as_default():
+            with tf.variable_scope('a') as a:
+                self.assertFalse(a.reuse)
+
+                with auto_reuse_variables('b') as b:
+                    self.assertFalse(b.reuse)
+                    b1 = self._check_vs('v1', 'a/b', 'a/b/', 'a/b/v1:0',
+                                        'a/b/op:0')
+
+                with auto_reuse_variables('b') as vs:
+                    self.assertTrue(vs.reuse)
+                    b1_2 = self._check_vs('v1', 'a/b', 'a/b_1/', 'a/b/v1:0',
+                                          'a/b_1/op:0')
+                    self.assertIs(b1_2, b1)
+
+            with auto_reuse_variables('a') as vs:
+                self.assertFalse(vs.reuse)
+
+                with auto_reuse_variables('b') as vs:
+                    self.assertTrue(vs.reuse)
+                    b1_3 = self._check_vs('v1', 'a/b', 'a_1/b/', 'a/b/v1:0',
+                                          'a_1/b/op:0')
+                    self.assertIs(b1_3, b1)
+
+    def test_different_graph(self):
+        with tf.Graph().as_default():
+            with auto_reuse_variables('a') as a:
+                self.assertFalse(a.reuse)
+                v1 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
+
+            with auto_reuse_variables('a') as vs:
+                self.assertTrue(vs.reuse)
+                v1_2 = self._check_vs('v1', 'a', 'a_1/', 'a/v1:0', 'a_1/op:0')
+                self.assertIs(v1_2, v1)
 
         with tf.Graph().as_default():
-            # test reuse the variable scope at different graph
-            with auto_reuse_variables('a', unique_name_scope=False) as vs:
-                self.assertEqual(vs.name, 'a')
-                g2_v1 = _get_var('v1')
-                self.assertIsNot(g2_v1, v1)
-                self.assertEqual(g2_v1.name, 'a/v1:0')
-                self.assertEqual(_get_op('op1').name, 'a/op1:0')
+            with auto_reuse_variables('a') as vs:
+                self.assertFalse(vs.reuse)
+                v1_3 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
+                self.assertIsNot(v1_3, v1)
 
-    def test_local_reuse(self):
+    def test_reuse_root(self):
+        with tf.Graph().as_default():
+            root = tf.get_variable_scope()
+
+            with auto_reuse_variables(root) as vs:
+                self.assertFalse(vs.reuse)
+                v0 = self._check_vs('v0', '', '', 'v0:0', 'op:0')
+
+            with tf.variable_scope('a'):
+                with auto_reuse_variables(root) as vs:
+                    self.assertTrue(vs.reuse)
+                    v0_1 = self._check_vs('v0', '', '', 'v0:0', 'a/op:0')
+                    self.assertIs(v0_1, v0)
+
+    def test_errors(self):
+        with tf.Graph().as_default():
+            with self.assertRaisesRegex(
+                    ValueError, '`name_or_scope` cannot be empty.'):
+                with auto_reuse_variables(''):
+                    pass
+
+            with self.assertRaisesRegex(
+                    ValueError, '`name_or_scope` cannot be empty.'):
+                with auto_reuse_variables(None):
+                    pass
+
+
+class LocalReuseTestCase(TestCase):
+
+    def test_basic(self):
         @local_reuse
         def f():
-            var = tf.get_variable('var', shape=())
-            op = tf.add(1, 2, name='op')
-            return var, op
+            return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
 
         @local_reuse(scope='f')
         def f_1():
             return tf.get_variable('var', shape=())
 
-        @local_reuse(unique_name_scope=False)
+        @local_reuse
         def g():
-            var = tf.get_variable('var', shape=())
-            op = tf.add(1, 2, name='op')
-            return var, op
+            return f()
 
         with tf.Graph().as_default():
             # test reuse with default settings
@@ -157,16 +183,108 @@ class ReuseTestCase(TestCase):
                 self.assertEqual(var_3.name, 'parent/f/var:0')
                 self.assertEqual(op_3.name, 'parent/f/op:0')
 
-            # test reuse with `unique_name_scope == False`
-            var_1, op_1 = g()
-            var_2, op_2 = g()
+            # test reuse with nested `local_reuse`
+            var_4, op_4 = g()
+            var_5, op_5 = g()
+            self.assertIs(var_4, var_5)
+            self.assertIsNot(op_4, op_5)
+            self.assertEqual(var_4.name, 'g/f/var:0')
+            self.assertEqual(op_4.name, 'g/f/op:0')
+            self.assertEqual(op_5.name, 'g_1/f/op:0')
+
+    def test_nested_scope(self):
+        @local_reuse(scope='nested/scope')
+        def nested():
+            return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+        with tf.Graph().as_default():
+            var_1, op_1 = nested()
+            var_2, op_2 = nested()
             self.assertIs(var_1, var_2)
             self.assertIsNot(op_1, op_2)
-            self.assertEqual(var_1.name, 'g/var:0')
-            self.assertEqual(op_1.name, 'g/op:0')
-            self.assertEqual(op_2.name, 'g/op_1:0')
+            self.assertEqual(var_1.name, 'nested/scope/var:0')
+            self.assertEqual(op_1.name, 'nested/scope/op:0')
+            self.assertEqual(op_2.name, 'nested/scope_1/op:0')
 
-    def test_instance_reuse(self):
+
+class GlobalReuseTestCase(TestCase):
+
+    def test_basic(self):
+        @global_reuse
+        def f():
+            return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+        @global_reuse(scope='f')
+        def f_1():
+            return tf.get_variable('var', shape=())
+
+        @global_reuse
+        def g():
+            return f()
+
+        with tf.Graph().as_default():
+            # test reuse with default settings
+            var_1, op_1 = f()
+            var_2, op_2 = f()
+            self.assertIs(var_1, var_2)
+            self.assertIsNot(op_1, op_2)
+            self.assertEqual(var_1.name, 'f/var:0')
+            self.assertEqual(op_1.name, 'f/op:0')
+            self.assertEqual(op_2.name, 'f_1/op:0')
+
+            # test reuse according to the scope name
+            var_3 = f_1()
+            self.assertIs(var_3, var_1)
+
+            # test reuse within different parent scope
+            with tf.variable_scope('parent'):
+                var_3, op_3 = f()
+                self.assertIs(var_3, var_2)
+                self.assertIsNot(op_3, op_2)
+                self.assertEqual(var_3.name, 'f/var:0')
+                self.assertEqual(op_3.name, 'f_3/op:0')
+
+            # test reuse with nested `global_reuse`
+            var_4, op_4 = g()
+            self.assertIs(var_4, var_1)
+            self.assertEqual(var_4.name, 'f/var:0')
+            self.assertEqual(op_4.name, 'f_4/op:0')
+
+    def test_nested_scope(self):
+        @local_reuse(scope='nested/scope')
+        def nested():
+            return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+        with tf.Graph().as_default():
+            var_1, op_1 = nested()
+            var_2, op_2 = nested()
+            self.assertIs(var_1, var_2)
+            self.assertIsNot(op_1, op_2)
+            self.assertEqual(var_1.name, 'nested/scope/var:0')
+            self.assertEqual(op_1.name, 'nested/scope/op:0')
+            self.assertEqual(op_2.name, 'nested/scope_1/op:0')
+
+
+class InstanceReuseTestCase(TestCase):
+
+    def test_basic(self):
+        class _Reusable(object):
+            def __init__(self, name):
+                with tf.variable_scope(None, default_name=name) as vs:
+                    self.variable_scope = vs
+
+            @instance_reuse
+            def f(self):
+                return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+            @instance_reuse(scope='f')
+            def f_1(self):
+                return tf.get_variable('var', shape=())
+
+            @instance_reuse
+            def g(self):
+                return self.f()
+
         with tf.Graph().as_default():
             obj = _Reusable('obj')
 
@@ -191,24 +309,46 @@ class ReuseTestCase(TestCase):
                 self.assertEqual(var_3.name, 'obj/f/var:0')
                 self.assertEqual(op_3.name, 'obj/f_3/op:0')
 
-            # test reuse with `unique_name_scope == False`
-            var_1, op_1 = obj.g()
-            var_2, op_2 = obj.g()
-            self.assertIs(var_1, var_2)
-            self.assertIsNot(op_1, op_2)
-            self.assertEqual(var_1.name, 'obj/g/var:0')
-            self.assertEqual(op_1.name, 'obj/g/op:0')
-            self.assertEqual(op_2.name, 'obj/g/op_1:0')
+            # test reuse with nested call
+            var_4, op_4 = obj.g()
+            var_5, op_5 = obj.g()
+            self.assertIs(var_4, var_5)
+            self.assertIs(var_4, var_1)
+            self.assertIsNot(op_4, op_5)
+            self.assertEqual(var_4.name, 'obj/f/var:0')
+            self.assertEqual(op_4.name, 'obj/f_4/op:0')
+            self.assertEqual(op_5.name, 'obj/f_5/op:0')
 
             # test reuse on another object
             obj2 = _Reusable('obj')
-            var_1, op_1 = obj2.f()
-            var_2, op_2 = obj2.f()
+            var_6, op_6 = obj2.f()
+            var_7, op_7 = obj2.f()
+            self.assertIs(var_6, var_7)
+            self.assertIsNot(var_6, var_1)
+            self.assertIsNot(op_6, op_7)
+            self.assertEqual(var_6.name, 'obj_1/f/var:0')
+            self.assertEqual(op_6.name, 'obj_1/f/op:0')
+            self.assertEqual(op_7.name, 'obj_1/f_1/op:0')
+
+    def test_nested_scope(self):
+        class _Reusable(object):
+            def __init__(self, name):
+                with tf.variable_scope(None, default_name=name) as vs:
+                    self.variable_scope = vs
+
+            @instance_reuse(scope='nested/scope')
+            def nested(self):
+                return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
+
+        with tf.Graph().as_default():
+            obj = _Reusable('obj')
+            var_1, op_1 = obj.nested()
+            var_2, op_2 = obj.nested()
             self.assertIs(var_1, var_2)
             self.assertIsNot(op_1, op_2)
-            self.assertEqual(var_1.name, 'obj_1/f/var:0')
-            self.assertEqual(op_1.name, 'obj_1/f/op:0')
-            self.assertEqual(op_2.name, 'obj_1/f_1/op:0')
+            self.assertEqual(var_1.name, 'obj/nested/scope/var:0')
+            self.assertEqual(op_1.name, 'obj/nested/scope/op:0')
+            self.assertEqual(op_2.name, 'obj/nested/scope_1/op:0')
 
 if __name__ == '__main__':
     unittest.main()
