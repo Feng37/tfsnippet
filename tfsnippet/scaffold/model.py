@@ -178,6 +178,7 @@ class Model(VarScopeObject):
         dict[str, tf.Variable]
             Dict which maps from relative names to variable objects.
         """
+        self.build()
         vs_name = self.variable_scope.name + '/'
         if vs_name and not vs_name.endswith('/'):
             vs_name += '/'
@@ -192,6 +193,7 @@ class Model(VarScopeObject):
         also be initialized.  Otherwise the `global_step` must be manually
         initialized.
         """
+        self.build()
         var_list = list(six.itervalues(self.get_variables()))
         ensure_variables_initialized(var_list)
 
@@ -206,6 +208,7 @@ class Model(VarScopeObject):
         overwrite : bool
             Whether or not to overwrite the existing directory?
         """
+        self.build()
         path = os.path.abspath(save_dir)
         if os.path.exists(path):
             if overwrite:
@@ -226,6 +229,7 @@ class Model(VarScopeObject):
         save_dir : str
             Directory where the saved variables are placed.
         """
+        self.build()
         path = os.path.abspath(save_dir)
         saver = VariableSaver(self.get_param_variables(), path)
         saver.restore(ignore_non_exist=False)

@@ -2,7 +2,6 @@
 
 from .arith_mixin import *
 from .configutils import *
-from .graph import *
 from .imported import *
 from .misc import *
 from .reuse import *
