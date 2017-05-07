@@ -9,7 +9,8 @@ from tfsnippet.utils import (get_variables_as_dict,
                              VarScopeObject,
                              instance_reuse,
                              NameScopeObject,
-                             instance_name_scope)
+                             instance_name_scope,
+                             is_tensorflow_version_higher_or_equal)
 from tests.helper import TestCase
 
 
@@ -108,16 +109,16 @@ class TensorFlowScopeTestCase(TestCase, _VarScopeTestMixin):
                 with tf.variable_scope('b') as b:
                     self.assertTrue(b.reuse)
 
-                # It is absurd where `reuse` flag cannot be cancelled if we
-                # open `b` by name, but can indeed be cancelled if we open
-                # it by stored variable scope instance.
-                with tf.variable_scope('b', reuse=False) as vs:
-                    self.assertTrue(vs.reuse)
+                # TensorFlow >= 1.1.0 does not allow to cancel reuse flag
+                if is_tensorflow_version_higher_or_equal('1.1.0'):
+                    with tf.variable_scope('b', reuse=False) as vs:
+                        self.assertTrue(vs.reuse)
 
-                with tf.variable_scope(b, reuse=False) as vs:
-                    self.assertFalse(vs.reuse)
+                    with tf.variable_scope(b, reuse=False) as vs:
+                        self.assertTrue(vs.reuse)
 
-                with tf.variable_scope(root, reuse=False) as vs:
+                # Reopen a stored variable scope will restore its reuse flag.
+                with tf.variable_scope(root) as vs:
                     self.assertFalse(vs.reuse)
 
 
