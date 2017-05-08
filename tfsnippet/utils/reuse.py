@@ -129,7 +129,7 @@ def local_reuse(method=None, scope=None):
             return tf.get_variable('bar', ...)
 
     These two functions will return the same `bar` variable.
-    
+
     See Also
     --------
     global_reuse, instance_reuse, auto_reuse_variables
@@ -199,7 +199,7 @@ def global_reuse(method=None, scope=None):
             return tf.get_variable('bar', ...)
 
     These two functions will return the same `bar` variable.
-    
+
     See Also
     --------
     local_reuse, instance_reuse,auto_reuse_variables
@@ -260,7 +260,7 @@ def instance_reuse(method=None, scope=None):
 
     See Also
     --------
-    global_reuse, local_reuse, auto_reuse_variables 
+    global_reuse, local_reuse, auto_reuse_variables
 
     Parameters
     ----------
