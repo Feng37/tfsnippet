@@ -67,6 +67,11 @@ class Distribution(VarScopeObject):
         raise NotImplementedError()
 
     @property
+    def is_reparameterized(self):
+        """Whether or not the distribution is re-parameterized?"""
+        raise NotImplementedError()
+
+    @property
     def group_event_ndims(self):
         """Get the number of dimensions to be considered as events group.
 

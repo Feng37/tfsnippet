@@ -48,6 +48,7 @@ class NormalTestCase(TestCase):
             self.assertEqual(dist.dtype, tf.float32)
             self.assertEqual(dist.param_dtype, tf.float32)
             self.assertTrue(dist.is_continuous)
+            self.assertTrue(dist.is_reparameterized)
 
             dist = Normal(mean.astype(np.float64), stddev)
             self.assertEqual(dist.dtype, tf.float64)
@@ -128,6 +129,7 @@ class NormalTestCase(TestCase):
 
         # test 1d sampling
         with tf.Graph().as_default(), tf.Session().as_default() as session:
+            tf.set_random_seed(1234)
             dist = Normal(mean, stddev)
             samples_tensor = dist.sample()
             self.assertEqual(samples_tensor.dtype, tf.float32)

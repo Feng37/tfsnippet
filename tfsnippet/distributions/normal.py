@@ -127,6 +127,10 @@ class Normal(Distribution):
         return True
 
     @property
+    def is_reparameterized(self):
+        return True
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 

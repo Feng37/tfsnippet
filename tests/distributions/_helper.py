@@ -21,6 +21,7 @@ def get_distribution_samples(distribution_class, kwargs, n_samples=N_SAMPLES,
                              sample_shape=(), explicit_batch_size=False,
                              func=None):
     with tf.Graph().as_default():
+        tf.set_random_seed(1234)
         try:
             batch_size = n_samples if explicit_batch_size else None
             kwargs_ph = {
@@ -57,6 +58,7 @@ def get_distribution_samples(distribution_class, kwargs, n_samples=N_SAMPLES,
 def compute_distribution_prob(distribution_class, kwargs, data,
                               func=None, group_event_ndims=None):
     with tf.Graph().as_default():
+        tf.set_random_seed(1234)
         try:
             kwargs_ph = {
                 k: tf.placeholder(shape=a.shape, dtype=floatx())
@@ -89,6 +91,7 @@ def compute_distribution_prob(distribution_class, kwargs, data,
 
 def compute_analytic_kld(distribution_class, kwargs1, kwargs2):
     with tf.Graph().as_default():
+        tf.set_random_seed(1234)
         try:
             kwargs1_ph = {
                 k: tf.placeholder(shape=a.shape, dtype=floatx())

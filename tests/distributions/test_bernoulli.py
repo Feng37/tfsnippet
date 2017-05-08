@@ -15,7 +15,7 @@ from tests.helper import TestCase
 
 class BernoulliTestCase(TestCase):
     TOL = dict(rtol=1e-3, atol=1e-5)
-    LOGITS = np.asarray([0.0, 0.5, -1.0], dtype=np.float32)
+    LOGITS = np.asarray([0.0, 0.7, -0.7], dtype=np.float32)
 
     def test_construction_error(self):
         with tf.Graph().as_default(), tf.Session().as_default():
@@ -41,6 +41,7 @@ class BernoulliTestCase(TestCase):
             self.assertEqual(dist.dtype, tf.int32)
             self.assertEqual(dist.param_dtype, tf.float32)
             self.assertFalse(dist.is_continuous)
+            self.assertTrue(dist.is_reparameterized)
 
             dist = Bernoulli(logits.astype(np.float64), tf.int64)
             self.assertEqual(dist.dtype, tf.int64)
@@ -94,6 +95,7 @@ class BernoulliTestCase(TestCase):
 
         # test 1d sampling
         with tf.Graph().as_default(), tf.Session().as_default() as session:
+            tf.set_random_seed(1234)
             dist = Bernoulli(logits)
             samples_tensor = dist.sample()
             self.assertEqual(samples_tensor.dtype, tf.int32)
@@ -114,8 +116,7 @@ class BernoulliTestCase(TestCase):
         true_prob, true_log_prob = likelihood(samples, logits)
         self.assertEqual(samples.shape, (N_SAMPLES, 3))
         np.testing.assert_equal(sorted(np.unique(samples)), [0, 1])
-        big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES,
-                          scale=6.)
+        big_number_verify(np.mean(samples, axis=0), mean, stddev, N_SAMPLES)
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
@@ -138,7 +139,7 @@ class BernoulliTestCase(TestCase):
         self.assertEqual(samples.shape, (4, 5, N_SAMPLES, 3))
         big_number_verify(
             np.mean(samples.reshape([-1, 3]), axis=0), mean, stddev,
-            N_SAMPLES * 20, scale=6.
+            N_SAMPLES * 20,
         )
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
@@ -164,13 +165,20 @@ class BernoulliTestCase(TestCase):
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 
         # test 3d sampling
-        bias = [[0.0], [-1.0], [2.0], [-3.0]]
+        bias = [[0.0], [-0.5], [0.5], [1.0], [-1.0]]
         logits_3d = logits.reshape([1, 3]) + bias
+        mean_3d = 1. / (1 + np.exp(-logits_3d))
+        stddev_3d = mean_3d * (1. - mean_3d)
         samples, prob, log_prob = get_distribution_samples(
             Bernoulli, {'logits': logits_3d}
         )
         true_prob, true_log_prob = likelihood(samples, logits_3d)
-        self.assertEqual(samples.shape, (N_SAMPLES, 4, 3))
+        self.assertEqual(samples.shape, (N_SAMPLES, 5, 3))
+        for i in range(5):
+            big_number_verify(
+                np.mean(samples[:, i, :], axis=0), mean_3d[i], stddev_3d[i],
+                N_SAMPLES
+            )
         np.testing.assert_allclose(prob, true_prob, **tol)
         np.testing.assert_allclose(log_prob, true_log_prob, **tol)
 

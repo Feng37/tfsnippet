@@ -20,7 +20,7 @@ __all__ = [
 def sgvb(model, variational, axis=None, name=None):
     """SGVB estimator for the variational lower bound.
 
-    The SGVB estimator, if given observed variable `x` and latent variable
+    The SGVB estimator[1], if given observed variable `x` and latent variable
     `z`, where the posterior of `x` is represented by `p(x|z)`, the prior of
     `z` is represented by `p(z)` and the approximated posterior of `z` is
     represented by `q(z|x)`, then it computes the variational lower bound by:
@@ -33,6 +33,12 @@ def sgvb(model, variational, axis=None, name=None):
                         \\log p(x) + \\log p(z|x) - \\log q(z|x) \\right] \\\\
                 &= \\mathop{\\mathbb{E}_{q(z|x)}} \\left[
                         \\log p(x,z) - \\log q(z|x) \\right]
+    
+    Note that SGVB can only be applied on continuous variables which can be
+    re-parameterized.
+                        
+    [1]	D. P. Kingma and M. Welling, “Auto-Encoding Variational Bayes,” vol. 
+        stat.ML. 21-Dec-2013.
 
     Parameters
     ----------
