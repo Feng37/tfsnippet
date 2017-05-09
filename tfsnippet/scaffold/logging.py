@@ -5,7 +5,7 @@ import six
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import (humanize_duration, MetricAccumulator,
+from tfsnippet.utils import (MetricAccumulator, humanize_duration,
                              get_default_session_or_error)
 
 __all__ = [
@@ -222,13 +222,16 @@ class SummaryWriter(object):
         self._writer.add_summary(summary, global_step=global_step)
 
 
-def get_parameters_summary(variables):
+def get_parameters_summary(variables, title='Variables Summary'):
     """Get a formatted summary about the parameters.
 
     Parameters
     ----------
     variables : list[tf.Variable] | dict[str, tf.Variable]
         List or dict of variables, which should be optimized during training.
+
+    title : str
+        Optional title of this summary.
 
     Returns
     -------
@@ -251,7 +254,7 @@ def get_parameters_summary(variables):
     var_count = [str(s) for s in var_count]
 
     if len(var_count) > 0:
-        var_title = 'Trainable Parameters (%d in total)' % (var_count_total,)
+        var_title = '%s (%d in total)' % (title, var_count_total)
 
         x, y, z = (max(map(len, var_name)), max(map(len, var_shape)),
                    max(map(len, var_count)))

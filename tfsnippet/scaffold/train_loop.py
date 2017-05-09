@@ -370,7 +370,8 @@ class _TrainLoop(object):
         *   Execution environment.
         *   Parameter variables to be optimized during training.
         """
-        self.println(get_parameters_summary(variables=self._param_vars))
+        self.println(get_parameters_summary(variables=self._param_vars,
+                                            title='Trainable Parameters'))
         self.println('')
 
     def print_logs(self):
