@@ -8,7 +8,7 @@ from tests.helper import TestCase
 
 class _MyComponent(Component):
 
-    def _build(self):
+    def _call(self):
         return tf.get_variable('var', shape=())
 
 

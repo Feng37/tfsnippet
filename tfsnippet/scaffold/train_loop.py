@@ -13,7 +13,7 @@ from .logging import (SummaryWriter, get_parameters_summary, MetricFormatter,
 from .validation import _EarlyStopping, early_stopping as open_early_stopping
 
 __all__ = [
-    'train_loop'
+    'train_loop', '_TrainLoop',
 ]
 
 _EPOCH_TIME_METRIC = 'epoch_time'

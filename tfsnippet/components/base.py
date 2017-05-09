@@ -20,9 +20,9 @@ class Component(VarScopeObject):
                 return layers.fully_connected(inputs, num_outputs=2)
     """
 
-    def _build(self, *args, **kwargs):
+    def _call(self, *args, **kwargs):
         raise NotImplementedError()
 
     def __call__(self, *args, **kwargs):
         with auto_reuse_variables(self.variable_scope):
-            return self._build(*args, **kwargs)
+            return self._call(*args, **kwargs)

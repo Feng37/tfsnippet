@@ -10,7 +10,10 @@ from logging import getLogger
 import tensorflow as tf
 from tfsnippet.utils import VariableSaver, TemporaryDirectory, makedirs
 
-__all__ = ['early_stopping']
+__all__ = [
+    'early_stopping',
+    '_EarlyStopping',
+]
 
 
 class _EarlyStopping(object):
