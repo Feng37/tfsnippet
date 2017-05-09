@@ -33,11 +33,11 @@ def sgvb(model, variational, axis=None, name=None):
                         \\log p(x) + \\log p(z|x) - \\log q(z|x) \\right] \\\\
                 &= \\mathop{\\mathbb{E}_{q(z|x)}} \\left[
                         \\log p(x,z) - \\log q(z|x) \\right]
-    
+
     Note that SGVB can only be applied on continuous variables which can be
     re-parameterized.
-                        
-    [1]	D. P. Kingma and M. Welling, “Auto-Encoding Variational Bayes,” vol. 
+
+    [1]	D. P. Kingma and M. Welling, “Auto-Encoding Variational Bayes,” vol.
         stat.ML. 21-Dec-2013.
 
     Parameters
