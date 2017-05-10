@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.scaffold import (get_parameters_summary, MetricLogger,
+from tfsnippet.scaffold import (get_variables_summary, MetricLogger,
                                 SummaryWriter)
 from tfsnippet.utils import TemporaryDirectory
 from tests.helper import TestCase
@@ -22,20 +22,20 @@ class LoggingUtilsTestCase(TestCase):
                 b = tf.get_variable('b', dtype=tf.float32, shape=(3, 4, 5))
             c = tf.get_variable('c', dtype=tf.float32, shape=())
 
-            self.assertEqual(get_parameters_summary([]), '')
-            self.assertEqual(get_parameters_summary([a]), (
+            self.assertEqual(get_variables_summary([]), '')
+            self.assertEqual(get_variables_summary([a]), (
                 'Variables Summary (2 in total)\n'
                 '------------------------------\n'
                 'a  (2,)  2'
             ))
-            self.assertEqual(get_parameters_summary([a, b, c]), (
+            self.assertEqual(get_variables_summary([a, b, c]), (
                 'Variables Summary (63 in total)\n'
                 '-------------------------------\n'
                 'a         (2,)       2\n'
                 'c         ()         1\n'
                 'nested/b  (3, 4, 5)  60'
             ))
-            self.assertEqual(get_parameters_summary({'a': a, 'b': b, 'c': c}), (
+            self.assertEqual(get_variables_summary({'a': a, 'b': b, 'c': c}), (
                 'Variables Summary (63 in total)\n'
                 '-------------------------------\n'
                 'a  (2,)       2\n'

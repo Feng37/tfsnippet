@@ -9,6 +9,7 @@ import tensorflow as tf
 from tfsnippet.utils import (ensure_variables_initialized,
                              VarScopeObject,
                              get_variables_as_dict,
+                             reopen_variable_scope,
                              VariableSaver)
 
 __all__ = ['Model']
@@ -95,7 +96,7 @@ class Model(VarScopeObject):
             return
         self._has_built = True
 
-        with tf.variable_scope(self.variable_scope):
+        with reopen_variable_scope(self.variable_scope):
             # create the global step variable if there's none
             if self._global_step is None:
                 self._global_step = tf.get_variable(

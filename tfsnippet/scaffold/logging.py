@@ -12,7 +12,7 @@ __all__ = [
     'MetricFormatter',
     'MetricLogger',
     'SummaryWriter',
-    'get_parameters_summary',
+    'get_variables_summary',
 ]
 
 
@@ -222,7 +222,7 @@ class SummaryWriter(object):
         self._writer.add_summary(summary, global_step=global_step)
 
 
-def get_parameters_summary(variables, title='Variables Summary'):
+def get_variables_summary(variables, title='Variables Summary'):
     """Get a formatted summary about the parameters.
 
     Parameters

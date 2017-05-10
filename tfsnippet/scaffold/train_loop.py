@@ -8,7 +8,7 @@ import six
 import tensorflow as tf
 
 from tfsnippet.utils import MetricAccumulator
-from .logging import (SummaryWriter, get_parameters_summary, MetricFormatter,
+from .logging import (SummaryWriter, get_variables_summary, MetricFormatter,
                       MetricLogger)
 from .validation import _EarlyStopping, early_stopping as open_early_stopping
 
@@ -370,8 +370,8 @@ class _TrainLoop(object):
         *   Execution environment.
         *   Parameter variables to be optimized during training.
         """
-        self.println(get_parameters_summary(variables=self._param_vars,
-                                            title='Trainable Parameters'))
+        self.println(get_variables_summary(variables=self._param_vars,
+                                           title='Trainable Parameters'))
         self.println('')
 
     def print_logs(self):
