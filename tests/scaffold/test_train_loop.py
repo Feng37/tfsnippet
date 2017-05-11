@@ -373,7 +373,7 @@ class TrainLoopTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b]), [1, 2])
             with train_loop([a], early_stopping=True):
                 set_variable_values([a, b], [10, 20])
-            self.assertEqual(get_variable_values([a, b]), [1, 20])
+            self.assertEqual(get_variable_values([a, b]), [10, 20])
 
             # test early-stopping with smaller-better metric
             set_variable_values([a, b], [1, 2])

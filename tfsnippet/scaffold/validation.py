@@ -93,7 +93,7 @@ def early_stopping(param_vars, initial_metric=None, save_dir=None,
     One may also get the best metric via ``es.best_metric``.
 
     Note that if no loss is given via ``es.update``, then the variables
-    would always be restored to their initial states after exiting context.
+    would keep their latest values when exiting the early-stopping context.
 
     Parameters
     ----------
@@ -155,7 +155,6 @@ def early_stopping(param_vars, initial_metric=None, save_dir=None,
             es = _EarlyStopping(saver,
                                 best_metric=initial_metric,
                                 smaller_is_better=smaller_is_better)
-            saver.save()
 
             try:
                 yield es
@@ -178,5 +177,6 @@ def early_stopping(param_vars, initial_metric=None, save_dir=None,
                 if not es.ever_updated:
                     warnings.warn(
                         'Early-stopping metric has never been updated. '
+                        'The variables will keep their latest values. '
                         'Did you forget to add corresponding metric?'
                     )

@@ -228,7 +228,7 @@ class SummaryWriter(object):
 
     def add_graph(self, graph=None, global_step=None):
         """Add graph to the summary.
-        
+
         Parameters
         ----------
         graph : tf.Graph

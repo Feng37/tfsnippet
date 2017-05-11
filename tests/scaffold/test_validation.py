@@ -35,7 +35,7 @@ class EarlyStoppingTestCase(TestCase):
             # test: early-stopping context without updating loss
             with early_stopping([a, b]):
                 set_variable_values([a], [10])
-            self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
+            self.assertEqual(get_variable_values([a, b, c]), [10, 2, 3])
 
             # test: the first loss will always cause saving
             with early_stopping([a, b]) as es:
