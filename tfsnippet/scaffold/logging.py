@@ -173,6 +173,11 @@ class SummaryWriter(object):
     def __init__(self, writer):
         self._writer = writer
 
+    @property
+    def writer(self):
+        """Get the underlying TensorFlow summary writer."""
+        return self._writer
+
     def close(self):
         """Close the underlying summary writer."""
         if self._writer is not None:
@@ -220,6 +225,25 @@ class SummaryWriter(object):
         if isinstance(global_step, (tf.Tensor, tf.Variable)):
             global_step = get_default_session_or_error().run(global_step)
         self._writer.add_summary(summary, global_step=global_step)
+
+    def add_graph(self, graph=None, global_step=None):
+        """Add graph to the summary.
+        
+        Parameters
+        ----------
+        graph : tf.Graph
+            The graph to be added.  If not specified, will add the
+            current active graph.
+
+        global_step : int | tf.Tensor | tf.Variable
+            The global step counter. (optional)
+        """
+        if isinstance(global_step, (tf.Tensor, tf.Variable)):
+            global_step = get_default_session_or_error().run(global_step)
+        self._writer.add_graph(
+            graph or tf.get_default_graph(),
+            global_step=global_step
+        )
 
 
 def get_variables_summary(variables, title='Variables Summary'):

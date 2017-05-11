@@ -94,6 +94,7 @@ class SummaryWriterTestCase(TestCase):
                             global_step=tf.constant(step),
                             metrics={'valid_loss': -epoch}
                         )
+                        sw.add_graph(global_step=tf.constant(step))
 
             # read the metric summary
             acc_steps = []

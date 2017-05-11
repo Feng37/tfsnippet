@@ -118,6 +118,11 @@ class _TrainLoop(object):
             self._step_start_time = None
 
     @property
+    def summary_writer(self):
+        """Get the summary writer instance."""
+        return self._summary_writer
+
+    @property
     def param_vars(self):
         """Get the trainable parameter variables."""
         return self._param_vars
