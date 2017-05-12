@@ -1,6 +1,6 @@
 # anaconda packages
 numpy >= 1.11
-pandas >= 0.19
+pandas >= 0.18
 six >= 1.10.0
 
 # pip-only packages
