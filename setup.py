@@ -50,6 +50,9 @@ setup(
     platforms='any',
     setup_requires=['setuptools'],
     install_requires=install_requires,
+    dependency_links=[
+        'git+https://github.com/korepwx/mlcomp.git@dev'
+    ],
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
