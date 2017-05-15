@@ -19,18 +19,14 @@ class Sequential(Component):
     sequential networks.  Following code demonstrates an example of
     using this wrapper:
 
-        def Linear(num_outputs):
-            return functools.partial(
-                layers.fully_connected, num_outputs=num_outputs,
-                activation_fn=None
-            )
+        from tfsnippet import components as comp
 
         mlp = Sequential([
-            Linear(100),
+            comp.Linear(100),
             tf.nn.relu,
-            Linear(100),
+            comp.Linear(100),
             tf.nn.relu,
-            Linear(1),
+            comp.Linear(1),
             tf.nn.sigmoid
         ])
 
