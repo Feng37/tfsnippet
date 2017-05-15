@@ -16,6 +16,7 @@ __all__ = [
 
 @contextmanager
 def auto_reuse_variables(name_or_scope,
+                         reopen_name_scope=False,
                          initializer=None,
                          regularizer=None,
                          caching_device=None,
@@ -33,6 +34,12 @@ def auto_reuse_variables(name_or_scope,
     name_or_scope : str | tf.VariableScope
         The name of the variable scope, or the variable scope to open.
 
+    reopen_name_scope : bool
+        Whether or not to re-open the original name scope of `name_or_scope`?
+
+        This option is valid only if `name_or_scope` is actually an instance
+        of `tf.VariableScope`.
+
     initializer, regularizer, caching_device, partitioner, custom_getter, dtype
         Other parameters for opening the variable scope.
 
@@ -48,13 +55,35 @@ def auto_reuse_variables(name_or_scope,
                          'and call `auto_reuse_variables` on that, instead '
                          'of calling with an empty name.')
 
-    with tf.variable_scope(name_or_scope,
-                           initializer=initializer,
-                           regularizer=regularizer,
-                           caching_device=caching_device,
-                           partitioner=partitioner,
-                           custom_getter=custom_getter,
-                           dtype=dtype) as vs:
+    if reopen_name_scope:
+        if not isinstance(name_or_scope, tf.VariableScope):
+            raise ValueError('`reopen_name_scope` can be set to True '
+                             'only if `name_or_scope` is an instance of '
+                             '`tf.VariableScope`.')
+
+        def generate_context():
+            return reopen_variable_scope(
+                name_or_scope,
+                initializer=initializer,
+                regularizer=regularizer,
+                caching_device=caching_device,
+                partitioner=partitioner,
+                custom_getter=custom_getter,
+                dtype=dtype
+            )
+    else:
+        def generate_context():
+            return tf.variable_scope(
+                name_or_scope,
+                initializer=initializer,
+                regularizer=regularizer,
+                caching_device=caching_device,
+                partitioner=partitioner,
+                custom_getter=custom_getter,
+                dtype=dtype
+            )
+
+    with generate_context() as vs:
         # check whether or not the variable scope has been initialized
         graph = tf.get_default_graph()
         if graph not in __auto_reuse_variables_graph_dict:
@@ -278,12 +307,12 @@ def instance_reuse(method=None, scope=None):
     else:
         getargspec = inspect.getfullargspec
 
-    argspec = getargspec(method)
-    if argspec.args[0] != 'self':
-        raise TypeError('`method` seems not to be an instance method '
-                        '(whose first argument should be `self`).')
     if inspect.ismethod(method):
         raise TypeError('`method` is expected to be unbound instance method.')
+    argspec = getargspec(method)
+    if not argspec.args or argspec.args[0] != 'self':
+        raise TypeError('`method` seems not to be an instance method '
+                        '(whose first argument should be `self`).')
 
     # determine the scope name
     scope = scope or method.__name__

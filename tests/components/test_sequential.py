@@ -37,18 +37,18 @@ class SequentialTestCase(TestCase):
             seq(tf.constant(1.))
             self.assertEqual(
                 sorted(v.name for v in tf.global_variables()),
-                ['c/__call__/a:0',
-                 'c_1/__call__/b:0',
-                 'sequential/__call__/layer0/v:0',
-                 'sequential/__call__/layer3/v:0']
+                ['c/a:0',
+                 'c_1/b:0',
+                 'sequential/layer0/v:0',
+                 'sequential/layer3/v:0']
             )
             seq(tf.constant(2.))
             self.assertEqual(
                 sorted(v.name for v in tf.global_variables()),
-                ['c/__call__/a:0',
-                 'c_1/__call__/b:0',
-                 'sequential/__call__/layer0/v:0',
-                 'sequential/__call__/layer3/v:0']
+                ['c/a:0',
+                 'c_1/b:0',
+                 'sequential/layer0/v:0',
+                 'sequential/layer3/v:0']
             )
 
     def test_errors(self):

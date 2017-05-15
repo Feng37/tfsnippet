@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-from tfsnippet.utils import VarScopeObject, instance_reuse
+import tensorflow as tf
+
+from tfsnippet.utils import VarScopeObject, auto_reuse_variables
 
 __all__ = ['Component']
 
@@ -23,6 +25,15 @@ class Component(VarScopeObject):
     def _call(self, *args, **kwargs):
         raise NotImplementedError()
 
-    @instance_reuse(scope='__call__')
     def __call__(self, *args, **kwargs):
-        return self._call(*args, **kwargs)
+        with auto_reuse_variables(self.variable_scope,
+                                  reopen_name_scope=True):
+            # Here `reopen_name_scope` is set to True, so that multiple
+            # calls to the same Component instance will not occupy multiple
+            # suffixes of the variable scope name.
+            #
+            # However, in order for ``tf.variable_scope(default_name=...)``
+            # to work properly along with variable reusing, we must generate
+            # a unique name scope, using ``tf.name_scope('build')``
+            with tf.name_scope('build'):
+                return self._call(*args, **kwargs)

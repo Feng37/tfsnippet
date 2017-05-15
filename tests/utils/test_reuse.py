@@ -102,6 +102,22 @@ class AutoReuseVariablesTestCase(TestCase):
                                           'a_1/b/op:0')
                     self.assertIs(b1_3, b1)
 
+    def test_reopen_name_scope(self):
+        with tf.Graph().as_default():
+            with auto_reuse_variables('a') as a:
+                self.assertFalse(a.reuse)
+                v1 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op:0')
+
+            with auto_reuse_variables(a, reopen_name_scope=True) as vs:
+                self.assertTrue(vs.reuse)
+                v1_2 = self._check_vs('v1', 'a', 'a/', 'a/v1:0', 'a/op_1:0')
+                self.assertIs(v1_2, v1)
+
+                with self.assertRaisesRegex(
+                        ValueError, 'Variable a/v2 does not exist, or was not '
+                                    'created with tf.get_variable()'):
+                    tf.get_variable('v2', shape=())
+
     def test_different_graph(self):
         with tf.Graph().as_default():
             with auto_reuse_variables('a') as a:
@@ -143,6 +159,13 @@ class AutoReuseVariablesTestCase(TestCase):
             with self.assertRaisesRegex(
                     ValueError, '`name_or_scope` cannot be empty.'):
                 with auto_reuse_variables(None):
+                    pass
+
+            with self.assertRaisesRegex(
+                    ValueError, '`reopen_name_scope` can be set to True '
+                                'only if `name_or_scope` is an instance of '
+                                '`tf.VariableScope`.'):
+                with auto_reuse_variables('a', reopen_name_scope=True):
                     pass
 
 
@@ -349,6 +372,40 @@ class InstanceReuseTestCase(TestCase):
             self.assertEqual(var_1.name, 'obj/nested/scope/var:0')
             self.assertEqual(op_1.name, 'obj/nested/scope/op:0')
             self.assertEqual(op_2.name, 'obj/nested/scope_1/op:0')
+
+    def test_errors(self):
+        class _Reusable(object):
+            def __init__(self):
+                self.variable_scope = ''
+
+            @instance_reuse
+            def f(self):
+                pass
+
+        with tf.Graph().as_default():
+            obj = _Reusable()
+            with self.assertRaisesRegex(
+                    TypeError, '`variable_scope` attribute of the instance .* '
+                               'is expected to be a `tf.VariableScope`.*'):
+                obj.f()
+
+            with self.assertRaisesRegex(
+                    TypeError, '`method` seems not to be an instance method.*'):
+                @instance_reuse
+                def f():
+                    pass
+
+            with self.assertRaisesRegex(
+                    TypeError, '`method` seems not to be an instance method.*'):
+                @instance_reuse
+                def f(a):
+                    pass
+
+            with self.assertRaisesRegex(
+                    TypeError, '`method` is expected to be unbound instance '
+                               'method.'):
+                obj = _Reusable()
+                instance_reuse(obj.f)
 
 if __name__ == '__main__':
     unittest.main()

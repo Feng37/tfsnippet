@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from tfsnippet.utils import auto_reuse_variables
+import tensorflow as tf
+
 from .base import Component
 
 __all__ = ['Sequential']
@@ -41,6 +42,10 @@ class Sequential(Component):
     layer, the variables of that component is managed within its scope,
     instead of the scope of this sequential component.
 
+    If instead a function or a method is provided, it will be called
+    within the child variable scope of "layer%d", under the scope of
+    sequential component itself.
+
     Parameters
     ----------
     layers : list[(inputs) -> outputs]
@@ -65,6 +70,6 @@ class Sequential(Component):
     def _call(self, inputs):
         outputs = inputs
         for i, c in enumerate(self.components):
-            with auto_reuse_variables('layer%d' % (i,)):
+            with tf.variable_scope('layer%d' % i):
                 outputs = c(outputs)
         return outputs
