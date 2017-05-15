@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from tfsnippet.utils import VarScopeObject, auto_reuse_variables
+from tfsnippet.utils import VarScopeObject, instance_reuse
 
 __all__ = ['Component']
 
@@ -16,13 +16,13 @@ class Component(VarScopeObject):
 
         class MyComponent(Component):
 
-            def _build(self, inputs):
+            def _call(self, inputs):
                 return layers.fully_connected(inputs, num_outputs=2)
     """
 
     def _call(self, *args, **kwargs):
         raise NotImplementedError()
 
+    @instance_reuse(scope='__call__')
     def __call__(self, *args, **kwargs):
-        with auto_reuse_variables(self.variable_scope):
-            return self._call(*args, **kwargs)
+        return self._call(*args, **kwargs)
