@@ -2,3 +2,4 @@
 
 from .base import *
 from .sequential import *
+from .wrapper import *
