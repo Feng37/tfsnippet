@@ -23,12 +23,14 @@ class _MyDistribution(Distribution):
 
             # get the shapes of parameter
             self._static_value_shape = p.get_shape()[-1:]
-            self._dynamic_value_shape = \
+            self._dynamic_value_shape = tf.convert_to_tensor(
                 get_dynamic_tensor_shape(p, lambda s: s[-1:])
+            )
 
             self._static_batch_shape = p.get_shape()[: -1]
-            self._dynamic_batch_shape = \
+            self._dynamic_batch_shape = tf.convert_to_tensor(
                 get_dynamic_tensor_shape(p, lambda s: s[: -1])
+            )
 
     @property
     def dtype(self):

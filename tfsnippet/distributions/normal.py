@@ -20,13 +20,15 @@ class Normal(Distribution):
 
     stddev : tf.Tensor | np.ndarray | float
         The standard derivation of the Normal distribution.
-        Should be broadcastable to match `mean`.
+        Should be broadcastable to match `mean`.  Also, the data
+        type of `stddev` will be casted to that of `mean`.
 
         Note that the range of `stddev` is :math:`(0, \\infty)`.
 
     logstd : tf.Tensor | np.ndarray | float
         The log standard derivation of the Normal distribution.
-        Should be broadcastable to match `mean`.
+        Should be broadcastable to match `mean`.  Also, the data
+        type of `stddev` will be casted to that of `mean`.
 
         If `stddev` is specified, then `logstd` will be ignored.
         Note that the range of `logstd` is :math:`(-\\infty, \\infty)`.
@@ -140,7 +142,7 @@ class Normal(Distribution):
 
     @property
     def dynamic_value_shape(self):
-        return ()
+        return tf.constant([], dtype=tf.int32)
 
     @property
     def static_value_shape(self):
@@ -181,27 +183,26 @@ class Normal(Distribution):
         """Get the log-precision of Normal distribution."""
         return self._log_prec
 
-    def sample(self, sample_shape=(), name=None):
-        with tf.name_scope(name, default_name='sample'):
-            # check the arguments of `sample_shape`
-            helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
-            static_sample_shape = helper.get_static_shape()
-            dynamic_sample_shape = helper.get_dynamic_shape()
+    def _sample(self, sample_shape=()):
+        # check the arguments of `sample_shape`
+        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
+        static_sample_shape = helper.get_static_shape()
+        dynamic_sample_shape = helper.get_dynamic_shape()
 
-            # derive the sampler
-            static_shape = (
-                tf.TensorShape(static_sample_shape).
-                    concatenate(self.static_batch_shape)
-            )
-            dynamic_shape = tf.concat(
-                [dynamic_sample_shape, self.dynamic_batch_shape],
-                axis=0
-            )
-            samples = self.mean + self.stddev * (
-                tf.random_normal(dynamic_shape, dtype=self.dtype)
-            )
-            samples.set_shape(static_shape)
-            return samples
+        # derive the sampler
+        static_shape = (
+            tf.TensorShape(static_sample_shape).
+                concatenate(self.static_batch_shape)
+        )
+        dynamic_shape = tf.concat(
+            [dynamic_sample_shape, self.dynamic_batch_shape],
+            axis=0
+        )
+        samples = self.mean + self.stddev * (
+            tf.random_normal(dynamic_shape, dtype=self.dtype)
+        )
+        samples.set_shape(static_shape)
+        return samples
 
     def _log_prob(self, x):
         c = tf.constant(-0.5 * np.log(2 * np.pi), dtype=self.dtype)
@@ -211,12 +212,10 @@ class Normal(Distribution):
                 self.precision * tf.square(x - self.mean))
         )
 
-    def analytic_kld(self, other, name=None):
+    def _analytic_kld(self, other):
         if isinstance(other, Normal):
-            with tf.name_scope(name, default_name='analytic_kld'):
-                return tf.constant(0.5, dtype=self.dtype) * (
-                    self.var * other.precision +
-                    tf.square(other.mean - self.mean) * other.precision +
-                    other.logvar - self.logvar - 1
-                )
-        raise NotImplementedError()
+            return tf.constant(0.5, dtype=self.dtype) * (
+                self.var * other.precision +
+                tf.square(other.mean - self.mean) * other.precision +
+                other.logvar - self.logvar - 1
+            )

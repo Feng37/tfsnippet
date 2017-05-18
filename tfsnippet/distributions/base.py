@@ -101,8 +101,7 @@ class Distribution(VarScopeObject):
         Returns
         -------
         tf.TensorShape
-            The tensor shape object to provided auxiliary information
-            about the `dynamic_batch_shape` if it is dynamic.
+            The tensor shape object corresponding to `dynamic_batch_shape`.
         """
         raise NotImplementedError()
 
@@ -112,8 +111,8 @@ class Distribution(VarScopeObject):
 
         Returns
         -------
-        tuple[int] | tf.Tensor
-            The static shape tuple, or a tensor if the value shape is dynamic.
+        tf.Tensor
+            A tensor as the dynamic value shape.
         """
         raise NotImplementedError()
 
@@ -124,9 +123,12 @@ class Distribution(VarScopeObject):
         Returns
         -------
         tf.TensorShape
-            The tensor shape object to provided auxiliary information
-            about the `dynamic_value_shape` if it is dynamic.
+            The tensor shape object corresponding to `dynamic_value_shape`.
         """
+        raise NotImplementedError()
+
+    def _sample(self, sample_shape=()):
+        # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
 
     def sample(self, sample_shape=(), name=None):
@@ -146,7 +148,8 @@ class Distribution(VarScopeObject):
         tf.Tensor
             The samples as tensor.
         """
-        raise NotImplementedError()
+        with tf.name_scope(name, default_name='sample'):
+            return self._sample(sample_shape)
 
     def _log_prob(self, x):
         # `@instance_reuse` decorator should not be applied to this method.
@@ -233,6 +236,10 @@ class Distribution(VarScopeObject):
         with tf.name_scope(name, default_name='prob'):
             return tf.exp(self.log_prob(x, group_event_ndims=group_event_ndims))
 
+    def _analytic_kld(self, other):
+        # `@instance_reuse` decorator should not be applied to this method.
+        raise NotImplementedError()
+
     def analytic_kld(self, other, name=None):
         """Compute the KLD(self || other) using the analytic method.
 
@@ -255,4 +262,8 @@ class Distribution(VarScopeObject):
         tf.Tensor
             The KL-divergence.
         """
-        raise NotImplementedError()
+        with tf.name_scope(name, default_name='analytic_kld'):
+            ret = self._analytic_kld(other)
+            if ret is None:
+                raise NotImplementedError()
+            return ret

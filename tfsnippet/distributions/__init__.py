@@ -2,4 +2,5 @@
 
 from .base import *
 from .bernoulli import *
+from .gamma import *
 from .normal import *

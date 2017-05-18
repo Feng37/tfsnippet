@@ -112,7 +112,7 @@ class Bernoulli(Distribution):
 
     @property
     def dynamic_value_shape(self):
-        return ()
+        return tf.constant([], dtype=tf.int32)
 
     @property
     def static_value_shape(self):
@@ -138,30 +138,29 @@ class Bernoulli(Distribution):
         """Get the probability of being 0."""
         return self._one_minus_p
 
-    def sample(self, sample_shape=(), name=None):
-        with tf.name_scope(name, default_name='sample'):
-            # check the arguments of `sample_shape`
-            helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
-            static_sample_shape = helper.get_static_shape()
-            dynamic_sample_shape = helper.get_dynamic_shape()
+    def _sample(self, sample_shape=()):
+        # check the arguments of `sample_shape`
+        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
+        static_sample_shape = helper.get_static_shape()
+        dynamic_sample_shape = helper.get_dynamic_shape()
 
-            # derive the sampler
-            static_shape = (
-                tf.TensorShape(static_sample_shape).
-                    concatenate(self.static_batch_shape)
-            )
-            dynamic_shape = tf.concat(
-                [dynamic_sample_shape, self.dynamic_batch_shape],
-                axis=0
-            )
-            uniform_samples = tf.random_uniform(
-                dynamic_shape, minval=0., maxval=1., dtype=self.param_dtype)
-            samples = tf.cast(
-                tf.less(uniform_samples, self.p),
-                dtype=self.dtype
-            )
-            samples.set_shape(static_shape)
-            return samples
+        # derive the sampler
+        static_shape = (
+            tf.TensorShape(static_sample_shape).
+                concatenate(self.static_batch_shape)
+        )
+        dynamic_shape = tf.concat(
+            [dynamic_sample_shape, self.dynamic_batch_shape],
+            axis=0
+        )
+        uniform_samples = tf.random_uniform(
+            dynamic_shape, minval=0., maxval=1., dtype=self.param_dtype)
+        samples = tf.cast(
+            tf.less(uniform_samples, self.p),
+            dtype=self.dtype
+        )
+        samples.set_shape(static_shape)
+        return samples
 
     def _log_prob(self, x):
         x = tf.cast(x, dtype=self.param_dtype)
@@ -169,17 +168,15 @@ class Bernoulli(Distribution):
         x, logits = maybe_explicit_broadcast(x, logits)
         return -tf.nn.sigmoid_cross_entropy_with_logits(labels=x, logits=logits)
 
-    def analytic_kld(self, other, name=None):
+    def _analytic_kld(self, other):
         if isinstance(other, Bernoulli):
-            with tf.name_scope(name, default_name='analytic_kld'):
-                p_1, p_0 = self.p, self.p_take_zero
-                delta_1 = (
-                    tf.nn.softplus(-other.logits) -
-                    tf.nn.softplus(-self.logits)
-                )
-                delta_0 = (
-                    tf.nn.softplus(other.logits) -
-                    tf.nn.softplus(self.logits)
-                )
-                return p_1 * delta_1 + p_0 * delta_0
-        raise NotImplementedError()
+            p_1, p_0 = self.p, self.p_take_zero
+            delta_1 = (
+                tf.nn.softplus(-other.logits) -
+                tf.nn.softplus(-self.logits)
+            )
+            delta_0 = (
+                tf.nn.softplus(other.logits) -
+                tf.nn.softplus(self.logits)
+            )
+            return p_1 * delta_1 + p_0 * delta_0
