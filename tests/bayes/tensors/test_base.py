@@ -13,7 +13,7 @@ from tests.helper import TestCase
 class StochasticTensorTestCase(TestCase):
 
     def test_basic(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             # test construct a non-observed tensor
             distrib = _MyDistribution(
                 np.arange(24, dtype=np.float32).reshape([2, 3, 4]))
@@ -72,7 +72,7 @@ class StochasticTensorTestCase(TestCase):
                 _ = StochasticTensor(lambda: '')
 
     def test_sample_num_and_static_shape(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             distrib = _MyDistribution(
                 np.arange(24, dtype=np.float32).reshape([2, 3, 4]))
 
@@ -120,7 +120,7 @@ class StochasticTensorTestCase(TestCase):
                     distrib, sample_num=tf.placeholder(tf.float32, ()))
 
     def test_computed_tensor_and_convert_to_tensor(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             distrib = Normal(0., [1., 2., 3.])
             observed = np.asarray([-1., 1., 2.])
 
@@ -156,7 +156,7 @@ class StochasticTensorTestCase(TestCase):
                 _ = tf.convert_to_tensor(t, dtype=tf.int32)
 
     def test_prob_and_log_prob(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             # test distrib.group_event_ndims == None, while at the same time
             # tensor.group_event_ndims == None
             distrib = Normal(0., [1., 2., 3.])
@@ -238,7 +238,7 @@ class StochasticTensorTestCase(TestCase):
                 _ = StochasticTensor(distrib, group_event_ndims=tf.constant(0))
 
     def test_is_dynamic_tensor_like(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             # TODO: add tests for StochasticTensor and is_dynamic_tensor_like
             #       related methods
             pass

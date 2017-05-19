@@ -11,7 +11,7 @@ from tests.helper import TestCase
 class UtilsTestCase(TestCase):
 
     def test_local_log_prob(self):
-        with tf.Graph().as_default(), tf.Session().as_default() as sess:
+        with self.test_session() as sess:
             # test regular
             a = bayes.Normal(0., [1., 2., 3.], sample_num=16,
                              group_event_ndims=1)

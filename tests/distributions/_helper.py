@@ -1,122 +1,328 @@
 # -*- coding: utf-8 -*-
-from logging import getLogger
-
 import six
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import floatx
-
-N_SAMPLES = 10000
+from tfsnippet.utils import get_default_session_or_error
 
 
-def big_number_verify(x, mean, stddev, n_samples, scale=5.):
-    np.testing.assert_array_less(
-        np.abs(x - mean), stddev * scale / np.sqrt(n_samples),
-        err_msg='away from expected mean by %s stddev' % scale
-    )
+class DistributionTestMixin(object):
 
+    # inherited class should complete these attributes and methods
+    dist_class = None
+    simple_params = None
+    extended_dimensional_params = None
 
-def get_distribution_samples(distribution_class, kwargs, n_samples=N_SAMPLES,
-                             sample_shape=(), explicit_batch_size=False,
-                             func=None):
-    with tf.Graph().as_default():
+    is_continuous = None
+    is_reparameterized = None
+
+    def get_dtype_for_param_dtype(self, param_dtype):
+        return param_dtype
+
+    def get_shapes_for_param(self, **params):
+        raise NotImplementedError()
+
+    def log_prob(self, x, group_event_ndims=None, **params):
+        raise NotImplementedError()
+
+    def prob(self, x, group_event_ndims=None, **params):
+        return np.exp(self.log_prob(x, group_event_ndims=group_event_ndims,
+                                    **params))
+
+    def assert_allclose(self, a, b):
+        np.testing.assert_allclose(a, b, rtol=1e-3, atol=1e-5)
+
+    # helper utilities
+    def get_samples_and_prob(self, sample_shape=(), **params):
         tf.set_random_seed(1234)
-        try:
-            batch_size = n_samples if explicit_batch_size else None
-            kwargs_ph = {
-                k: tf.placeholder(shape=(batch_size,) + a.shape, dtype=floatx())
-                for k, a in six.iteritems(kwargs)
+        dist = self.dist_class(**params)
+        x = dist.sample(sample_shape)
+        prob, log_prob = dist.prob(x), dist.log_prob(x)
+        return get_default_session_or_error().run([x, prob, log_prob])
+
+    # pre-configured test cases
+    def test_param_dtype(self):
+        dist = self.dist_class(**{
+            k: np.asarray(v, dtype=np.float32)
+            for k, v in six.iteritems(self.simple_params)
+        })
+        self.assertEqual(dist.param_dtype, tf.float32)
+        self.assertEqual(dist.dtype,
+                         self.get_dtype_for_param_dtype(dist.param_dtype))
+        self.assertEqual(dist.sample().dtype, dist.dtype)
+
+        dist = self.dist_class(**{
+            k: np.asarray(v, dtype=np.float64)
+            for k, v in six.iteritems(self.simple_params)
+        })
+        self.assertEqual(dist.param_dtype, tf.float64)
+        self.assertEqual(dist.dtype,
+                         self.get_dtype_for_param_dtype(dist.param_dtype))
+        self.assertEqual(dist.sample().dtype, dist.dtype)
+
+    def test_properties(self):
+        dist = self.dist_class(**self.simple_params)
+        self.assertEqual(dist.is_continuous, self.is_continuous)
+        self.assertEqual(dist.is_reparameterized, self.is_reparameterized)
+
+    def test_shapes_with_static_parameters(self):
+        with self.test_session():
+            dist = self.dist_class(**self.simple_params)
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+
+            self.assertIsInstance(dist.static_value_shape, tf.TensorShape)
+            self.assertEqual(dist.static_value_shape,
+                             tf.TensorShape(value_shape))
+            self.assertIsInstance(dist.dynamic_value_shape, tf.Tensor)
+            np.testing.assert_equal(dist.dynamic_value_shape.eval(),
+                                    value_shape)
+
+            self.assertIsInstance(dist.static_batch_shape, tf.TensorShape)
+            self.assertEqual(dist.static_batch_shape,
+                             tf.TensorShape(batch_shape))
+            self.assertIsInstance(dist.dynamic_batch_shape, tf.Tensor)
+            np.testing.assert_equal(dist.dynamic_batch_shape.eval(),
+                                    batch_shape)
+
+    def test_shapes_with_dynamic_parameters(self):
+        with self.test_session():
+            params_ph = {
+                k: tf.placeholder(tf.float32, shape=(None,) + v.shape)
+                for k, v in six.iteritems(self.simple_params)
             }
-            keys = sorted(six.iterkeys(kwargs))
-            distribution = distribution_class(**kwargs_ph)
-            output = distribution.sample(sample_shape=sample_shape)
-            prob = distribution.prob(output)
-            log_prob = distribution.log_prob(output)
-            outputs = [output, prob, log_prob]
-            if func:
-                outputs += func(distribution)
-            with tf.Session() as session:
-                result = session.run(outputs, feed_dict={
-                    kwargs_ph[k]: np.repeat(
-                        kwargs[k].reshape((-1,) + kwargs[k].shape),
-                        n_samples,
-                        axis=0
-                    )
-                    for k in keys
-                })
-            return tuple(np.asarray(r) for r in result)
-        except Exception:
-            getLogger(__name__).exception(
-                'failed to get samples for %r' %
-                ((distribution_class, kwargs, n_samples, sample_shape,
-                  explicit_batch_size),)
+            params = {
+                k: np.tile(v, [3] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {params_ph[k]: params[k] for k in six.iterkeys(params)}
+            dist = self.dist_class(**params_ph)
+            value_shape, batch_shape = self.get_shapes_for_param(**params)
+
+            self.assertIsInstance(dist.static_value_shape, tf.TensorShape)
+            self.assertEqual(dist.static_value_shape,
+                             tf.TensorShape(value_shape))
+            self.assertIsInstance(dist.dynamic_value_shape, tf.Tensor)
+            np.testing.assert_equal(dist.dynamic_value_shape.eval(feed_dict),
+                                    value_shape)
+
+            self.assertIsInstance(dist.static_batch_shape, tf.TensorShape)
+            self.assertEqual(dist.static_batch_shape[1:],
+                             tf.TensorShape(batch_shape[1:]))
+            self.assertIsNone(dist.static_batch_shape[0].value)
+            self.assertIsInstance(dist.dynamic_batch_shape, tf.Tensor)
+            np.testing.assert_equal(dist.dynamic_batch_shape.eval(feed_dict),
+                                    batch_shape)
+
+    def test_sampling(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(**self.simple_params)
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(x.shape, batch_shape + value_shape)
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_sampling_for_static_auxiliary_batch_shape(self):
+        with self.test_session(use_gpu=True):
+            params = {
+                k: np.tile(v, [10] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            x, prob, log_prob = self.get_samples_and_prob(**params)
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [10] + list(batch_shape + value_shape))
+            self.assert_allclose(prob, self.prob(x, **params))
+            self.assert_allclose(log_prob, self.log_prob(x, **params))
+
+    def test_sampling_for_dynamic_auxiliary_batch_shape(self):
+        with self.test_session(use_gpu=True):
+            params = {
+                k: np.tile(v, [10] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+
+            # sample `x` from distribution with dynamic batch shape
+            tf.set_random_seed(1234)
+            params_ph = {
+                k: tf.placeholder(tf.float32, shape=[None] + list(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {
+                params_ph[k]: np.tile(
+                    self.simple_params[k],
+                    [10] + [1] * len(self.simple_params[k].shape)
+                )
+                for k in six.iterkeys(self.simple_params)
+            }
+            dist = self.dist_class(**params_ph)
+            x = dist.sample()
+            prob, log_prob = dist.prob(x), dist.log_prob(x)
+            x, prob, log_prob = get_default_session_or_error().run(
+                [x, prob, log_prob], feed_dict=feed_dict
             )
-            raise
 
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [10] + list(batch_shape + value_shape))
+            self.assert_allclose(prob, self.prob(x, **params))
+            self.assert_allclose(log_prob, self.log_prob(x, **params))
 
-def compute_distribution_prob(distribution_class, kwargs, data,
-                              func=None, group_event_ndims=None):
-    with tf.Graph().as_default():
-        tf.set_random_seed(1234)
-        try:
-            kwargs_ph = {
-                k: tf.placeholder(shape=a.shape, dtype=floatx())
-                for k, a in six.iteritems(kwargs)
-            }
-            data_ph = tf.placeholder(shape=data.shape, dtype=floatx())
-            keys = sorted(six.iterkeys(kwargs))
-            distribution = distribution_class(**kwargs_ph)
-            prob = distribution.prob(
-                data, group_event_ndims=group_event_ndims)
-            log_prob = distribution.log_prob(
-                data, group_event_ndims=group_event_ndims)
-            outputs = [prob, log_prob]
-            if func:
-                outputs += func(distribution)
-            with tf.Session() as session:
-                feed_dict = {
-                    kwargs_ph[k]: kwargs[k] for k in keys
-                }
-                feed_dict[data_ph] = data
-                result = session.run(outputs, feed_dict=feed_dict)
-            return tuple(np.asarray(r) for r in result)
-        except Exception:
-            getLogger(__name__).exception(
-                'failed to compute prob for %r' %
-                ((distribution_class, kwargs),)
+    def test_sampling_for_static_auxiliary_sample_shape(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=[4, 5], **self.simple_params
             )
-            raise
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [4, 5] + list(batch_shape + value_shape))
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
 
-
-def compute_analytic_kld(distribution_class, kwargs1, kwargs2):
-    with tf.Graph().as_default():
-        tf.set_random_seed(1234)
-        try:
-            kwargs1_ph = {
-                k: tf.placeholder(shape=a.shape, dtype=floatx())
-                for k, a in six.iteritems(kwargs1)
-            }
-            kwargs2_ph = {
-                k: tf.placeholder(shape=a.shape, dtype=floatx())
-                for k, a in six.iteritems(kwargs2)
-            }
-            keys1 = sorted(six.iterkeys(kwargs1))
-            dist1 = distribution_class(**kwargs1_ph)
-            keys2 = sorted(six.iterkeys(kwargs2))
-            dist2 = distribution_class(**kwargs2_ph)
-            kld = dist1.analytic_kld(dist2)
-            with tf.Session() as session:
-                feed_dict = {}
-                for k in keys1:
-                    feed_dict[kwargs1_ph[k]] = kwargs1[k]
-                for k in keys2:
-                    feed_dict[kwargs2_ph[k]] = kwargs2[k]
-                result = session.run([kld], feed_dict=feed_dict)
-            return np.asarray(result[0])
-        except Exception:
-            getLogger(__name__).exception(
-                'failed to compute prob for %r' %
-                ((distribution_class, kwargs1, kwargs2),)
+    def test_sampling_for_dynamic_auxiliary_sample_shape(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=tf.constant([4, 5]), **self.simple_params
             )
-            raise
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [4, 5] + list(batch_shape + value_shape))
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_sampling_for_1_sample_shape(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=[1], **self.simple_params
+            )
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [1] + list(batch_shape + value_shape))
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_sampling_for_extended_dimensional_params(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                **self.extended_dimensional_params
+            )
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.extended_dimensional_params)
+            np.testing.assert_equal(x.shape, batch_shape + value_shape)
+            self.assert_allclose(
+                prob, self.prob(x, **self.extended_dimensional_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.extended_dimensional_params))
+
+    def test_prob_with_group_event_ndims_0(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                group_event_ndims=0, **self.extended_dimensional_params
+            )
+            self.assert_allclose(prob, self.prob(
+                x, group_event_ndims=0, **self.extended_dimensional_params))
+            self.assert_allclose(log_prob, self.log_prob(
+                x, group_event_ndims=0, **self.extended_dimensional_params))
+
+    def test_prob_with_group_event_ndims_1(self):
+        with self.test_session(use_gpu=True):
+            x, prob, log_prob = self.get_samples_and_prob(
+                group_event_ndims=1, **self.extended_dimensional_params
+            )
+            self.assert_allclose(prob, self.prob(
+                x, group_event_ndims=1, **self.extended_dimensional_params))
+            self.assert_allclose(log_prob, self.log_prob(
+                x, group_event_ndims=1, **self.extended_dimensional_params))
+
+    def test_prob_with_higher_dimensional_params(self):
+        with self.test_session(use_gpu=True):
+            x, _, _ = self.get_samples_and_prob(
+                **self.extended_dimensional_params
+            )
+            x = x[0, ...]
+            dist = self.dist_class(**self.extended_dimensional_params)
+            prob, log_prob = get_default_session_or_error().run(
+                [dist.prob(x), dist.log_prob(x)]
+            )
+            self.assert_allclose(
+                prob, self.prob(x, **self.extended_dimensional_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.extended_dimensional_params))
+
+
+class UnivariateDistributionTestMixin(DistributionTestMixin):
+
+    big_number_samples = 10000
+    big_number_scale = 5.0
+
+    def get_mean_stddev(self, **params):
+        raise NotImplementedError()
+
+    def test_big_number_law(self):
+        with self.test_session(use_gpu=True):
+            mean, stddev = self.get_mean_stddev(**self.simple_params)
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=[self.big_number_samples],
+                **self.simple_params
+            )
+            np.testing.assert_array_less(
+                np.abs(np.average(x, axis=0) - mean),
+                stddev * self.big_number_scale /
+                np.sqrt(self.big_number_samples),
+                err_msg='away from expected mean by %s stddev' %
+                        self.big_number_scale
+            )
+
+    def test_big_number_law_for_extended_dimensional_params(self):
+        with self.test_session(use_gpu=True):
+            mean, stddev = self.get_mean_stddev(
+                **self.extended_dimensional_params
+            )
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=[self.big_number_samples],
+                **self.extended_dimensional_params
+            )
+            for i in range(x.shape[1]):
+                x_i = x[:, i, ...]
+                mean_i = mean[i, ...]
+                stddev_i = stddev[i, ...]
+                np.testing.assert_array_less(
+                    np.abs(np.average(x_i, axis=0) - mean_i),
+                    stddev_i * self.big_number_scale /
+                    np.sqrt(self.big_number_samples),
+                    err_msg='away from expected mean by %s stddev' %
+                            self.big_number_scale
+                )
+
+
+class AnalyticKldTestMixin(object):
+
+    kld_simple_params = None
+
+    def analytic_kld(self, params1, params2):
+        raise NotImplementedError()
+
+    # pre-configured test cases
+    def test_analytic_kld(self):
+        with self.test_session(use_gpu=True):
+            dist1 = self.dist_class(**self.simple_params)
+            dist2 = self.dist_class(**self.kld_simple_params)
+            kld = get_default_session_or_error().run(
+                dist1.analytic_kld(dist2)
+            )
+            self.assert_allclose(kld, self.analytic_kld(
+                self.simple_params, self.kld_simple_params))

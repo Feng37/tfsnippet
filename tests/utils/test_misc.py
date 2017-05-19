@@ -50,68 +50,65 @@ class MiscTestCase(TestCase):
             )
 
     def test_is_dynamic_tensor_like(self):
-        with tf.Graph().as_default():
-            for v in [tf.placeholder(tf.int32, ()),
-                      tf.get_variable('v', shape=(), dtype=tf.int32),
-                      StochasticTensor(Normal(0., 1.))]:
-                self.assertTrue(
-                    is_dynamic_tensor_like(v),
-                    msg='%r should be interpreted as a dynamic tensor.' %
-                        (v,)
-                )
-            for v in [1, 1.0, object(), (), [], {},
-                      np.array([1, 2, 3])]:
-                self.assertFalse(
-                    is_dynamic_tensor_like(v),
-                    msg='%r should not be interpreted as a dynamic tensor.' %
-                        (v,)
-                )
+        for v in [tf.placeholder(tf.int32, ()),
+                  tf.get_variable('v', shape=(), dtype=tf.int32),
+                  StochasticTensor(Normal(0., 1.))]:
+            self.assertTrue(
+                is_dynamic_tensor_like(v),
+                msg='%r should be interpreted as a dynamic tensor.' %
+                    (v,)
+            )
+        for v in [1, 1.0, object(), (), [], {},
+                  np.array([1, 2, 3])]:
+            self.assertFalse(
+                is_dynamic_tensor_like(v),
+                msg='%r should not be interpreted as a dynamic tensor.' %
+                    (v,)
+            )
 
     def test_convert_to_tensor_if_dynamic(self):
-        with tf.Graph().as_default():
-            for v in [tf.placeholder(tf.int32, ()),
-                      tf.get_variable('v', shape=(), dtype=tf.int32),
-                      StochasticTensor(Normal(0., 1.))]:
-                self.assertIsInstance(
-                    convert_to_tensor_if_dynamic(v),
-                    tf.Tensor
-                )
-            for v in [1, 1.0, object(), (), [], {},
-                      np.array([1, 2, 3])]:
-                self.assertIs(
-                    convert_to_tensor_if_dynamic(v), v)
+        for v in [tf.placeholder(tf.int32, ()),
+                  tf.get_variable('v', shape=(), dtype=tf.int32),
+                  StochasticTensor(Normal(0., 1.))]:
+            self.assertIsInstance(
+                convert_to_tensor_if_dynamic(v),
+                tf.Tensor
+            )
+        for v in [1, 1.0, object(), (), [], {},
+                  np.array([1, 2, 3])]:
+            self.assertIs(
+                convert_to_tensor_if_dynamic(v), v)
 
     def test_preferred_tensor_dtype(self):
-        with tf.Graph().as_default():
-            for dtype in [tf.int16, tf.int32, tf.float32, tf.float64]:
-                ph = tf.placeholder(dtype)
-                var = tf.get_variable('var_%s' % (dtype.name,), shape=(),
-                                      dtype=dtype)
-                self.assertEqual(
-                    get_preferred_tensor_dtype(ph),
-                    dtype
-                )
-                self.assertEqual(
-                    get_preferred_tensor_dtype(var),
-                    dtype
-                )
-            for np_dtype, tf_dtype in [(np.int16, tf.int16),
-                                       (np.int32, tf.int32),
-                                       (np.float32, tf.float32),
-                                       (np.float64, tf.float64)]:
-                array = np.asarray([], dtype=np_dtype)
-                self.assertEqual(
-                    get_preferred_tensor_dtype(array),
-                    tf_dtype
-                )
+        for dtype in [tf.int16, tf.int32, tf.float32, tf.float64]:
+            ph = tf.placeholder(dtype)
+            var = tf.get_variable('var_%s' % (dtype.name,), shape=(),
+                                  dtype=dtype)
             self.assertEqual(
-                get_preferred_tensor_dtype(1),
-                tf.as_dtype(np.asarray([1]).dtype)
+                get_preferred_tensor_dtype(ph),
+                dtype
             )
             self.assertEqual(
-                get_preferred_tensor_dtype(1.0),
-                tf.as_dtype(np.asarray([1.0]).dtype)
+                get_preferred_tensor_dtype(var),
+                dtype
             )
+        for np_dtype, tf_dtype in [(np.int16, tf.int16),
+                                   (np.int32, tf.int32),
+                                   (np.float32, tf.float32),
+                                   (np.float64, tf.float64)]:
+            array = np.asarray([], dtype=np_dtype)
+            self.assertEqual(
+                get_preferred_tensor_dtype(array),
+                tf_dtype
+            )
+        self.assertEqual(
+            get_preferred_tensor_dtype(1),
+            tf.as_dtype(np.asarray([1]).dtype)
+        )
+        self.assertEqual(
+            get_preferred_tensor_dtype(1.0),
+            tf.as_dtype(np.asarray([1.0]).dtype)
+        )
 
     def test_MetricAccumulator(self):
         # test empty initial values

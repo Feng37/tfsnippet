@@ -68,7 +68,7 @@ class ArithMixinTestCase(TestCase):
                         (name, res_val, ans_val, x)
             )
 
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             int_data = np.asarray([1, -2, 3], dtype=np.int32)
             float_data = np.asarray([1.1, -2.2, 3.3], dtype=np.float32)
             bool_data = np.asarray([True, False, True], dtype=np.bool)
@@ -136,7 +136,7 @@ class ArithMixinTestCase(TestCase):
             'ge': lambda x, y: x >= y,
         }
 
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             # arithmetic operators
             run_ops(np.asarray([-4, 5, 6], dtype=np.int32),
                     np.asarray([1, -2, 3], dtype=np.int32),
@@ -199,7 +199,7 @@ class ArithMixinTestCase(TestCase):
                 return item
         sg = _SliceGenerator()
 
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             data = np.asarray([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
             indices_or_slices = [
                 0,
@@ -227,22 +227,21 @@ class ArithMixinTestCase(TestCase):
                     check_getitem(data, s, x_tensor, y_simple_tensor)
 
     def test_disallowed_op(self):
-        with tf.Graph().as_default():
-            with self.assertRaises(TypeError) as cm:
-                _ = iter(_SimpleTensor(tf.constant(1)))
-            self.assertIn('Tensor object is not iterable',
-                          str(cm.exception))
+        with self.assertRaises(TypeError) as cm:
+            _ = iter(_SimpleTensor(tf.constant(1)))
+        self.assertIn('Tensor object is not iterable',
+                      str(cm.exception))
 
-            with self.assertRaises(TypeError) as cm:
-                _ = not _SimpleTensor(tf.constant(1))
-            self.assertIn('Using a tensor as a Python `bool` is not allowed',
-                          str(cm.exception))
+        with self.assertRaises(TypeError) as cm:
+            _ = not _SimpleTensor(tf.constant(1))
+        self.assertIn('Using a tensor as a Python `bool` is not allowed',
+                      str(cm.exception))
 
-            with self.assertRaises(TypeError) as cm:
-                if _SimpleTensor(tf.constant(1)):
-                    pass
-            self.assertIn('Using a tensor as a Python `bool` is not allowed',
-                          str(cm.exception))
+        with self.assertRaises(TypeError) as cm:
+            if _SimpleTensor(tf.constant(1)):
+                pass
+        self.assertIn('Using a tensor as a Python `bool` is not allowed',
+                      str(cm.exception))
 
 if __name__ == '__main__':
     unittest.main()

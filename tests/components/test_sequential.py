@@ -23,39 +23,37 @@ class SequentialTestCase(TestCase):
                 v = tf.get_variable('a' if self.flag else 'b', shape=())
                 return v * inputs
 
-        with tf.Graph().as_default():
-            c = C(flag=True)
-            seq = Sequential([
-                f,
-                c,
-                tf.nn.relu,
-                f,
-                C(flag=False),
-                c,
-            ])
-            self.assertEqual(tf.global_variables(), [])
-            seq(tf.constant(1.))
-            self.assertEqual(
-                sorted(v.name for v in tf.global_variables()),
-                ['c/a:0',
-                 'c_1/b:0',
-                 'sequential/layer0/v:0',
-                 'sequential/layer3/v:0']
-            )
-            seq(tf.constant(2.))
-            self.assertEqual(
-                sorted(v.name for v in tf.global_variables()),
-                ['c/a:0',
-                 'c_1/b:0',
-                 'sequential/layer0/v:0',
-                 'sequential/layer3/v:0']
-            )
+        c = C(flag=True)
+        seq = Sequential([
+            f,
+            c,
+            tf.nn.relu,
+            f,
+            C(flag=False),
+            c,
+        ])
+        self.assertEqual(tf.global_variables(), [])
+        seq(tf.constant(1.))
+        self.assertEqual(
+            sorted(v.name for v in tf.global_variables()),
+            ['c/a:0',
+             'c_1/b:0',
+             'sequential/layer0/v:0',
+             'sequential/layer3/v:0']
+        )
+        seq(tf.constant(2.))
+        self.assertEqual(
+            sorted(v.name for v in tf.global_variables()),
+            ['c/a:0',
+             'c_1/b:0',
+             'sequential/layer0/v:0',
+             'sequential/layer3/v:0']
+        )
 
     def test_errors(self):
-        with tf.Graph().as_default():
-            with self.assertRaisesRegex(
-                    ValueError, '`components` must not be empty.'):
-                Sequential([])
+        with self.assertRaisesRegex(
+                ValueError, '`components` must not be empty.'):
+            Sequential([])
 
 
 if __name__ == '__main__':

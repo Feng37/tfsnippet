@@ -15,33 +15,32 @@ from tests.helper import TestCase
 class LoggingUtilsTestCase(TestCase):
 
     def test_get_parameters_summary(self):
-        with tf.Graph().as_default():
-            # test variable summaries
-            a = tf.get_variable('a', dtype=tf.int32, shape=[2])
-            with tf.variable_scope('nested'):
-                b = tf.get_variable('b', dtype=tf.float32, shape=(3, 4, 5))
-            c = tf.get_variable('c', dtype=tf.float32, shape=())
+        # test variable summaries
+        a = tf.get_variable('a', dtype=tf.int32, shape=[2])
+        with tf.variable_scope('nested'):
+            b = tf.get_variable('b', dtype=tf.float32, shape=(3, 4, 5))
+        c = tf.get_variable('c', dtype=tf.float32, shape=())
 
-            self.assertEqual(get_variables_summary([]), '')
-            self.assertEqual(get_variables_summary([a]), (
-                'Variables Summary (2 in total)\n'
-                '------------------------------\n'
-                'a  (2,)  2'
-            ))
-            self.assertEqual(get_variables_summary([a, b, c]), (
-                'Variables Summary (63 in total)\n'
-                '-------------------------------\n'
-                'a         (2,)       2\n'
-                'c         ()         1\n'
-                'nested/b  (3, 4, 5)  60'
-            ))
-            self.assertEqual(get_variables_summary({'a': a, 'b': b, 'c': c}), (
-                'Variables Summary (63 in total)\n'
-                '-------------------------------\n'
-                'a  (2,)       2\n'
-                'b  (3, 4, 5)  60\n'
-                'c  ()         1'
-            ))
+        self.assertEqual(get_variables_summary([]), '')
+        self.assertEqual(get_variables_summary([a]), (
+            'Variables Summary (2 in total)\n'
+            '------------------------------\n'
+            'a  (2,)  2'
+        ))
+        self.assertEqual(get_variables_summary([a, b, c]), (
+            'Variables Summary (63 in total)\n'
+            '-------------------------------\n'
+            'a         (2,)       2\n'
+            'c         ()         1\n'
+            'nested/b  (3, 4, 5)  60'
+        ))
+        self.assertEqual(get_variables_summary({'a': a, 'b': b, 'c': c}), (
+            'Variables Summary (63 in total)\n'
+            '-------------------------------\n'
+            'a  (2,)       2\n'
+            'b  (3, 4, 5)  60\n'
+            'c  ()         1'
+        ))
 
 
 class MetricLoggerTestCase(TestCase):
@@ -66,9 +65,8 @@ class MetricLoggerTestCase(TestCase):
         logger.clear()
         self.assertEqual(logger.format_logs(), '')
 
-        with tf.Graph().as_default(), tf.Session().as_default():
-            logger.add_metrics(metrics={'loss': 1.})
-            self.assertEqual(logger.format_logs(), 'loss: 1')
+        logger.add_metrics(metrics={'loss': 1.})
+        self.assertEqual(logger.format_logs(), 'loss: 1')
 
     def test_errors(self):
         logger = MetricLogger()
@@ -89,7 +87,7 @@ class SummaryWriterTestCase(TestCase):
                         step += 1
                         sw.add_metrics(global_step=step, acc=step * 100 + data)
 
-                    with tf.Graph().as_default(), tf.Session().as_default():
+                    with self.test_session():
                         sw.add_metrics(
                             global_step=tf.constant(step),
                             metrics={'valid_loss': -epoch}

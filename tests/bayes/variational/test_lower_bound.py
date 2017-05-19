@@ -12,7 +12,7 @@ from tests.helper import TestCase
 class LowerBoundTestCase(TestCase):
 
     def test_sgvb(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a = Normal(0., 1., observed=np.asarray([[0., 1., 2.]]))
             b = Normal(1., 2., observed=np.asarray([[1., 2., 3.]]))
             c = Normal(2., 3., observed=np.asarray([[2., 3., 4.]]))

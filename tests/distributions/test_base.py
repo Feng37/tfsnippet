@@ -59,7 +59,7 @@ class _MyDistribution(Distribution):
 class DistributionTestCase(TestCase):
 
     def test_group_event_ndims(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             p_data = np.arange(1, 25, dtype=np.float32).reshape([2, 3, 4])
 
             # test the group_event_ndims attribute
@@ -71,7 +71,7 @@ class DistributionTestCase(TestCase):
                 _MyDistribution(p_data, tf.placeholder(tf.int32, ()))
 
     def test_log_prob(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             p_data = np.arange(1, 25, dtype=np.float32).reshape([2, 3, 4])
             p1 = tf.placeholder(tf.float32, (2, 3, None))
             p2 = tf.placeholder(tf.float32, (None, 3, 4))

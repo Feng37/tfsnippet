@@ -215,35 +215,34 @@ class TrainLoopTestCase(TestCase):
             self.assertTrue(loop._valid_metric_smaller_is_better)
 
     def test_training_summary(self):
-        with tf.Graph().as_default():
-            a = tf.get_variable('a', dtype=tf.float32, shape=(2, 3))
-            b = tf.get_variable('b', dtype=tf.float32, shape=(4,))
-            c = tf.get_variable('c', dtype=tf.float32, shape=())
+        a = tf.get_variable('a', dtype=tf.float32, shape=(2, 3))
+        b = tf.get_variable('b', dtype=tf.float32, shape=(4,))
+        c = tf.get_variable('c', dtype=tf.float32, shape=())
 
-            # test param variables in list
-            logs = []
-            with train_loop([a, b], print_function=logs.append) as loop:
-                self.assertEqual(loop.param_vars, [a, b])
-                loop.print_training_summary()
-            self.assertEqual('\n'.join(logs), (
-                'Trainable Parameters (10 in total)\n'
-                '----------------------------------\n'
-                'a  (2, 3)  6\n'
-                'b  (4,)    4\n'
-            ))
+        # test param variables in list
+        logs = []
+        with train_loop([a, b], print_function=logs.append) as loop:
+            self.assertEqual(loop.param_vars, [a, b])
+            loop.print_training_summary()
+        self.assertEqual('\n'.join(logs), (
+            'Trainable Parameters (10 in total)\n'
+            '----------------------------------\n'
+            'a  (2, 3)  6\n'
+            'b  (4,)    4\n'
+        ))
 
-            # test param variables in dict
-            logs = []
-            with train_loop({'aa': a, 'bb': b},
-                            print_function=logs.append) as loop:
-                self.assertEqual(loop.param_vars, {'aa': a, 'bb': b})
-                loop.print_training_summary()
-            self.assertEqual('\n'.join(logs), (
-                'Trainable Parameters (10 in total)\n'
-                '----------------------------------\n'
-                'aa  (2, 3)  6\n'
-                'bb  (4,)    4\n'
-            ))
+        # test param variables in dict
+        logs = []
+        with train_loop({'aa': a, 'bb': b},
+                        print_function=logs.append) as loop:
+            self.assertEqual(loop.param_vars, {'aa': a, 'bb': b})
+            loop.print_training_summary()
+        self.assertEqual('\n'.join(logs), (
+            'Trainable Parameters (10 in total)\n'
+            '----------------------------------\n'
+            'aa  (2, 3)  6\n'
+            'bb  (4,)    4\n'
+        ))
 
     def test_timeit(self):
         logs = []
@@ -313,7 +312,7 @@ class TrainLoopTestCase(TestCase):
                         loop.add_metrics(loss=epoch + loss)
                     loop.add_metrics(valid_loss=epoch)
 
-                with tf.Graph().as_default(), tf.Session().as_default():
+                with self.test_session():
                     summary_op = tf.summary.scalar('x', tf.constant(1.23))
                     loop.add_summary(summary_op.eval())
 
@@ -364,7 +363,7 @@ class TrainLoopTestCase(TestCase):
             )
 
     def test_early_stopping(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a = tf.get_variable('a', shape=(), dtype=tf.int32)
             b = tf.get_variable('b', shape=(), dtype=tf.int32)
 
@@ -399,7 +398,7 @@ class TrainLoopTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b]), [13, 23])
 
     def test_tensor_arguments(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a = tf.get_variable('a', initializer=0, dtype=tf.int32)
             ensure_variables_initialized()
             with train_loop([a],

@@ -22,7 +22,7 @@ def _populate_variables():
 class EarlyStoppingTestCase(TestCase):
 
     def test_basic(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a, b, c = _populate_variables()
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
@@ -74,7 +74,7 @@ class EarlyStoppingTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b, c]), [100, 20, 3])
 
     def test_restore_on_error(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a, b, c = _populate_variables()
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
@@ -99,7 +99,7 @@ class EarlyStoppingTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
     def test_bigger_is_better(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a, b, c = _populate_variables()
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 
@@ -120,7 +120,7 @@ class EarlyStoppingTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b, c]), [100, 20, 30])
 
     def test_save_dir(self):
-        with tf.Graph().as_default(), tf.Session().as_default():
+        with self.test_session():
             a, b, c = _populate_variables()
             self.assertEqual(get_variable_values([a, b, c]), [1, 2, 3])
 

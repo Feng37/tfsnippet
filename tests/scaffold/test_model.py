@@ -36,43 +36,42 @@ class _MyModel(Model):
 class ModelTestCase(TestCase):
 
     def test_construction(self):
-        with tf.Graph().as_default():
-            # the variable out of model scope
-            _ = tf.get_variable('out_var', shape=(), dtype=tf.int32)
+        # the variable out of model scope
+        _ = tf.get_variable('out_var', shape=(), dtype=tf.int32)
 
-            # test build
-            model = _MyModel()
-            self.assertFalse(model.has_built)
-            model.build()
-            self.assertTrue(model.has_built)
-            self.assertEqual(model.variable_scope.name, 'my_model')
+        # test build
+        model = _MyModel()
+        self.assertFalse(model.has_built)
+        model.build()
+        self.assertTrue(model.has_built)
+        self.assertEqual(model.variable_scope.name, 'my_model')
 
-            # test get all variables
-            self.assertEqual(
-                model.get_variables(),
-                {
-                    'model/model_var': model.model_var,
-                    'model/nested/nested_var': model.nested_var,
-                    'other_var': model.other_var,
-                    'global_step': model.get_global_step()
-                }
-            )
+        # test get all variables
+        self.assertEqual(
+            model.get_variables(),
+            {
+                'model/model_var': model.model_var,
+                'model/nested/nested_var': model.nested_var,
+                'other_var': model.other_var,
+                'global_step': model.get_global_step()
+            }
+        )
 
-            # test get parameter variables
-            self.assertEqual(
-                model.get_param_variables(),
-                {'model/model_var': model.model_var,
-                 'model/nested/nested_var': model.nested_var}
-            )
-            self.assertEqual(
-                model.get_param_variables(tf.GraphKeys.TRAINABLE_VARIABLES),
-                {'model/model_var': model.model_var}
-            )
+        # test get parameter variables
+        self.assertEqual(
+            model.get_param_variables(),
+            {'model/model_var': model.model_var,
+             'model/nested/nested_var': model.nested_var}
+        )
+        self.assertEqual(
+            model.get_param_variables(tf.GraphKeys.TRAINABLE_VARIABLES),
+            {'model/model_var': model.model_var}
+        )
 
-            # test name de-duplication
-            self.assertEqual(_MyModel().variable_scope.name, 'my_model_1')
-            self.assertEqual(_MyModel('the_model').variable_scope.name,
-                             'the_model')
+        # test name de-duplication
+        self.assertEqual(_MyModel().variable_scope.name, 'my_model_1')
+        self.assertEqual(_MyModel('the_model').variable_scope.name,
+                         'the_model')
 
     def test_set_global_step(self):
         with tf.Graph().as_default():
@@ -98,7 +97,7 @@ class ModelTestCase(TestCase):
                 )
 
     def test_initialize_variables(self):
-        with tf.Graph().as_default(), tf.Session():
+        with self.test_session():
             model = _MyModel()
             model.build()
             out_var = tf.get_variable('out_var', shape=(), dtype=tf.int32)
@@ -116,7 +115,7 @@ class ModelTestCase(TestCase):
             )
 
     def test_load_save(self):
-        with tf.Graph().as_default(), tf.Session():
+        with self.test_session():
             model = _MyModel()
             model.ensure_variables_initialized()
 
