@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import tensorflow as tf
-
 from tfsnippet import bayes, distributions
 from tests.helper import TestCase
 
@@ -24,6 +22,14 @@ class StochasticTestCase(TestCase):
         # of StochasticTensor
         self.assertEqual(dist.distribution.variable_scope.name,
                          'bernoulli/distribution')
+
+    def test_Gamma(self):
+        dist = bayes.Gamma(1., 2.)
+        self.assertIsInstance(dist.distribution, distributions.Gamma)
+        # assert the distribution scope is contained in the scope
+        # of StochasticTensor
+        self.assertEqual(dist.distribution.variable_scope.name,
+                         'gamma/distribution')
 
 
 if __name__ == '__main__':

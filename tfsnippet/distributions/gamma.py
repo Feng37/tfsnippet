@@ -16,10 +16,14 @@ class Gamma(Distribution):
         The shape parameter of the Gamma distribution.
         Should be positive and broadcastable to match `beta`.
 
+        Note that the range of `alpha` is :math:`(0, \\infty)`.
+
     beta : tf.Tensor | np.ndarray | float
         The inverse scale parameter of the Gamma distribution.
         Should be positive and broadcastable to match `alpha`.
         Also, the data type of `beta` will be casted to that of `alpha`.
+
+        Note that the range of `beta` is :math:`(0, \\infty)`.
 
     group_event_ndims : int
         If specify, this number of dimensions at the end of `batch_shape`
