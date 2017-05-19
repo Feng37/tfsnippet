@@ -30,7 +30,7 @@ class Normal(Distribution):
         Should be broadcastable to match `mean`.  Also, the data
         type of `stddev` will be casted to that of `mean`.
 
-        If `stddev` is specified, then `logstd` will be ignored.
+        One and only one of `stddev` and `logstd` should be specified.
         Note that the range of `logstd` is :math:`(-\\infty, \\infty)`.
 
     group_event_ndims : int
@@ -48,9 +48,10 @@ class Normal(Distribution):
     def __init__(self, mean, stddev=None, logstd=None, group_event_ndims=None,
                  name=None, default_name=None):
         # check the arguments
-        if stddev is None and logstd is None:
-            raise ValueError('At least one of `stddev`, `logstd` should be '
-                             'specified.')
+        if (stddev is None and logstd is None) or \
+                (stddev is not None and logstd is not None):
+            raise ValueError('One and only one of `stddev`, `logstd` should '
+                             'be specified.')
         dtype = get_preferred_tensor_dtype(mean)
         if not dtype.is_floating:
             raise TypeError('Normal distribution parameters must be float '
@@ -189,7 +190,7 @@ class Normal(Distribution):
         static_sample_shape = helper.get_static_shape()
         dynamic_sample_shape = helper.get_dynamic_shape()
 
-        # derive the sampler
+        # derive the samples
         static_shape = (
             tf.TensorShape(static_sample_shape).
                 concatenate(self.static_batch_shape)
@@ -205,6 +206,7 @@ class Normal(Distribution):
         return samples
 
     def _log_prob(self, x):
+        x = tf.convert_to_tensor(x, dtype=self.param_dtype)
         c = tf.constant(-0.5 * np.log(2 * np.pi), dtype=self.dtype)
         return (
             c - self.logstd -

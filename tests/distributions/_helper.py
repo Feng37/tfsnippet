@@ -6,6 +6,13 @@ import tensorflow as tf
 from tfsnippet.utils import get_default_session_or_error
 
 
+def big_number_verify(x, mean, stddev, scale, n_samples):
+    np.testing.assert_array_less(
+        np.abs(x - mean), stddev * scale / np.sqrt(n_samples),
+        err_msg='away from expected mean by %s stddev' % scale
+    )
+
+
 class DistributionTestMixin(object):
 
     # inherited class should complete these attributes and methods
@@ -264,10 +271,10 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.extended_dimensional_params))
 
 
-class UnivariateDistributionTestMixin(DistributionTestMixin):
+class BigNumberVerifyTestMixin(object):
 
-    big_number_samples = 10000
     big_number_scale = 5.0
+    big_number_samples = 10000
 
     def get_mean_stddev(self, **params):
         raise NotImplementedError()
@@ -279,12 +286,9 @@ class UnivariateDistributionTestMixin(DistributionTestMixin):
                 sample_shape=[self.big_number_samples],
                 **self.simple_params
             )
-            np.testing.assert_array_less(
-                np.abs(np.average(x, axis=0) - mean),
-                stddev * self.big_number_scale /
-                np.sqrt(self.big_number_samples),
-                err_msg='away from expected mean by %s stddev' %
-                        self.big_number_scale
+            big_number_verify(
+                np.average(x, axis=0), mean, stddev,
+                self.big_number_scale, self.big_number_samples
             )
 
     def test_big_number_law_for_extended_dimensional_params(self):
@@ -300,12 +304,9 @@ class UnivariateDistributionTestMixin(DistributionTestMixin):
                 x_i = x[:, i, ...]
                 mean_i = mean[i, ...]
                 stddev_i = stddev[i, ...]
-                np.testing.assert_array_less(
-                    np.abs(np.average(x_i, axis=0) - mean_i),
-                    stddev_i * self.big_number_scale /
-                    np.sqrt(self.big_number_samples),
-                    err_msg='away from expected mean by %s stddev' %
-                            self.big_number_scale
+                big_number_verify(
+                    np.average(x_i, axis=0), mean_i, stddev_i,
+                    self.big_number_scale, self.big_number_samples
                 )
 
 

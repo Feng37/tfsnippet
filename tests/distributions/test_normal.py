@@ -6,13 +6,15 @@ import six
 import numpy as np
 
 from tfsnippet.distributions import Normal
-from tests.distributions._helper import (UnivariateDistributionTestMixin,
+from tests.distributions._helper import (DistributionTestMixin,
+                                         BigNumberVerifyTestMixin,
                                          AnalyticKldTestMixin)
 from tests.helper import TestCase
 
 
 class NormalTestCase(TestCase,
-                     UnivariateDistributionTestMixin,
+                     DistributionTestMixin,
+                     BigNumberVerifyTestMixin,
                      AnalyticKldTestMixin):
 
     dist_class = Normal
@@ -63,9 +65,14 @@ class NormalTestCase(TestCase,
         with self.test_session():
             # test construction due to no std specified
             with self.assertRaisesRegex(
-                    ValueError, 'At least one of `stddev`, `logstd` should be '
-                                'specified'):
+                    ValueError, 'One and only one of `stddev`, `logstd` should '
+                                'be specified.'):
                 Normal(1.)
+
+            with self.assertRaisesRegex(
+                    ValueError, 'One and only one of `stddev`, `logstd` should '
+                                'be specified.'):
+                Normal(1., 2., 3.)
 
             # test construction due to data type error
             with self.assertRaisesRegex(
@@ -115,10 +122,11 @@ class NormalTestCase(TestCase,
                 dist.log_precision.eval(), -2. * np.log(stddev))
 
     def test_sampling_with_log_std(self):
-        with self.test_session():
+        with self.test_session(use_gpu=True):
             params = copy.copy(self.simple_params)
+            params['logstd'] = np.log(params['stddev'])
             del params['stddev']
-            params['logstd'] = np.log(self.simple_params['stddev'])
+
             x, prob, log_prob = self.get_samples_and_prob(**params)
             value_shape, batch_shape = \
                 self.get_shapes_for_param(**self.simple_params)
@@ -127,6 +135,22 @@ class NormalTestCase(TestCase,
                 prob, self.prob(x, **self.simple_params))
             self.assert_allclose(
                 log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_analytic_kld_with_log_std(self):
+        with self.test_session(use_gpu=True):
+            params = copy.copy(self.simple_params)
+            params['logstd'] = np.log(params['stddev'])
+            del params['stddev']
+
+            kld_params = copy.copy(self.kld_simple_params)
+            kld_params['logstd'] = np.log(kld_params['stddev'])
+            del kld_params['stddev']
+
+            self.assert_allclose(
+                (Normal(**params).
+                 analytic_kld(Normal(**kld_params))).eval(),
+                self.analytic_kld(self.simple_params, self.kld_simple_params)
+            )
 
 
 if __name__ == '__main__':

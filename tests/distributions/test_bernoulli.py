@@ -6,13 +6,15 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.distributions import Bernoulli
-from tests.distributions._helper import (UnivariateDistributionTestMixin,
+from tests.distributions._helper import (DistributionTestMixin,
+                                         BigNumberVerifyTestMixin,
                                          AnalyticKldTestMixin)
 from tests.helper import TestCase
 
 
 class BernoulliTestCase(TestCase,
-                        UnivariateDistributionTestMixin,
+                        DistributionTestMixin,
+                        BigNumberVerifyTestMixin,
                         AnalyticKldTestMixin):
 
     dist_class = Bernoulli
@@ -66,12 +68,6 @@ class BernoulliTestCase(TestCase,
                     TypeError, 'Bernoulli distribution parameters must be '
                                'float numbers'):
                 Bernoulli(1)
-
-            # test construction error due to shape mismatch
-            with self.assertRaisesRegex(
-                    TypeError, '`dtype` is expected to be an integer type, '
-                                'but got .*'):
-                Bernoulli(1., tf.float32)
 
     def test_other_properties(self):
         mean, _ = self.get_mean_stddev(**self.simple_params)

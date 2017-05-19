@@ -6,13 +6,15 @@ import numpy as np
 from scipy.special import gammaln, digamma
 
 from tfsnippet.distributions import Gamma
-from tests.distributions._helper import (UnivariateDistributionTestMixin,
+from tests.distributions._helper import (DistributionTestMixin,
+                                         BigNumberVerifyTestMixin,
                                          AnalyticKldTestMixin)
 from tests.helper import TestCase
 
 
 class GammaTestCase(TestCase,
-                    UnivariateDistributionTestMixin,
+                    DistributionTestMixin,
+                    BigNumberVerifyTestMixin,
                     AnalyticKldTestMixin):
     dist_class = Gamma
     simple_params = {

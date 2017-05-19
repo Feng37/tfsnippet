@@ -179,8 +179,6 @@ class Distribution(VarScopeObject):
             The log-probability of `x`.
         """
         with tf.name_scope(name, default_name='prob'):
-            x = tf.convert_to_tensor(x, dtype=self.dtype)
-
             # determine the number of group event dimensions
             if group_event_ndims is None:
                 group_event_ndims = self.group_event_ndims

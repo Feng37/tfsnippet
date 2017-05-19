@@ -119,6 +119,7 @@ class Gamma(Distribution):
             alpha=self.alpha, beta=self.beta, dtype=self.dtype)
 
     def _log_prob(self, x):
+        x = tf.convert_to_tensor(x, dtype=self.param_dtype)
         return (
             self.alpha * tf.log(self.beta) + (self.alpha - 1) * tf.log(x) -
             self.beta * x - tf.lgamma(self.alpha)

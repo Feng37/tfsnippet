@@ -485,7 +485,6 @@ class ReshapeHelper(NameScopeObject):
                 self._add_with_hint(dynamic_shape, static_shape)
             else:
                 self._add_with_hint(static_shape)
-            return self
 
         elif isinstance(static_shape, tf.Dimension):
             assert (slice_func is not None)
@@ -508,6 +507,7 @@ class ReshapeHelper(NameScopeObject):
                 '`slice_func` transforms shape into object %r, which is '
                 'neither shape nor dimension.' % (static_shape,)
             )
+        return self
 
 
 def explicit_broadcast(x, y, name=None):

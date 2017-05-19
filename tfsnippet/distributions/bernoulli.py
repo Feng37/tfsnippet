@@ -52,9 +52,6 @@ class Bernoulli(Distribution):
             dtype = tf.int32
         else:
             dtype = tf.as_dtype(dtype)
-            if not dtype.is_integer:
-                raise TypeError('`dtype` is expected to be an integer type, '
-                                'but got %r.' % (dtype,))
 
         super(Bernoulli, self).__init__(
             group_event_ndims=group_event_ndims,
@@ -72,7 +69,7 @@ class Bernoulli(Distribution):
                 self._logits = logits
                 self._static_batch_shape = logits_shape
                 if is_deterministic_shape(logits_shape):
-                    self._dynamic_batch_shape = tf.convert_to_tensor(
+                    self._dynamic_batch_shape = tf.constant(
                         logits_shape.as_list(),
                         dtype=tf.int32
                     )
@@ -144,7 +141,7 @@ class Bernoulli(Distribution):
         static_sample_shape = helper.get_static_shape()
         dynamic_sample_shape = helper.get_dynamic_shape()
 
-        # derive the sampler
+        # derive the samples
         static_shape = (
             tf.TensorShape(static_sample_shape).
                 concatenate(self.static_batch_shape)
