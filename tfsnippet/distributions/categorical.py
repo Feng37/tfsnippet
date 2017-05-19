@@ -5,16 +5,14 @@ import tensorflow as tf
 from tfsnippet.utils import (get_preferred_tensor_dtype,
                              reopen_variable_scope,
                              is_deterministic_shape,
-                             ReshapeHelper)
+                             ReshapeHelper, maybe_explicit_broadcast)
 from .base import Distribution
 
-__all__ = [
-    'Categorical'
-]
+__all__ = ['Categorical', 'OneHotCategorical']
 
 
 class _BaseCategorical(Distribution):
-    """Base categorical distribution class.
+    """Base categorical distribution.
 
     Parameters
     ----------
@@ -87,13 +85,18 @@ class _BaseCategorical(Distribution):
                 # derive the shape and data types of parameters
                 logits_shape = logits.get_shape()
                 self._static_batch_shape = logits_shape[:-1]
-                if is_deterministic_shape(logits_shape[:-1]):
+                if is_deterministic_shape(self._static_batch_shape):
                     self._dynamic_batch_shape = tf.constant(
-                        logits_shape[:-1].as_list(),
+                        self._static_batch_shape.as_list(),
                         dtype=tf.int32
                     )
                 else:
                     self._dynamic_batch_shape = tf.shape(logits)[:-1]
+
+                # infer the number of categories
+                self._n_categories = logits_shape[-1].value
+                if self._n_categories is None:
+                    self._n_categories = tf.shape(logits)[-1]
 
     @property
     def param_dtype(self):
@@ -114,6 +117,17 @@ class _BaseCategorical(Distribution):
     @property
     def static_batch_shape(self):
         return self._static_batch_shape
+
+    @property
+    def n_categories(self):
+        """Get the number of categories.
+
+        Returns
+        -------
+        int | tf.Tensor
+            Constant or dynamic number of categories.
+        """
+        return self._n_categories
 
     @property
     def logits(self):
@@ -177,7 +191,7 @@ class _BaseCategorical(Distribution):
 
 
 class Categorical(_BaseCategorical):
-    """Categorical distribution class.
+    """Categorical distribution.
 
     Parameters
     ----------
@@ -262,3 +276,116 @@ class Categorical(_BaseCategorical):
         return -tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=x, logits=logits,
         )
+
+
+class OneHotCategorical(_BaseCategorical):
+    """Categorical distribution with one-hot encoded samples.
+
+    Parameters
+    ----------
+    logits : tf.Tensor | np.ndarray
+        A float 1-d tensor of shape (..., n_categories), which is the
+        un-normalized log-odds of probabilities of the categories.
+
+    probs : tf.Tensor | np.ndarray
+        A float 1-d tensor of shape (..., n_categories), which is the
+        normalized probabilities of the categories.
+
+        One and only one of `logits` and `probs` should be specified.
+        The relationship between these two arguments, if given each other,
+        is stated as follows:
+
+            .. math::
+                \\begin{aligned}
+                    \\text{logits} &= \\log (\\text{probs}) \\\\
+                     \\text{probs} &= \\text{softmax} (\\text{logits})
+                \\end{aligned}
+
+    dtype : tf.DType | np.dtype | str
+        The data type of samples from the distribution. (default is `tf.int32`)
+
+    group_event_ndims : int
+        If specify, this number of dimensions at the end of `batch_shape`
+        would be considered as a group of events, whose probabilities are
+        to be accounted together. (default None)
+
+    name : str
+        Name of this normal distribution.
+
+    default_name : str
+        Default name of this normal distribution.
+    """
+
+    def __init__(self, logits=None, probs=None, dtype=None,
+                 group_event_ndims=None, name=None, default_name=None):
+        if dtype is None:
+            dtype = tf.int32
+        else:
+            dtype = tf.as_dtype(dtype)
+
+        super(OneHotCategorical, self).__init__(
+            logits=logits,
+            probs=probs,
+            group_event_ndims=group_event_ndims,
+            name=name,
+            default_name=default_name
+        )
+        self._dtype = dtype
+
+        with reopen_variable_scope(self.variable_scope):
+            with tf.name_scope('init'):
+                # derive the value shape of parameters
+                logits_shape = self.logits.get_shape()
+                self._static_value_shape = logits_shape[-1:]
+                if is_deterministic_shape(self._static_value_shape):
+                    self._dynamic_value_shape = tf.constant(
+                        self._static_value_shape.as_list(),
+                        dtype=tf.int32
+                    )
+                else:
+                    self._dynamic_value_shape = tf.shape(logits)[-1:]
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def dynamic_value_shape(self):
+        return self._dynamic_value_shape
+
+    @property
+    def static_value_shape(self):
+        return self._static_value_shape
+
+    def _sample(self, sample_shape=()):
+        samples = self._sample_sparse(sample_shape, self.dtype)
+        samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
+        return samples
+
+    def _log_prob(self, x):
+        x = tf.cast(x, dtype=self.param_dtype)
+        x, logits = maybe_explicit_broadcast(x, self.logits)
+
+        if x.get_shape().ndims == 2:
+            x_2d, logits_2d = x, logits
+        else:
+            helper = (
+                ReshapeHelper().
+                    add(-1).
+                    add_template(x, lambda s: s[-1])
+            )
+            x_2d = helper.reshape(x)
+            logits_2d = helper.reshape(logits)
+        log_p_2d = -tf.nn.softmax_cross_entropy_with_logits(
+            labels=x_2d, logits=logits_2d,
+        )
+
+        if x.get_shape().ndims == 2:
+            log_p = log_p_2d
+        else:
+            log_p = (
+                ReshapeHelper().
+                    add_template(x, lambda s: s[: -1]).
+                    reshape(log_p_2d)
+            )
+        return log_p
