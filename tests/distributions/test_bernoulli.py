@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import copy
 import six
 import numpy as np
 import tensorflow as tf

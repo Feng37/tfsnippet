@@ -33,8 +33,12 @@ def is_float(x):
 __FLOATING_TYPES = (
     float,
     np.float,
-    np.float16, np.float32, np.float64, np.float128,
+    np.float16, np.float32, np.float64,
 )
+
+for _extra_float_type in ('float8', 'float128', 'float256'):
+    if hasattr(np, _extra_float_type):
+        __FLOATING_TYPES = __FLOATING_TYPES + (getattr(np, _extra_float_type),)
 
 
 def is_dynamic_tensor_like(x):

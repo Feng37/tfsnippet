@@ -4,7 +4,6 @@ import unittest
 import copy
 import six
 import numpy as np
-import tensorflow as tf
 
 from tfsnippet.distributions import Normal
 from tests.distributions._helper import (UnivariateDistributionTestMixin,

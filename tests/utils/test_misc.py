@@ -35,8 +35,11 @@ class MiscTestCase(TestCase):
             )
 
     def test_is_float(self):
-        for dtype in [float, np.float, np.float16, np.float32, np.float64,
-                      np.float128]:
+        float_types = [float, np.float, np.float16, np.float32, np.float64]
+        for extra_type in ['float8', 'float128', 'float256']:
+            if hasattr(np, extra_type):
+                float_types.append(getattr(np, extra_type))
+        for dtype in float_types:
             v = np.asarray([1], dtype=dtype)[0]
             self.assertTrue(
                 is_float(v),
