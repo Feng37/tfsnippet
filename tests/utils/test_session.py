@@ -22,19 +22,19 @@ class SessionTestCase(TestCase):
             self.assertIn('No session is active.', str(cm.exception))
 
         do_raise()
-        with self.test_session() as sess:
+        with self.get_session() as sess:
             self.assertIs(sess, get_default_session_or_error())
         do_raise()
 
     def test_try_get_variable_value(self):
         a = tf.get_variable('a', initializer=1, dtype=tf.int32)
-        with self.test_session() as sess:
+        with self.get_session() as sess:
             self.assertIsNone(try_get_variable_value(a))
             sess.run(a.initializer)
             self.assertEqual(try_get_variable_value(a), 1)
 
     def test_get_uninitialized_variables(self):
-        with self.test_session() as sess:
+        with self.get_session() as sess:
             a = tf.get_variable('a', dtype=tf.int32, initializer=1)
             b = tf.get_variable('b', dtype=tf.int32, initializer=2)
             c = tf.get_variable('c', dtype=tf.int32, initializer=3,
@@ -69,7 +69,7 @@ class SessionTestCase(TestCase):
             )
 
     def test_get_variable_values(self):
-        with self.test_session() as sess:
+        with self.get_session() as sess:
             a = tf.get_variable('a', dtype=tf.int32, initializer=1)
             b = tf.get_variable('b', dtype=tf.int32, initializer=2)
             c = tf.get_variable('c', dtype=tf.int32, initializer=3)
@@ -85,7 +85,7 @@ class SessionTestCase(TestCase):
                              {'a': 1, 'c': 3})
 
     def test_set_variable_values(self):
-        with self.test_session() as sess:
+        with self.get_session() as sess:
             a = tf.get_variable('a', dtype=tf.int32, initializer=1)
             b = tf.get_variable('b', dtype=tf.int32, initializer=2)
             c = tf.get_variable('c', dtype=tf.int32, initializer=3)
@@ -141,7 +141,7 @@ class SessionTestCase(TestCase):
             saver1 = VariableSaver([a, b, c], tempdir1)
             saver2 = VariableSaver({'aa': a, 'bb': b}, tempdir2)
 
-            with self.test_session() as sess:
+            with self.get_session() as sess:
                 sess.run(tf.global_variables_initializer())
                 self.assertEqual(get_values(sess), [1, 2, 3])
                 set_values(sess, 10, 20, 30)

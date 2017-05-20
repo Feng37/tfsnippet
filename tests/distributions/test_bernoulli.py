@@ -62,7 +62,7 @@ class BernoulliTestCase(TestCase,
 
     # test cases for Bernoulli distribution
     def test_construction_error(self):
-        with self.test_session():
+        with self.get_session():
             # test construction due to data type error
             with self.assertRaisesRegex(
                     TypeError, 'Bernoulli distribution parameters must be '
@@ -72,7 +72,7 @@ class BernoulliTestCase(TestCase,
     def test_other_properties(self):
         mean, _ = self.get_mean_stddev(**self.simple_params)
 
-        with self.test_session():
+        with self.get_session():
             dist = Bernoulli(**self.simple_params)
             self.assert_allclose(
                 dist.logits.eval(), self.simple_params['logits'])

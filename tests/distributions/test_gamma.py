@@ -65,7 +65,7 @@ class GammaTestCase(TestCase,
 
     # test cases for Gamma distribution
     def test_construction_error(self):
-        with self.test_session():
+        with self.get_session():
             # test construction due to data type error
             with self.assertRaisesRegex(
                     TypeError, 'Gamma distribution parameters must be '
@@ -79,7 +79,7 @@ class GammaTestCase(TestCase,
                       np.arange(3, dtype=np.float32))
 
     def test_other_properties(self):
-        with self.test_session():
+        with self.get_session():
             dist = Gamma(**self.simple_params)
             self.assert_allclose(dist.alpha.eval(), self.simple_params['alpha'])
             self.assert_allclose(dist.beta.eval(), self.simple_params['beta'])

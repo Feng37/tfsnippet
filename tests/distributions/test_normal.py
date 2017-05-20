@@ -62,7 +62,7 @@ class NormalTestCase(TestCase,
 
     # test cases for Normal distribution
     def test_construction_error(self):
-        with self.test_session():
+        with self.get_session():
             # test construction due to no std specified
             with self.assertRaisesRegex(
                     ValueError, 'One and only one of `stddev`, `logstd` should '
@@ -88,7 +88,7 @@ class NormalTestCase(TestCase,
                        np.arange(3, dtype=np.float32))
 
     def test_other_properties(self):
-        with self.test_session():
+        with self.get_session():
             mean, stddev = self.get_mean_stddev(**self.simple_params)
 
             # test the parameters of the distribution
@@ -122,7 +122,7 @@ class NormalTestCase(TestCase,
                 dist.log_precision.eval(), -2. * np.log(stddev))
 
     def test_sampling_with_log_std(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = copy.copy(self.simple_params)
             params['logstd'] = np.log(params['stddev'])
             del params['stddev']
@@ -137,7 +137,7 @@ class NormalTestCase(TestCase,
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_analytic_kld_with_log_std(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = copy.copy(self.simple_params)
             params['logstd'] = np.log(params['stddev'])
             del params['stddev']

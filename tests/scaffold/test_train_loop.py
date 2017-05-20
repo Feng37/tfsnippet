@@ -312,7 +312,7 @@ class TrainLoopTestCase(TestCase):
                         loop.add_metrics(loss=epoch + loss)
                     loop.add_metrics(valid_loss=epoch)
 
-                with self.test_session():
+                with self.get_session():
                     summary_op = tf.summary.scalar('x', tf.constant(1.23))
                     loop.add_summary(summary_op.eval())
 
@@ -363,7 +363,7 @@ class TrainLoopTestCase(TestCase):
             )
 
     def test_early_stopping(self):
-        with self.test_session():
+        with self.get_session():
             a = tf.get_variable('a', shape=(), dtype=tf.int32)
             b = tf.get_variable('b', shape=(), dtype=tf.int32)
 
@@ -398,7 +398,7 @@ class TrainLoopTestCase(TestCase):
             self.assertEqual(get_variable_values([a, b]), [13, 23])
 
     def test_tensor_arguments(self):
-        with self.test_session():
+        with self.get_session():
             a = tf.get_variable('a', initializer=0, dtype=tf.int32)
             ensure_variables_initialized()
             with train_loop([a],

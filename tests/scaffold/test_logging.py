@@ -87,7 +87,7 @@ class SummaryWriterTestCase(TestCase):
                         step += 1
                         sw.add_metrics(global_step=step, acc=step * 100 + data)
 
-                    with self.test_session():
+                    with self.get_session():
                         sw.add_metrics(
                             global_step=tf.constant(step),
                             metrics={'valid_loss': -epoch}

@@ -73,7 +73,7 @@ class DistributionTestMixin(object):
         self.assertEqual(dist.is_reparameterized, self.is_reparameterized)
 
     def test_shapes_with_static_parameters(self):
-        with self.test_session():
+        with self.get_session():
             dist = self.dist_class(**self.simple_params)
             value_shape, batch_shape = \
                 self.get_shapes_for_param(**self.simple_params)
@@ -93,7 +93,7 @@ class DistributionTestMixin(object):
                                     batch_shape)
 
     def test_shapes_with_dynamic_parameters(self):
-        with self.test_session():
+        with self.get_session():
             params_ph = {
                 k: tf.placeholder(tf.float32, shape=(None,) + v.shape)
                 for k, v in six.iteritems(self.simple_params)
@@ -122,7 +122,7 @@ class DistributionTestMixin(object):
                                     batch_shape)
 
     def test_sampling(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(**self.simple_params)
             value_shape, batch_shape = \
                 self.get_shapes_for_param(**self.simple_params)
@@ -133,7 +133,7 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_sampling_for_static_auxiliary_batch_shape(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = {
                 k: np.tile(v, [10] + [1] * len(v.shape))
                 for k, v in six.iteritems(self.simple_params)
@@ -147,7 +147,7 @@ class DistributionTestMixin(object):
             self.assert_allclose(log_prob, self.log_prob(x, **params))
 
     def test_sampling_for_dynamic_auxiliary_batch_shape(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = {
                 k: np.tile(v, [10] + [1] * len(v.shape))
                 for k, v in six.iteritems(self.simple_params)
@@ -181,7 +181,7 @@ class DistributionTestMixin(object):
             self.assert_allclose(log_prob, self.log_prob(x, **params))
 
     def test_sampling_for_static_auxiliary_sample_shape(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 sample_shape=[4, 5], **self.simple_params
             )
@@ -195,7 +195,7 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_sampling_for_dynamic_auxiliary_sample_shape(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 sample_shape=tf.constant([4, 5]), **self.simple_params
             )
@@ -209,7 +209,7 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_sampling_for_1_sample_shape(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 sample_shape=[1], **self.simple_params
             )
@@ -223,7 +223,7 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_sampling_for_extended_dimensional_params(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 **self.extended_dimensional_params
             )
@@ -236,7 +236,7 @@ class DistributionTestMixin(object):
                 log_prob, self.log_prob(x, **self.extended_dimensional_params))
 
     def test_prob_with_group_event_ndims_0(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 group_event_ndims=0, **self.extended_dimensional_params
             )
@@ -246,7 +246,7 @@ class DistributionTestMixin(object):
                 x, group_event_ndims=0, **self.extended_dimensional_params))
 
     def test_prob_with_group_event_ndims_1(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 group_event_ndims=1, **self.extended_dimensional_params
             )
@@ -256,7 +256,7 @@ class DistributionTestMixin(object):
                 x, group_event_ndims=1, **self.extended_dimensional_params))
 
     def test_prob_with_higher_dimensional_params(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             x, _, _ = self.get_samples_and_prob(
                 **self.extended_dimensional_params
             )
@@ -280,7 +280,7 @@ class BigNumberVerifyTestMixin(object):
         raise NotImplementedError()
 
     def test_big_number_law(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             mean, stddev = self.get_mean_stddev(**self.simple_params)
             x, prob, log_prob = self.get_samples_and_prob(
                 sample_shape=[self.big_number_samples],
@@ -292,7 +292,7 @@ class BigNumberVerifyTestMixin(object):
             )
 
     def test_big_number_law_for_extended_dimensional_params(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             mean, stddev = self.get_mean_stddev(
                 **self.extended_dimensional_params
             )
@@ -319,7 +319,7 @@ class AnalyticKldTestMixin(object):
 
     # pre-configured test cases
     def test_analytic_kld(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             dist1 = self.dist_class(**self.simple_params)
             dist2 = self.dist_class(**self.kld_simple_params)
             kld = get_default_session_or_error().run(

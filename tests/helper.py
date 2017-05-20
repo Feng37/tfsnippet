@@ -12,7 +12,7 @@ class TestCase(unittest.TestCase):
     """Extended TestCase class."""
 
     @contextmanager
-    def test_session(self, use_gpu=False):
+    def get_session(self, use_gpu=False):
         config = tf.ConfigProto(
             device_count={'GPU': int(use_gpu)}
         )

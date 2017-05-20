@@ -97,7 +97,7 @@ class ModelTestCase(TestCase):
                 )
 
     def test_initialize_variables(self):
-        with self.test_session():
+        with self.get_session():
             model = _MyModel()
             model.build()
             out_var = tf.get_variable('out_var', shape=(), dtype=tf.int32)
@@ -115,7 +115,7 @@ class ModelTestCase(TestCase):
             )
 
     def test_load_save(self):
-        with self.test_session():
+        with self.get_session():
             model = _MyModel()
             model.ensure_variables_initialized()
 

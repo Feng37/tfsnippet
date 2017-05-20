@@ -2,9 +2,8 @@
 import unittest
 
 import numpy as np
-import tensorflow as tf
 
-from tfsnippet.bayes import Normal
+from tfsnippet.bayes.tensors import Normal
 from tfsnippet.bayes.variational import sgvb
 from tests.helper import TestCase
 
@@ -12,7 +11,7 @@ from tests.helper import TestCase
 class LowerBoundTestCase(TestCase):
 
     def test_sgvb(self):
-        with self.test_session():
+        with self.get_session():
             a = Normal(0., 1., observed=np.asarray([[0., 1., 2.]]))
             b = Normal(1., 2., observed=np.asarray([[1., 2., 3.]]))
             c = Normal(2., 3., observed=np.asarray([[2., 3., 4.]]))

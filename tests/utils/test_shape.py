@@ -16,7 +16,7 @@ from tests.helper import TestCase
 class ShapeTestCase(TestCase):
 
     def test_get_dimension_size(self):
-        with self.test_session():
+        with self.get_session():
             x = tf.placeholder(tf.float32, shape=[None, 3])
             dim = tf.placeholder(tf.int32, shape=())
             shape = tf.placeholder(tf.int32, shape=[None])
@@ -74,7 +74,7 @@ class ShapeTestCase(TestCase):
             )
 
     def test_get_dynamic_tensor_shape(self):
-        with self.test_session():
+        with self.get_session():
             x = tf.placeholder(tf.float32, shape=[None, 3, 4])
             shape = tf.placeholder(tf.int32, shape=[None])
             x_data = np.arange(24).reshape([-1, 3, 4])
@@ -214,7 +214,7 @@ class ShapeTestCase(TestCase):
                           batch_size_ph),)
             )
 
-        with self.test_session():
+        with self.get_session():
             # test regular data
             x_data = np.arange(48).reshape([-1, 3, 4])
             do_check(
@@ -340,7 +340,7 @@ class ShapeTestCase(TestCase):
                           str(cm.exception))
 
     def test_ReshapeHelper(self):
-        with self.test_session():
+        with self.get_session():
             helper = ReshapeHelper()
 
             # test an empty reshape helper
@@ -554,7 +554,7 @@ class ShapeTestCase(TestCase):
             )
 
     def test_maybe_explicit_broadcast(self):
-        with self.test_session() as session:
+        with self.get_session() as session:
             # test on equal static shape
             x = tf.convert_to_tensor(np.arange(2))
             y = tf.convert_to_tensor(np.arange(2, 4))

@@ -61,7 +61,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
     big_number_scale = 5.0
 
     def test_construction_error(self):
-        with self.test_session():
+        with self.get_session():
             with self.assertRaisesRegex(
                     ValueError, 'One and only one of `logits`, `probs` should '
                                 'be specified.'):
@@ -78,7 +78,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
                 self.dist_class([1, 2])
 
     def test_other_properties(self):
-        with self.test_session():
+        with self.get_session():
             logits = self.simple_params['logits']
             probs = _softmax(logits)
 
@@ -112,7 +112,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
         self.assertEqual(dist.dtype, tf.int32)
 
     def test_sampling_with_probs(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = {'probs': _softmax(self.simple_params['logits'])}
             x, prob, log_prob = self.get_samples_and_prob(**params)
             value_shape, batch_shape = \
@@ -124,7 +124,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
                 log_prob, self.log_prob(x, **self.simple_params))
 
     def test_log_prob_with_float(self):
-        with self.test_session():
+        with self.get_session():
             x, prob, log_prob = self.get_samples_and_prob(**self.simple_params)
             x = x.astype(np.float32)
             dist = self.dist_class(**self.simple_params)
@@ -134,7 +134,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
                 dist.log_prob(x).eval(), self.log_prob(x, **self.simple_params))
 
     def test_analytic_kld_with_probs(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             params = {'probs': _softmax(self.simple_params['logits'])}
             kld_params = {'probs': _softmax(self.kld_simple_params['logits'])}
             self.assert_allclose(
@@ -163,7 +163,7 @@ class CategoricalTestCase(TestCase, _CategoricalTestMixin):
         return log_prob
 
     def test_big_number_law(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             logits = self.simple_params['logits']
             probs = _softmax(logits)
             x, prob, log_prob = self.get_samples_and_prob(
@@ -197,7 +197,7 @@ class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
         return log_prob
 
     def test_big_number_law(self):
-        with self.test_session(use_gpu=True):
+        with self.get_session(use_gpu=True):
             logits = self.simple_params['logits']
             probs = _softmax(logits)
             x, prob, log_prob = self.get_samples_and_prob(
