@@ -8,7 +8,12 @@ from tfsnippet.utils import (get_preferred_tensor_dtype,
                              ReshapeHelper, maybe_explicit_broadcast)
 from .base import Distribution
 
-__all__ = ['Categorical', 'OneHotCategorical']
+__all__ = [
+    'Categorical',
+    'OneHotCategorical',
+    'Discrete',
+    'OneHotDiscrete',
+]
 
 
 class _BaseCategorical(Distribution):
@@ -277,6 +282,8 @@ class Categorical(_BaseCategorical):
             labels=x, logits=logits,
         )
 
+Discrete = Categorical
+
 
 class OneHotCategorical(_BaseCategorical):
     """Categorical distribution with one-hot encoded samples.
@@ -389,3 +396,5 @@ class OneHotCategorical(_BaseCategorical):
                     reshape(log_p_2d)
             )
         return log_p
+
+OneHotDiscrete = OneHotCategorical

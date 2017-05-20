@@ -2,7 +2,12 @@
 from tfsnippet import distributions
 from .base import StochasticTensor
 
-__all__ = ['Categorical', 'OneHotCategorical']
+__all__ = [
+    'Categorical',
+    'OneHotCategorical',
+    'Discrete',
+    'OneHotDiscrete',
+]
 
 
 class Categorical(StochasticTensor):
@@ -75,6 +80,8 @@ class Categorical(StochasticTensor):
             default_name=default_name,
         )
 
+Discrete = Categorical
+
 
 class OneHotCategorical(StochasticTensor):
     """Stochastic tensor for one-hot encoded Categorical distribution.
@@ -145,3 +152,5 @@ class OneHotCategorical(StochasticTensor):
             name=name,
             default_name=default_name,
         )
+
+OneHotDiscrete = OneHotCategorical
