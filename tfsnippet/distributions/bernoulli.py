@@ -16,7 +16,12 @@ class Bernoulli(Distribution):
     ----------
     logits : tf.Tensor | np.ndarray | float
         A float tensor, which is the log-odds of probabilities of being 1.
+        Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
+        
+    probs : tf.Tensor | np.ndarray | float
+        A float tensor, which is the probabilities of being 1.
 
+        One and only one of `logits` and `p` should be specified.
         The relationship between Bernoulli `p` and `logits` are:
 
             .. math::
@@ -25,7 +30,7 @@ class Bernoulli(Distribution):
                                  p &= \\frac{1}{1 + \\exp(-\\text{logits})}
                 \\end{aligned}
 
-        Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
+        Note that the range of `probs` is :math:`[0, 1]`.
 
     dtype : tf.DType | np.dtype | str
         The data type of samples from the distribution. (default is `tf.int32`)
@@ -42,9 +47,18 @@ class Bernoulli(Distribution):
         Default name of this normal distribution.
     """
 
-    def __init__(self, logits, dtype=None, group_event_ndims=None,
+    def __init__(self, logits=None, probs=None, dtype=None, group_event_ndims=None,
                  name=None, default_name=None):
-        param_dtype = get_preferred_tensor_dtype(logits)
+        # check the arguments
+        if (logits is None and probs is None) or \
+                (logits is not None and probs is not None):
+            raise ValueError('One and only one of `logits`, `probs` should '
+                             'be specified.')
+
+        if logits is not None:
+            param_dtype = get_preferred_tensor_dtype(logits)
+        else:
+            param_dtype = get_preferred_tensor_dtype(probs)
         if not param_dtype.is_floating:
             raise TypeError('Bernoulli distribution parameters must be float '
                             'numbers.')
@@ -62,10 +76,24 @@ class Bernoulli(Distribution):
         with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):
                 # obtain parameter tensors
-                logits = tf.convert_to_tensor(logits, dtype=param_dtype)
-                logits_shape = logits.get_shape()
+                if logits is not None:
+                    logits = tf.convert_to_tensor(logits, dtype=param_dtype,
+                                                  name='logits')
+                    probs = tf.nn.sigmoid(logits, 'probs')
+                    one_minus_probs = tf.nn.sigmoid(-logits, 'one_minus_probs')
+                    probs_is_derived = True
+                else:
+                    probs = tf.convert_to_tensor(probs, dtype=param_dtype,
+                                                 name='probs')
+                    one_minus_probs = tf.subtract(1., probs, 'one_minus_probs')
+                    logits = tf.subtract(
+                        tf.log(probs), tf.log(one_minus_probs),
+                        name='logits'
+                    )
+                    probs_is_derived = False
 
                 # derive the shape and data types of parameters
+                logits_shape = logits.get_shape()
                 self._logits = logits
                 self._static_batch_shape = logits_shape
                 if is_deterministic_shape(logits_shape):
@@ -77,8 +105,9 @@ class Bernoulli(Distribution):
                     self._dynamic_batch_shape = tf.shape(logits)
 
                 # derive various distribution attributes
-                self._p = tf.nn.sigmoid(logits, 'p')
-                self._one_minus_p = tf.nn.sigmoid(-logits, 'one_minus_p')
+                self._probs = probs
+                self._one_minus_probs = one_minus_probs
+                self._probs_is_derived = probs_is_derived
 
                 # set other attributes
                 self._dtype = dtype
@@ -123,17 +152,17 @@ class Bernoulli(Distribution):
     @property
     def mean(self):
         """Get the mean of Bernoulli distribution."""
-        return self._p
+        return self._probs
 
     @property
-    def p(self):
+    def probs(self):
         """Get the probabilities of being 1."""
-        return self._p
+        return self._probs
 
     @property
-    def p_take_zero(self):
+    def probs_take_zero(self):
         """Get the probability of being 0."""
-        return self._one_minus_p
+        return self._one_minus_probs
 
     def _sample(self, sample_shape=()):
         # check the arguments of `sample_shape`
@@ -153,7 +182,7 @@ class Bernoulli(Distribution):
         uniform_samples = tf.random_uniform(
             dynamic_shape, minval=0., maxval=1., dtype=self.param_dtype)
         samples = tf.cast(
-            tf.less(uniform_samples, self.p),
+            tf.less(uniform_samples, self.probs),
             dtype=self.dtype
         )
         samples.set_shape(static_shape)
@@ -166,14 +195,20 @@ class Bernoulli(Distribution):
         return -tf.nn.sigmoid_cross_entropy_with_logits(labels=x, logits=logits)
 
     def _analytic_kld(self, other):
+        def get_log_probs(o):
+            if o._probs_is_derived:
+                log_p = -tf.nn.softplus(-o.logits)
+                log_one_minus_p = -tf.nn.softplus(o.logits)
+            else:
+                log_p = tf.log(o.probs)
+                log_one_minus_p = tf.log(1. - o.probs)
+            return log_p, log_one_minus_p
+
         if isinstance(other, Bernoulli):
-            p_1, p_0 = self.p, self.p_take_zero
-            delta_1 = (
-                tf.nn.softplus(-other.logits) -
-                tf.nn.softplus(-self.logits)
+            p, one_minus_p = self.probs, self.probs_take_zero
+            log_p, log_one_minus_p = get_log_probs(self)
+            log_q, log_one_minus_q = get_log_probs(other)
+            return (
+                p * (log_p - log_q) +
+                one_minus_p * (log_one_minus_p - log_one_minus_q)
             )
-            delta_0 = (
-                tf.nn.softplus(other.logits) -
-                tf.nn.softplus(self.logits)
-            )
-            return p_1 * delta_1 + p_0 * delta_0

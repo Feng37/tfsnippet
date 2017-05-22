@@ -147,8 +147,8 @@ class NormalTestCase(TestCase,
             del kld_params['stddev']
 
             self.assert_allclose(
-                (Normal(**params).
-                 analytic_kld(Normal(**kld_params))).eval(),
+                (self.dist_class(**params).
+                 analytic_kld(self.dist_class(**kld_params))).eval(),
                 self.analytic_kld(self.simple_params, self.kld_simple_params)
             )
 

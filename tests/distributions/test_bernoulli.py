@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-import unittest
-
 import six
+import unittest
 import numpy as np
 import tensorflow as tf
 
@@ -69,22 +68,71 @@ class BernoulliTestCase(TestCase,
                                'float numbers'):
                 Bernoulli(1)
 
+            # test construction with no parameter
+            with self.assertRaisesRegex(
+                    ValueError, 'One and only one of `logits`, `probs` should '
+                                'be specified.'):
+                Bernoulli()
+
+            with self.assertRaisesRegex(
+                    ValueError, 'One and only one of `logits`, `probs` should '
+                                'be specified.'):
+                Bernoulli(1., 2.)
+
     def test_other_properties(self):
-        mean, _ = self.get_mean_stddev(**self.simple_params)
+        logits = self.simple_params['logits']
+        probs, _ = self.get_mean_stddev(logits=logits)
 
         with self.get_session():
-            dist = Bernoulli(**self.simple_params)
-            self.assert_allclose(
-                dist.logits.eval(), self.simple_params['logits'])
-            self.assert_allclose(dist.mean.eval(), mean)
-            self.assert_allclose(dist.p.eval(), mean)
-            self.assert_allclose(dist.p_take_zero.eval(), 1. - mean)
+            # test construction with logits
+            dist = Bernoulli(logits=logits)
+            self.assert_allclose(dist.logits.eval(), logits)
+            self.assert_allclose(dist.mean.eval(), probs)
+            self.assert_allclose(dist.probs.eval(), probs)
+            self.assert_allclose(dist.probs_take_zero.eval(), 1. - probs)
+
+            # test construction with probs
+            dist = Bernoulli(probs=probs)
+            self.assert_allclose(dist.logits.eval(), logits)
+            self.assert_allclose(dist.mean.eval(), probs)
+            self.assert_allclose(dist.probs.eval(), probs)
+            self.assert_allclose(dist.probs_take_zero.eval(), 1. - probs)
 
     def test_specify_data_type(self):
         dist = Bernoulli(dtype=tf.int64, **self.simple_params)
         self.assertEqual(dist.dtype, tf.int64)
         dist = Bernoulli(dtype='int32', **self.simple_params)
         self.assertEqual(dist.dtype, tf.int32)
+
+    def test_sampling_with_probs(self):
+        logits = self.simple_params['logits']
+        probs, _ = self.get_mean_stddev(logits=logits)
+
+        with self.get_session(use_gpu=True):
+            params = {'probs': probs}
+            x, prob, log_prob = self.get_samples_and_prob(**params)
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(x.shape, batch_shape + value_shape)
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_analytic_kld_with_probs(self):
+        logits = self.simple_params['logits']
+        probs, _ = self.get_mean_stddev(logits=logits)
+        kl_logits = self.kld_simple_params['logits']
+        kl_probs, _ = self.get_mean_stddev(logits=kl_logits)
+
+        with self.get_session(use_gpu=True):
+            params = {'probs': probs}
+            kld_params = {'probs': kl_probs}
+            self.assert_allclose(
+                (self.dist_class(**params).
+                 analytic_kld(self.dist_class(**kld_params))).eval(),
+                self.analytic_kld(self.simple_params, self.kld_simple_params)
+            )
 
 
 if __name__ == '__main__':

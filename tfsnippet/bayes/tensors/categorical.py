@@ -16,11 +16,11 @@ class Categorical(StochasticTensor):
     Parameters
     ----------
     logits : tf.Tensor | np.ndarray
-        A float 1-d tensor of shape (..., n_categories), which is the
+        A float tensor of shape (..., n_categories), which is the
         un-normalized log-odds of probabilities of the categories.
 
     probs : tf.Tensor | np.ndarray
-        A float 1-d tensor of shape (..., n_categories), which is the
+        A float tensor of shape (..., n_categories), which is the
         normalized probabilities of the categories.
 
         One and only one of `logits` and `probs` should be specified.
@@ -89,11 +89,11 @@ class OneHotCategorical(StochasticTensor):
     Parameters
     ----------
     logits : tf.Tensor | np.ndarray
-        A float 1-d tensor of shape (..., n_categories), which is the
+        A float tensor of shape (..., n_categories), which is the
         un-normalized log-odds of probabilities of the categories.
 
     probs : tf.Tensor | np.ndarray
-        A float 1-d tensor of shape (..., n_categories), which is the
+        A float tensor of shape (..., n_categories), which is the
         normalized probabilities of the categories.
 
         One and only one of `logits` and `probs` should be specified.
