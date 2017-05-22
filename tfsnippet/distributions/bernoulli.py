@@ -17,7 +17,7 @@ class Bernoulli(Distribution):
     logits : tf.Tensor | np.ndarray | float
         A float tensor, which is the log-odds of probabilities of being 1.
         Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
-        
+
     probs : tf.Tensor | np.ndarray | float
         A float tensor, which is the probabilities of being 1.
 
@@ -47,8 +47,8 @@ class Bernoulli(Distribution):
         Default name of this normal distribution.
     """
 
-    def __init__(self, logits=None, probs=None, dtype=None, group_event_ndims=None,
-                 name=None, default_name=None):
+    def __init__(self, logits=None, probs=None, dtype=None,
+                 group_event_ndims=None, name=None, default_name=None):
         # check the arguments
         if (logits is None and probs is None) or \
                 (logits is not None and probs is not None):

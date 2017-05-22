@@ -12,7 +12,12 @@ class Bernoulli(StochasticTensor):
     ----------
     logits : tf.Tensor | np.ndarray | float
         A float tensor, which is the log-odds of probabilities of being 1.
+        Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
 
+    probs : tf.Tensor | np.ndarray | float
+        A float tensor, which is the probabilities of being 1.
+
+        One and only one of `logits` and `p` should be specified.
         The relationship between Bernoulli `p` and `logits` are:
 
             .. math::
@@ -21,7 +26,7 @@ class Bernoulli(StochasticTensor):
                                  p &= \\frac{1}{1 + \\exp(-\\text{logits})}
                 \\end{aligned}
 
-        Note that the range of `logits` is :math:`(-\\infty, \\infty)`.
+        Note that the range of `probs` is :math:`[0, 1]`.
 
     dtype : tf.DType | np.dtype | str
         The data type of samples from the distribution. (default is `tf.int32`)
@@ -52,12 +57,13 @@ class Bernoulli(StochasticTensor):
         Default name of this normal distribution.
     """
 
-    def __init__(self, logits, dtype=None, sample_num=None,
+    def __init__(self, logits=None, probs=None, dtype=None, sample_num=None,
                  observed=None, validate_observed_shape=False,
                  group_event_ndims=None, name=None, default_name=None):
         super(Bernoulli, self).__init__(
             distribution=lambda: distributions.Bernoulli(
                 logits=logits,
+                probs=probs,
                 dtype=dtype,
                 name='distribution'
             ),
