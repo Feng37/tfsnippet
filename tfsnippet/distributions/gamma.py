@@ -88,6 +88,14 @@ class Gamma(Distribution):
         return False
 
     @property
+    def is_enumerable(self):
+        return False
+
+    @property
+    def n_enum_values(self):
+        return None
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
@@ -117,6 +125,9 @@ class Gamma(Distribution):
         return tf.random_gamma(
             tf.convert_to_tensor(sample_shape, dtype=tf.int32),
             alpha=self.alpha, beta=self.beta, dtype=self.dtype)
+
+    def _enum_sample(self):
+        raise RuntimeError('Gamma distribution is not enumerable.')
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)

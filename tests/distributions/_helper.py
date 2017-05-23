@@ -22,6 +22,7 @@ class DistributionTestMixin(object):
 
     is_continuous = None
     is_reparameterized = None
+    is_enumerable = None
 
     def get_dtype_for_param_dtype(self, param_dtype):
         return param_dtype
@@ -71,6 +72,7 @@ class DistributionTestMixin(object):
         dist = self.dist_class(**self.simple_params)
         self.assertEqual(dist.is_continuous, self.is_continuous)
         self.assertEqual(dist.is_reparameterized, self.is_reparameterized)
+        self.assertEqual(dist.is_enumerable, self.is_enumerable)
 
     def test_shapes_with_static_parameters(self):
         with self.get_session():
@@ -146,7 +148,7 @@ class DistributionTestMixin(object):
             self.assert_allclose(prob, self.prob(x, **params))
             self.assert_allclose(log_prob, self.log_prob(x, **params))
 
-    def test_sampling_for_dynamic_auxiliary_batch_shape(self):
+    def test_sampling_for_dynamic_shape(self):
         with self.get_session(use_gpu=True):
             params = {
                 k: np.tile(v, [10] + [1] * len(v.shape))
@@ -156,7 +158,7 @@ class DistributionTestMixin(object):
             # sample `x` from distribution with dynamic batch shape
             tf.set_random_seed(1234)
             params_ph = {
-                k: tf.placeholder(tf.float32, shape=[None] + list(v.shape))
+                k: tf.placeholder(tf.float32, shape=[None] * (len(v.shape) + 1))
                 for k, v in six.iteritems(self.simple_params)
             }
             feed_dict = {
@@ -270,6 +272,17 @@ class DistributionTestMixin(object):
             self.assert_allclose(
                 log_prob, self.log_prob(x, **self.extended_dimensional_params))
 
+    def test_non_enumerable_distribution(self):
+        if not self.is_enumerable:
+            dist = self.dist_class(**self.simple_params)
+            self.assertIsNone(dist.n_enum_values)
+            msg = (
+                '%s distribution is not enumerable.' %
+                self.dist_class.__name__
+            )
+            with self.assertRaisesRegex(RuntimeError, msg):
+                dist.enum_sample()
+
 
 class BigNumberVerifyTestMixin(object):
 
@@ -327,3 +340,60 @@ class AnalyticKldTestMixin(object):
             )
             self.assert_allclose(kld, self.analytic_kld(
                 self.simple_params, self.kld_simple_params))
+
+
+class EnumerableTestMixin(object):
+
+    def get_n_enum_values_for_params(self, params):
+        raise NotImplementedError()
+
+    def get_enum_samples_for_params(self, params):
+        raise NotImplementedError()
+
+    # pre-configured test cases
+    def test_n_enum_values(self):
+        with self.get_session():
+            dist = self.dist_class(**self.simple_params)
+            self.assertEqual(
+                tf.convert_to_tensor(dist.n_enum_values).eval(),
+                self.get_n_enum_values_for_params(self.simple_params)
+            )
+
+    def test_enum_sample(self):
+        with self.get_session():
+            dist = self.dist_class(**self.simple_params)
+            np.testing.assert_equal(
+                dist.enum_sample().eval(),
+                self.get_enum_samples_for_params(self.simple_params)
+            )
+
+    def test_enum_sample_for_extended_dimensional_params(self):
+        with self.get_session():
+            dist = self.dist_class(**self.extended_dimensional_params)
+            np.testing.assert_equal(
+                dist.enum_sample().eval(),
+                self.get_enum_samples_for_params(
+                    self.extended_dimensional_params)
+            )
+
+    def test_enum_sample_for_dynamic_shape(self):
+        with self.get_session(use_gpu=True):
+            params = {
+                k: np.tile(v, [10] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            params_ph = {
+                k: tf.placeholder(tf.float32, shape=[None] * (len(v.shape) + 1))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {
+                params_ph[k]: np.tile(
+                    self.simple_params[k],
+                    [10] + [1] * len(self.simple_params[k].shape)
+                )
+                for k in six.iterkeys(self.simple_params)
+            }
+            dist = self.dist_class(**params_ph)
+            x = dist.enum_sample().eval(feed_dict)
+            np.testing.assert_equal(
+                x,  self.get_enum_samples_for_params(params))

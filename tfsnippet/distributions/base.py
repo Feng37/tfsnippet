@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import (VarScopeObject, is_integer, ReshapeHelper)
+from tfsnippet.utils import VarScopeObject, is_integer
 
 __all__ = ['Distribution']
 
@@ -63,12 +63,38 @@ class Distribution(VarScopeObject):
 
     @property
     def is_continuous(self):
-        """Whether or not the distribution is continous?"""
+        """Whether or not the distribution is continuous?"""
         raise NotImplementedError()
 
     @property
     def is_reparameterized(self):
         """Whether or not the distribution is re-parameterized?"""
+        raise NotImplementedError()
+
+    @property
+    def is_enumerable(self):
+        """Whether or not the value set of the distribution are enumerable.
+
+        Basically, a finite set of values is a enumerable value set.
+        Distributions with enumerable value set could have enumerated
+        samples, rather than random samples.
+
+        See Also
+        --------
+        enum_sample
+        """
+        raise NotImplementedError()
+
+    @property
+    def n_enum_values(self):
+        """Get the size of the enumerable value set.
+
+        Returns
+        -------
+        int | tf.Tensor | None
+            Static or dynamic size of enumerable value set.
+            If the distribution is not enumerable, it should return None.
+        """
         raise NotImplementedError()
 
     @property
@@ -132,7 +158,7 @@ class Distribution(VarScopeObject):
         raise NotImplementedError()
 
     def sample(self, sample_shape=(), name=None):
-        """Sample from the distribution.
+        """Get random samples from the distribution.
 
         Parameters
         ----------
@@ -146,10 +172,38 @@ class Distribution(VarScopeObject):
         Returns
         -------
         tf.Tensor
-            The samples as tensor.
+            The random samples as tensor.
         """
         with tf.name_scope(name, default_name='sample'):
             return self._sample(sample_shape)
+
+    def _enum_sample(self):
+        raise NotImplementedError()
+
+    def enum_sample(self, name=None):
+        """Get enumerated samples from the distribution.
+
+        The returned samples should be of shape ``(n_enum_values,) +
+        batch_shape + value_shape``, where `n_enum_values` is the size
+        of enumerable value set.
+
+        Parameters
+        ----------
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tf.Tensor
+            The enumerated samples as tensor.
+
+        Raises
+        ------
+        RuntimeError
+            If the distribution is not enumerable.
+        """
+        with tf.name_scope(name, default_name='enum_sample'):
+            return self._enum_sample()
 
     def _log_prob(self, x):
         # `@instance_reuse` decorator should not be applied to this method.

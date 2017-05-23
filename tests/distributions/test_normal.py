@@ -32,6 +32,7 @@ class NormalTestCase(TestCase,
     }
     is_continuous = True
     is_reparameterized = True
+    is_enumerable = False
 
     def get_shapes_for_param(self, **params):
         x = params['mean'] + params['stddev']

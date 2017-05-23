@@ -7,14 +7,16 @@ import tensorflow as tf
 from tfsnippet.distributions import Bernoulli
 from tests.distributions._helper import (DistributionTestMixin,
                                          BigNumberVerifyTestMixin,
-                                         AnalyticKldTestMixin)
+                                         AnalyticKldTestMixin,
+                                         EnumerableTestMixin)
 from tests.helper import TestCase
 
 
 class BernoulliTestCase(TestCase,
                         DistributionTestMixin,
                         BigNumberVerifyTestMixin,
-                        AnalyticKldTestMixin):
+                        AnalyticKldTestMixin,
+                        EnumerableTestMixin):
 
     dist_class = Bernoulli
     simple_params = {
@@ -30,6 +32,7 @@ class BernoulliTestCase(TestCase,
     }
     is_continuous = False
     is_reparameterized = True
+    is_enumerable = True
 
     def get_shapes_for_param(self, **params):
         return (), params['logits'].shape
@@ -58,6 +61,15 @@ class BernoulliTestCase(TestCase,
             p * np.log(p) + (1 - p) * np.log(1 - p)
             - p * np.log(q) - (1 - p) * np.log(1 - q)
         )
+
+    def get_n_enum_values_for_params(self, params):
+        return 2
+
+    def get_enum_samples_for_params(self, params):
+        x = np.asarray([0, 1], dtype=np.int32)
+        x = x.reshape([2] + [1] * len(params['logits'].shape))
+        x = np.tile(x, (1,) + params['logits'].shape)
+        return x
 
     # test cases for Bernoulli distribution
     def test_construction_error(self):

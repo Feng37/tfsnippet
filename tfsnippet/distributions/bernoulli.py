@@ -129,6 +129,14 @@ class Bernoulli(Distribution):
         return True
 
     @property
+    def is_enumerable(self):
+        return True
+
+    @property
+    def n_enum_values(self):
+        return 2
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
@@ -186,6 +194,19 @@ class Bernoulli(Distribution):
             dtype=self.dtype
         )
         samples.set_shape(static_shape)
+        return samples
+
+    def _enum_sample(self):
+        batch_ndims = self.static_batch_shape.ndims
+        assert(batch_ndims is not None)
+        samples = tf.reshape(tf.constant([0, 1], dtype=self.dtype),
+                             [2] + [1] * batch_ndims)
+        samples = tf.tile(
+            samples,
+            tf.concat([[1], self.dynamic_batch_shape], axis=0)
+        )
+        samples.set_shape(
+            tf.TensorShape([2]).concatenate(self.static_batch_shape))
         return samples
 
     def _log_prob(self, x):

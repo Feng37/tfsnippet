@@ -21,20 +21,31 @@ class TestCase(unittest.TestCase):
             yield session
 
     def setUp(self):
+        self.graph = tf.Graph()
         try:
-            self.graph = tf.Graph()
             self.graph_ctx = self.graph.as_default()
             self.graph_ctx.__enter__()
         except Exception:
-            self.graph_ctx = self.graph = None
+            self.graph_ctx = None
+        else:
+            self._setUp()
 
     def tearDown(self):
         try:
-            if self.graph_ctx:
-                self.graph_ctx.__exit__(*sys.exc_info())
+            self._tearDown()
         finally:
-            self.graph_ctx = None
-            self.graph = None
+            try:
+                if self.graph_ctx:
+                    self.graph_ctx.__exit__(*sys.exc_info())
+            finally:
+                self.graph_ctx = None
+                self.graph = None
+
+    def _setUp(self):
+        pass
+
+    def _tearDown(self):
+        pass
 
 if not hasattr(TestCase, 'assertRaisesRegex'):
     TestCase.assertRaisesRegex = TestCase.assertRaisesRegexp

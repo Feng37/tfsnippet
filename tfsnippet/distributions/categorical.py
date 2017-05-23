@@ -116,6 +116,14 @@ class _BaseCategorical(Distribution):
         return False
 
     @property
+    def is_enumerable(self):
+        return True
+
+    @property
+    def n_enum_values(self):
+        return self._n_categories
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
@@ -175,6 +183,26 @@ class _BaseCategorical(Distribution):
                 reshape(tf.transpose(samples))
         )
 
+        return samples
+
+    def _enum_sample_sparse(self, dtype=None):
+        batch_ndims = self.static_batch_shape.ndims
+        assert(batch_ndims is not None)
+        samples = tf.reshape(
+            tf.range(0, self.n_categories, dtype=dtype),
+            tf.stack([self.n_categories] + [1] * batch_ndims)
+        )
+        samples = tf.tile(
+            samples,
+            tf.concat([[1], self.dynamic_batch_shape], axis=0)
+        )
+        static_shape = (
+            tf.TensorShape([self.n_categories])
+            if is_deterministic_shape([self.n_categories])
+            else tf.TensorShape([None])
+        )
+        static_shape = static_shape.concatenate(self.static_batch_shape)
+        samples.set_shape(static_shape)
         return samples
 
     def _analytic_kld(self, other):
@@ -263,6 +291,9 @@ class Categorical(_BaseCategorical):
 
     def _sample(self, sample_shape=()):
         return self._sample_sparse(sample_shape, self.dtype)
+
+    def _enum_sample(self):
+        return self._enum_sample_sparse(self.dtype)
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x)
@@ -366,6 +397,11 @@ class OneHotCategorical(_BaseCategorical):
 
     def _sample(self, sample_shape=()):
         samples = self._sample_sparse(sample_shape, self.dtype)
+        samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
+        return samples
+
+    def _enum_sample(self):
+        samples = self._enum_sample_sparse(self.dtype)
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 

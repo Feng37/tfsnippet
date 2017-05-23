@@ -134,6 +134,14 @@ class Normal(Distribution):
         return True
 
     @property
+    def is_enumerable(self):
+        return False
+
+    @property
+    def n_enum_values(self):
+        return None
+
+    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
@@ -204,6 +212,9 @@ class Normal(Distribution):
         )
         samples.set_shape(static_shape)
         return samples
+
+    def _enum_sample(self):
+        raise RuntimeError('Normal distribution is not enumerable.')
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)
