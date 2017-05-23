@@ -41,6 +41,14 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         Otherwise only one sample will be taken and it will not occupy
         a new dimension.
 
+    enum_as_samples : bool
+        Whether or not to take enumeration "samples" rather than
+        random samples? (default False)
+
+        This argument cannot be True when `sample_num` is specified.
+        If the distribution is not enumerate but this argument is
+        set to True, a `TypeError` will be raised.
+
     observed : tf.Tensor
         If specified, random sampling will not take place.
         Instead this tensor will be regarded as sampled tensor.
@@ -66,9 +74,13 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         Optional name or default name of this stochastic tensor.
     """
 
-    def __init__(self, distribution, sample_num=None, observed=None,
-                 validate_observed_shape=False, group_event_ndims=None,
-                 name=None, default_name=None):
+    def __init__(self, distribution, sample_num=None, enum_as_samples=False,
+                 observed=None, validate_observed_shape=False,
+                 group_event_ndims=None, name=None, default_name=None):
+        if sample_num is not None and enum_as_samples:
+            raise ValueError('`enum_as_samples` cannot be True when '
+                             '`sample_num` is specified.')
+
         super(StochasticTensor, self).__init__(
             name=name,
             default_name=default_name
@@ -85,6 +97,12 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         if not isinstance(distribution, Distribution):
             raise TypeError(
                 'Expected a Distribution but got %r.' % (distribution,))
+
+        if enum_as_samples and not distribution.is_enumerable:
+            raise TypeError(
+                '`enum_as_samples` is True but %r is not enumerable.' %
+                (distribution,)
+            )
 
         with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):
@@ -139,6 +157,7 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
 
                 self._distrib = distribution
                 self._sample_num = sample_num
+                self._enum_as_samples = enum_as_samples
                 self._group_event_ndims = group_event_ndims
                 self._sample_shape = sample_shape
                 self._static_shape = static_shape
@@ -209,9 +228,11 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         """
         return self._observed_tensor
 
-    @instance_reuse(scope='sample')
     def _sample_tensor(self):
-        return self._distrib.sample(self._sample_shape)
+        with reopen_variable_scope(self.variable_scope):
+            if self._enum_as_samples:
+                return self._distrib.enum_sample()
+            return self._distrib.sample(self._sample_shape)
 
     @property
     def computed_tensor(self):

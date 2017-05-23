@@ -92,7 +92,7 @@ class Gamma(Distribution):
         return False
 
     @property
-    def n_enum_values(self):
+    def enum_value_count(self):
         return None
 
     @property

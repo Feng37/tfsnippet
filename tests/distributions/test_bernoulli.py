@@ -62,7 +62,7 @@ class BernoulliTestCase(TestCase,
             - p * np.log(q) - (1 - p) * np.log(1 - q)
         )
 
-    def get_n_enum_values_for_params(self, params):
+    def get_enum_value_count_for_params(self, params):
         return 2
 
     def get_enum_samples_for_params(self, params):

@@ -120,7 +120,7 @@ class _BaseCategorical(Distribution):
         return True
 
     @property
-    def n_enum_values(self):
+    def enum_value_count(self):
         return self._n_categories
 
     @property

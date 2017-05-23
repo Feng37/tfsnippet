@@ -275,7 +275,7 @@ class DistributionTestMixin(object):
     def test_non_enumerable_distribution(self):
         if not self.is_enumerable:
             dist = self.dist_class(**self.simple_params)
-            self.assertIsNone(dist.n_enum_values)
+            self.assertIsNone(dist.enum_value_count)
             msg = (
                 '%s distribution is not enumerable.' %
                 self.dist_class.__name__
@@ -344,7 +344,7 @@ class AnalyticKldTestMixin(object):
 
 class EnumerableTestMixin(object):
 
-    def get_n_enum_values_for_params(self, params):
+    def get_enum_value_count_for_params(self, params):
         raise NotImplementedError()
 
     def get_enum_samples_for_params(self, params):
@@ -355,8 +355,8 @@ class EnumerableTestMixin(object):
         with self.get_session():
             dist = self.dist_class(**self.simple_params)
             self.assertEqual(
-                tf.convert_to_tensor(dist.n_enum_values).eval(),
-                self.get_n_enum_values_for_params(self.simple_params)
+                tf.convert_to_tensor(dist.enum_value_count).eval(),
+                self.get_enum_value_count_for_params(self.simple_params)
             )
 
     def test_enum_sample(self):

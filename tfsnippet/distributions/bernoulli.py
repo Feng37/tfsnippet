@@ -133,7 +133,7 @@ class Bernoulli(Distribution):
         return True
 
     @property
-    def n_enum_values(self):
+    def enum_value_count(self):
         return 2
 
     @property

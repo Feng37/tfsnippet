@@ -73,11 +73,12 @@ class Distribution(VarScopeObject):
 
     @property
     def is_enumerable(self):
-        """Whether or not the value set of the distribution are enumerable.
+        """Whether or not the distribution is enumerable?
 
-        Basically, a finite set of values is a enumerable value set.
-        Distributions with enumerable value set could have enumerated
-        samples, rather than random samples.
+        A distribution with a finite value range is enumerable.
+        Enumerable distributions could derive a special set of "samples",
+        such that the probability of every possible value against each
+        individual set of parameters could be computed.
 
         See Also
         --------
@@ -86,13 +87,13 @@ class Distribution(VarScopeObject):
         raise NotImplementedError()
 
     @property
-    def n_enum_values(self):
-        """Get the size of the enumerable value set.
+    def enum_value_count(self):
+        """Get the count of possible values from this distribution.
 
         Returns
         -------
         int | tf.Tensor | None
-            Static or dynamic size of enumerable value set.
+            Static or dynamic count of possible values.
             If the distribution is not enumerable, it should return None.
         """
         raise NotImplementedError()
@@ -181,11 +182,11 @@ class Distribution(VarScopeObject):
         raise NotImplementedError()
 
     def enum_sample(self, name=None):
-        """Get enumerated samples from the distribution.
+        """Get enumeration "samples" from the distribution.
 
-        The returned samples should be of shape ``(n_enum_values,) +
-        batch_shape + value_shape``, where `n_enum_values` is the size
-        of enumerable value set.
+        The returned samples should be of shape ``(enum_value_count,) +
+        batch_shape + value_shape``, where `enum_value_count` is the count
+        of possible values from this distribution.
 
         Parameters
         ----------
@@ -195,7 +196,7 @@ class Distribution(VarScopeObject):
         Returns
         -------
         tf.Tensor
-            The enumerated samples as tensor.
+            The enumeration "samples" as tensor.
 
         Raises
         ------

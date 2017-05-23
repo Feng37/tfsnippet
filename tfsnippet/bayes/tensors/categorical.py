@@ -39,6 +39,12 @@ class Categorical(StochasticTensor):
     sample_num : int | tf.Tensor | tf.Variable
         Optional number of samples to take. (default None)
 
+    enum_as_samples : bool
+        Whether or not to take enumeration "samples" rather than
+        random samples? (default False)
+
+        This argument cannot be True when `sample_num` is specified.
+
     observed : tf.Tensor
         If specified, random sampling will not take place.
         Instead this tensor will be regarded as sampled tensor.
@@ -63,8 +69,9 @@ class Categorical(StochasticTensor):
     """
 
     def __init__(self, logits=None, probs=None, dtype=None, sample_num=None,
-                 observed=None, validate_observed_shape=False,
-                 group_event_ndims=None, name=None, default_name=None):
+                 enum_as_samples=False, observed=None,
+                 validate_observed_shape=False, group_event_ndims=None,
+                 name=None, default_name=None):
         super(Categorical, self).__init__(
             distribution=lambda: distributions.Categorical(
                 logits=logits,
@@ -73,6 +80,7 @@ class Categorical(StochasticTensor):
                 name='distribution'
             ),
             sample_num=sample_num,
+            enum_as_samples=enum_as_samples,
             observed=observed,
             validate_observed_shape=validate_observed_shape,
             group_event_ndims=group_event_ndims,
@@ -112,6 +120,12 @@ class OneHotCategorical(StochasticTensor):
     sample_num : int | tf.Tensor | tf.Variable
         Optional number of samples to take. (default None)
 
+    enum_as_samples : bool
+        Whether or not to take enumeration "samples" rather than
+        random samples? (default False)
+
+        This argument cannot be True when `sample_num` is specified.
+
     observed : tf.Tensor
         If specified, random sampling will not take place.
         Instead this tensor will be regarded as sampled tensor.
@@ -136,8 +150,9 @@ class OneHotCategorical(StochasticTensor):
     """
 
     def __init__(self, logits=None, probs=None, dtype=None, sample_num=None,
-                 observed=None, validate_observed_shape=False,
-                 group_event_ndims=None, name=None, default_name=None):
+                 enum_as_samples=False, observed=None,
+                 validate_observed_shape=False, group_event_ndims=None,
+                 name=None, default_name=None):
         super(OneHotCategorical, self).__init__(
             distribution=lambda: distributions.OneHotCategorical(
                 logits=logits,
@@ -146,6 +161,7 @@ class OneHotCategorical(StochasticTensor):
                 name='distribution'
             ),
             sample_num=sample_num,
+            enum_as_samples=enum_as_samples,
             observed=observed,
             validate_observed_shape=validate_observed_shape,
             group_event_ndims=group_event_ndims,

@@ -63,7 +63,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
     big_number_samples = 10000
     big_number_scale = 5.0
 
-    def get_n_enum_values_for_params(self, params):
+    def get_enum_value_count_for_params(self, params):
         logits = params['logits']
         return logits.shape[-1]
 
