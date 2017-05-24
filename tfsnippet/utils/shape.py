@@ -11,7 +11,6 @@ __all__ = [
     'get_dynamic_tensor_shape',
     'is_deterministic_shape',
     'ReshapeHelper',
-    'repeat_tensor_for_samples',
     'explicit_broadcast',
     'maybe_explicit_broadcast',
 ]
@@ -130,118 +129,6 @@ def is_deterministic_shape(x):
     if ret is None:
         raise TypeError('%r is not a shape object.' % (x,))
     return ret
-
-
-def repeat_tensor_for_samples(x, sample_size, batch_size, name=None):
-    """Repeat the tensor `x` whose first-dimension should be 1 or
-    `sample_size` or `batch_size` to a repeated tensor whose first-dimension
-    will be `sample_size` * `batch_size`.
-
-    Parameters
-    ----------
-    x: tf.Tensor | tf.Variable
-        The tensor or variable need to be repeated.
-
-    sample_size: int | tf.Tensor | tf.Variable
-        The size of samples, which should be an integer scalar.
-
-    batch_size: int | tf.Tensor | tf.Variable
-        The size of batch, which should be an integer scalar.
-
-    name : str
-        Optional name of this operation.
-
-    Returns
-    -------
-    tf.Tensor
-        The repeated tensor generated from `x`.
-    """
-    def check_size_arg(n, v):
-        if is_dynamic_tensor_like(v):
-            if v.get_shape().ndims == 0 and v.dtype.is_integer:
-                return tf.convert_to_tensor(v)
-        elif is_integer(v):
-            return v
-        raise ValueError(
-            '%r is expected to be an integer scalar but got %r.' %
-            (n, v)
-        )
-
-    sample_size = check_size_arg('sample_size', sample_size)
-    batch_size = check_size_arg('batch_size', batch_size)
-
-    with tf.name_scope(name=name, default_name='repeat_tensor_for_samples',
-                       values=[x, sample_size, batch_size]):
-        x = tf.convert_to_tensor(x)
-        if x.get_shape().ndims == 0:
-            raise ValueError('`x` must be a tensor, not a scalar.')
-        if x.get_shape().ndims is None:
-            raise ValueError('The number of dimensions of `x` is not '
-                             'deterministic, which is not supported.')
-
-        # Check the validation of the shape of `x` statically
-        first_dim = get_dimension_size(x, 0)
-        batch_size_mismatch_msg = (
-            'first dimension of `x` does not match `batch_size`'
-        )
-        if isinstance(first_dim, int) and isinstance(batch_size, int):
-            if first_dim != 1 and first_dim != batch_size:
-                raise ValueError(batch_size_mismatch_msg)
-
-        # fast routine: first_dim === 1, just repeat `x` at first dim
-        if first_dim == 1:
-            multiples = (
-                [sample_size * batch_size] + [1] * (x.get_shape().ndims - 1)
-            )
-            if not is_deterministic_shape(multiples):
-                multiples = tf.stack(multiples)
-            return tf.tile(x, multiples)
-
-        # slow routine: first_dim is dynamic or != 1, tile the two dimensions
-        else:
-            assert_ops = []
-            if is_dynamic_tensor_like(first_dim) or \
-                    is_dynamic_tensor_like(batch_size):
-                first_dim = tf.convert_to_tensor(first_dim)
-                batch_size = tf.convert_to_tensor(batch_size)
-                assert_ops = [
-                    tf.Assert(
-                        tf.logical_or(
-                            tf.equal(first_dim, 1),
-                            tf.equal(first_dim, batch_size)
-                        ),
-                        [batch_size_mismatch_msg, first_dim, batch_size]
-                    )
-                ]
-                batch_repeat = tf.cond(
-                    tf.equal(first_dim, 1),
-                    lambda: batch_size,
-                    lambda: tf.constant(1),
-                )
-            else:
-                # first dimension != 1, and it's ensured to match `batch_size`.
-                batch_repeat = 1
-
-            def f(ret):
-                ret = tf.expand_dims(ret, axis=0)
-                multiple_shape = (
-                    [sample_size, batch_repeat] +
-                    [1] * (ret.get_shape().ndims - 2)
-                )
-                if not is_deterministic_shape(multiple_shape):
-                    multiple_shape = tf.stack(multiple_shape)
-
-                ret = tf.tile(ret, multiple_shape)
-
-                helper = ReshapeHelper()
-                helper.add(sample_size * batch_size)
-                helper.add_template(ret, lambda s: s[2:])
-                return helper.reshape(ret)
-
-            if assert_ops:
-                with tf.control_dependencies(assert_ops):
-                    return f(x)
-            return f(x)
 
 
 class ReshapeHelper(NameScopeObject):
@@ -510,13 +397,18 @@ class ReshapeHelper(NameScopeObject):
         return self
 
 
-def explicit_broadcast(x, y, name=None):
+def explicit_broadcast(x, y, tail_no_broadcast_ndims=None, name=None):
     """Explicit broadcast two tensors to have the same shape.
 
     Parameters
     ----------
     x, y : tf.Tensor
         The tensors to broadcast.
+
+    tail_no_broadcast_ndims : int
+        If specified, this number of dimensions at the tail of the
+        two tensors would not be broadcast.  This requires `x` and
+        `y` to have at least this number of dimensions.
 
     name : str
         Optional name of this operation.
@@ -528,23 +420,60 @@ def explicit_broadcast(x, y, name=None):
     """
     try:
         with tf.name_scope(name, default_name='explicit_broadcast'):
-            x *= tf.ones_like(y, dtype=x.dtype)
-            y *= tf.ones_like(x, dtype=y.dtype)
+            def lift_shape_for_tail_no_broadcast_ndims(a, b):
+                static_shape = b.get_shape()[: -tail_no_broadcast_ndims]
+                static_shape = static_shape.concatenate(
+                    [1] * tail_no_broadcast_ndims
+                )
+                if static_shape.is_fully_defined():
+                    dynamic_shape = static_shape.as_list()
+                else:
+                    dynamic_shape = tf.concat(
+                        [
+                            tf.shape(b)[: -tail_no_broadcast_ndims],
+                            [1] * tail_no_broadcast_ndims
+                        ],
+                        axis=0
+                    )
+                ones = tf.ones(dynamic_shape, dtype=a.dtype)
+                ones.set_shape(static_shape)
+                return a * ones
+
+            def with_tail_no_broadcast_ndims():
+                a = lift_shape_for_tail_no_broadcast_ndims(x, y)
+                b = lift_shape_for_tail_no_broadcast_ndims(y, a)
+                return a, b
+
+            def without_tail_no_broadcast_ndims():
+                a, b = x, y
+                a *= tf.ones_like(b, dtype=a.dtype)
+                b *= tf.ones_like(a, dtype=b.dtype)
+                return a, b
+
+            if tail_no_broadcast_ndims:
+                return with_tail_no_broadcast_ndims()
+            else:
+                return without_tail_no_broadcast_ndims()
+
     except ValueError:
         raise ValueError(
             '%r and %r cannot broadcast to match. (%r vs %r)'
             % (x, y, x.get_shape(), y.get_shape())
         )
-    return x, y
 
 
-def maybe_explicit_broadcast(x, y, name=None):
+def maybe_explicit_broadcast(x, y, tail_no_broadcast_ndims=None, name=None):
     """Explicit broadcast two tensors to have the same shape if necessary.
 
     Parameters
     ----------
     x, y : tf.Tensor
         The tensors to broadcast.
+
+    tail_no_broadcast_ndims : int
+        If specified, this number of dimensions at the tail of the
+        two tensors would not be broadcast.  This requires `x` and
+        `y` to have at least this number of dimensions.
 
     name : str
         Optional name of this operation.
@@ -555,14 +484,26 @@ def maybe_explicit_broadcast(x, y, name=None):
         The tensors after broadcast.
     """
     if not (x.get_shape() and y.get_shape()):
-        x, y = explicit_broadcast(x, y)
+        x, y = explicit_broadcast(
+            x, y, tail_no_broadcast_ndims=tail_no_broadcast_ndims,
+            name=name
+        )
     else:
         if x.get_shape().ndims != y.get_shape().ndims:
-            x, y = explicit_broadcast(x, y)
+            x, y = explicit_broadcast(
+                x, y, tail_no_broadcast_ndims=tail_no_broadcast_ndims,
+                name=name
+            )
         elif x.get_shape().is_fully_defined() and \
                 y.get_shape().is_fully_defined():
             if x.get_shape() != y.get_shape():
-                x, y = explicit_broadcast(x, y, name=name)
+                x, y = explicit_broadcast(
+                    x, y, tail_no_broadcast_ndims=tail_no_broadcast_ndims,
+                    name=name
+                )
         else:
-            x, y = explicit_broadcast(x, y, name=name)
+            x, y = explicit_broadcast(
+                x, y, tail_no_broadcast_ndims=tail_no_broadcast_ndims,
+                name=name
+            )
     return x, y

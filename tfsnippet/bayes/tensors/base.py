@@ -203,6 +203,48 @@ class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
         return self._distrib
 
     @property
+    def param_dtype(self):
+        """Get the data type of parameter(s)."""
+        return self._distrib.param_dtype
+
+    @property
+    def is_continuous(self):
+        """Whether or not the stochastic tensor is continuous?"""
+        return self._distrib.is_continuous
+
+    @property
+    def is_reparameterized(self):
+        """Whether or not the stochastic tensor is re-parameterized?"""
+        return self._distrib.is_reparameterized
+
+    @property
+    def is_enumerable(self):
+        """Whether or not the stochastic tensor is enumerable?
+
+        A stochastic tensor with a finite value range is enumerable.
+        Enumerable stochastic tensors could derive a special set of "samples",
+        such that the probability of every possible value against each
+        individual set of parameters could be computed.
+
+        See Also
+        --------
+        enum_sample
+        """
+        return self._distrib.is_enumerable
+
+    @property
+    def enum_value_count(self):
+        """Get the count of possible values from this stochastic tensor.
+
+        Returns
+        -------
+        int | tf.Tensor | None
+            Static or dynamic count of possible values.
+            If the stochastic tensor is not enumerable, it should return None.
+        """
+        return self._distrib.enum_value_count
+
+    @property
     def dtype(self):
         """Get the data type of this stochastic tensor."""
         return self._distrib.dtype

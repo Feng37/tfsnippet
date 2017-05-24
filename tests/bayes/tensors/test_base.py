@@ -40,6 +40,16 @@ class StochasticTensorSkeletonTestCase(TestCase):
             self.assertNotEqual(StochasticTensor(distrib), t)
             self.assertEqual(hash(t), hash(t))
 
+    def test_attributes_from_distribution(self):
+        with self.get_session():
+            distrib = Normal(0., 1.)
+            t = StochasticTensor(distrib)
+
+            for k in ['param_dtype', 'is_continuous', 'is_reparameterized',
+                      'is_enumerable', 'enum_value_count']:
+                self.assertEqual(getattr(distrib, k), getattr(t, k),
+                                 msg='attribute %r mismatch.' % k)
+
     def test_dynamic_dimension_replaced_by_observed_shape(self):
         distrib = _MyDistribution(tf.placeholder(tf.float32, (None, 3, 4)))
         t = StochasticTensor(
