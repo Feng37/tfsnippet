@@ -7,7 +7,7 @@ from tfsnippet.bayes import Normal, sgvb
 from tests.helper import TestCase
 
 
-class LowerBoundTestCase(TestCase):
+class SgvbTestCase(TestCase):
 
     def test_sgvb(self):
         with self.get_session():
