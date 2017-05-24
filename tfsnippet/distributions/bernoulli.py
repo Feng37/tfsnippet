@@ -80,14 +80,12 @@ class Bernoulli(Distribution):
                     logits = tf.convert_to_tensor(logits, dtype=param_dtype,
                                                   name='logits')
                     probs = tf.nn.sigmoid(logits, 'probs')
-                    one_minus_probs = tf.nn.sigmoid(-logits, 'one_minus_probs')
                     probs_is_derived = True
                 else:
                     probs = tf.convert_to_tensor(probs, dtype=param_dtype,
                                                  name='probs')
-                    one_minus_probs = tf.subtract(1., probs, 'one_minus_probs')
                     logits = tf.subtract(
-                        tf.log(probs), tf.log(one_minus_probs),
+                        tf.log(probs), tf.log1p(-probs),
                         name='logits'
                     )
                     probs_is_derived = False
@@ -106,7 +104,6 @@ class Bernoulli(Distribution):
 
                 # derive various distribution attributes
                 self._probs = probs
-                self._one_minus_probs = one_minus_probs
                 self._probs_is_derived = probs_is_derived
 
                 # set other attributes
@@ -167,11 +164,6 @@ class Bernoulli(Distribution):
         """Get the probabilities of being 1."""
         return self._probs
 
-    @property
-    def probs_take_zero(self):
-        """Get the probability of being 0."""
-        return self._one_minus_probs
-
     def _sample(self, sample_shape=()):
         # check the arguments of `sample_shape`
         helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
@@ -211,9 +203,17 @@ class Bernoulli(Distribution):
 
     def _log_prob(self, x):
         x = tf.cast(x, dtype=self.param_dtype)
-        logits = self.logits
-        x, logits = maybe_explicit_broadcast(x, logits)
-        return -tf.nn.sigmoid_cross_entropy_with_logits(labels=x, logits=logits)
+        if self._probs_is_derived:
+            logits = self.logits
+            x, logits = maybe_explicit_broadcast(x, logits)
+            return -tf.nn.sigmoid_cross_entropy_with_logits(
+                labels=x, logits=logits
+            )
+        else:
+            # TODO: check whether this is better than using derived logits.
+            log_p = tf.log(self.probs)
+            log_one_minus_p = tf.log1p(-self.probs)
+            return x * log_p + (1. - x) * log_one_minus_p
 
     def _analytic_kld(self, other):
         def get_log_probs(o):
@@ -222,11 +222,16 @@ class Bernoulli(Distribution):
                 log_one_minus_p = -tf.nn.softplus(o.logits)
             else:
                 log_p = tf.log(o.probs)
-                log_one_minus_p = tf.log(1. - o.probs)
+                log_one_minus_p = tf.log1p(-o.probs)
             return log_p, log_one_minus_p
 
         if isinstance(other, Bernoulli):
-            p, one_minus_p = self.probs, self.probs_take_zero
+            p = self.probs
+            one_minus_p = (
+                tf.nn.sigmoid(-self.logits)
+                if self._probs_is_derived
+                else 1. - self.probs
+            )
             log_p, log_one_minus_p = get_log_probs(self)
             log_q, log_one_minus_q = get_log_probs(other)
             return (

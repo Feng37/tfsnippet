@@ -295,7 +295,7 @@ class Categorical(_BaseCategorical):
     def _enum_sample(self):
         return self._enum_sample_sparse(self.dtype)
 
-    def _log_prob(self, x):
+    def _log_prob_with_logits(self, x):
         x = tf.convert_to_tensor(x)
         if not x.dtype.is_integer:
             x = tf.cast(x, dtype=tf.int32)
@@ -312,6 +312,21 @@ class Categorical(_BaseCategorical):
         return -tf.nn.sparse_softmax_cross_entropy_with_logits(
             labels=x, logits=logits,
         )
+
+    def _log_prob_with_probs(self, x):
+        x = tf.one_hot(
+            tf.cast(x, dtype=tf.int32),
+            self.n_categories,
+            dtype=self.param_dtype
+        )
+        return tf.reduce_sum(x * tf.log(self.probs), axis=-1)
+
+    def _log_prob(self, x):
+        if self._probs_is_derived:
+            return self._log_prob_with_logits(x)
+        else:
+            # TODO: check whether this is better than using derived logits.
+            return self._log_prob_with_probs(x)
 
 Discrete = Categorical
 
@@ -405,8 +420,9 @@ class OneHotCategorical(_BaseCategorical):
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 
-    def _log_prob(self, x):
+    def _log_prob_with_logits(self, x):
         x = tf.cast(x, dtype=self.param_dtype)
+
         x, logits = maybe_explicit_broadcast(x, self.logits)
 
         if x.get_shape().ndims == 2:
@@ -432,5 +448,16 @@ class OneHotCategorical(_BaseCategorical):
                     reshape(log_p_2d)
             )
         return log_p
+
+    def _log_prob_with_probs(self, x):
+        x = tf.cast(x, dtype=self.param_dtype)
+        return tf.reduce_sum(x * tf.log(self.probs), axis=-1)
+
+    def _log_prob(self, x):
+        if self._probs_is_derived:
+            return self._log_prob_with_logits(x)
+        else:
+            # TODO: check whether this is better than using derived logits.
+            return self._log_prob_with_probs(x)
 
 OneHotDiscrete = OneHotCategorical

@@ -10,7 +10,7 @@ posterior of latent variables.
 
 import tensorflow as tf
 
-from ..utils import local_log_prob
+from ..utils import gather_log_prob
 
 __all__ = [
     'sgvb'
@@ -65,8 +65,8 @@ def sgvb(model, variational, axis=None, name=None):
         The computed variational lower bound.
     """
     with tf.name_scope(name, default_name='sgvb'):
-        model_log_prob = sum(local_log_prob(model))
-        variational_entropy = -sum(local_log_prob(variational))
+        model_log_prob = sum(gather_log_prob(model))
+        variational_entropy = -sum(gather_log_prob(variational))
         lower_bound = model_log_prob + variational_entropy
         if axis is not None:
             lower_bound = tf.reduce_mean(lower_bound, axis=axis)

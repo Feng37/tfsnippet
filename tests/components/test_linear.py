@@ -7,7 +7,7 @@ from tfsnippet.components import Linear
 from tests.helper import TestCase
 
 
-class WrapperTestCase(TestCase):
+class LinearTestCase(TestCase):
 
     def test_Linear(self):
         linear = Linear(100)

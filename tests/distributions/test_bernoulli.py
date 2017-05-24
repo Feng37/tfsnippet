@@ -101,14 +101,12 @@ class BernoulliTestCase(TestCase,
             self.assert_allclose(dist.logits.eval(), logits)
             self.assert_allclose(dist.mean.eval(), probs)
             self.assert_allclose(dist.probs.eval(), probs)
-            self.assert_allclose(dist.probs_take_zero.eval(), 1. - probs)
 
             # test construction with probs
             dist = Bernoulli(probs=probs)
             self.assert_allclose(dist.logits.eval(), logits)
             self.assert_allclose(dist.mean.eval(), probs)
             self.assert_allclose(dist.probs.eval(), probs)
-            self.assert_allclose(dist.probs_take_zero.eval(), 1. - probs)
 
     def test_specify_data_type(self):
         dist = Bernoulli(dtype=tf.int64, **self.simple_params)

@@ -5,13 +5,13 @@ from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (VarScopeObject,
                              is_integer,
                              reopen_variable_scope,
-                             TensorArithmeticMixin,
-                             instance_reuse)
+                             TensorArithmeticMixin)
+from ..utils import StochasticObject
 
 __all__ = ['StochasticTensor']
 
 
-class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
+class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
     """Tensor-like object that represents a stochastic variable.
 
     A `StochasticTensor` should be constructed from a `distribution`,
@@ -250,29 +250,9 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
                 self._computed_tensor = self._sample_tensor()
         return self._computed_tensor
 
-    def prob(self, group_event_ndims=None, name=None):
-        """Compute the likelihood of this stochastic tensor.
-
-        Parameters
-        ----------
-        group_event_ndims : int
-            If specified, will override the `group_event_ndims` configured
-            in both this stochastic tensor and the distribution.
-
-        name : str
-            Optional name of this operation.
-
-        Returns
-        -------
-        tf.Tensor
-            The likelihood of this stochastic tensor.
-        """
-        if group_event_ndims is None:
-            group_event_ndims = self._group_event_ndims
-        return self._distrib.prob(
-            self.computed_tensor, group_event_ndims=group_event_ndims,
-            name=name
-        )
+    @property
+    def is_log_prob_normalized(self):
+        return True
 
     def log_prob(self, group_event_ndims=None, name=None):
         """Compute the log-likelihood of this stochastic tensor.
@@ -294,6 +274,30 @@ class StochasticTensor(VarScopeObject, TensorArithmeticMixin):
         if group_event_ndims is None:
             group_event_ndims = self._group_event_ndims
         return self._distrib.log_prob(
+            self.computed_tensor, group_event_ndims=group_event_ndims,
+            name=name
+        )
+
+    def prob(self, group_event_ndims=None, name=None):
+        """Compute the likelihood of this stochastic tensor.
+
+        Parameters
+        ----------
+        group_event_ndims : int
+            If specified, will override the `group_event_ndims` configured
+            in both this stochastic tensor and the distribution.
+
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tf.Tensor
+            The likelihood of this stochastic tensor.
+        """
+        if group_event_ndims is None:
+            group_event_ndims = self._group_event_ndims
+        return self._distrib.prob(
             self.computed_tensor, group_event_ndims=group_event_ndims,
             name=name
         )

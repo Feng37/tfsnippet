@@ -8,15 +8,14 @@ from tfsnippet import bayes
 from tests.helper import TestCase
 
 
-class UtilsTestCase(TestCase):
+class GatherLogProbTestCase(TestCase):
 
-    def test_local_log_prob(self):
+    def test_basic(self):
         with self.get_session() as sess:
-            # test regular
             a = bayes.Normal(0., [1., 2., 3.], sample_num=16,
                              group_event_ndims=1)
             b = bayes.Normal(1., 2., sample_num=16)
-            a_prob, b_prob = bayes.local_log_prob([a, b])
+            a_prob, b_prob = bayes.gather_log_prob([a, b])
 
             self.assertIsInstance(a_prob, tf.Tensor)
             self.assertEqual(a_prob.get_shape().as_list(), [16])
@@ -34,8 +33,33 @@ class UtilsTestCase(TestCase):
             ])
             np.testing.assert_almost_equal(res, ans)
 
-            # test local_log_prob on empty list
-            self.assertEqual(bayes.local_log_prob([]), ())
+    def test_empty(self):
+        with self.get_session():
+            self.assertEqual(bayes.gather_log_prob([]), ())
+
+
+class LogProbReduceGroupEventsTestCase(TestCase):
+
+    def test_basic(self):
+        with self.get_session():
+            prob = np.arange(24, dtype=np.float32).reshape([3, 2, 4])
+            np.testing.assert_almost_equal(
+                bayes.log_prob_reduce_group_events(prob, 0).eval(),
+                prob
+            )
+            np.testing.assert_almost_equal(
+                bayes.log_prob_reduce_group_events(prob, 1).eval(),
+                np.sum(prob, axis=-1)
+            )
+            np.testing.assert_almost_equal(
+                bayes.log_prob_reduce_group_events(prob, 2).eval(),
+                np.sum(prob.reshape([3, -1]), axis=-1)
+            )
+            np.testing.assert_almost_equal(
+                bayes.log_prob_reduce_group_events(prob, 3).eval(),
+                np.sum(prob)
+            )
+
 
 if __name__ == '__main__':
     unittest.main()
