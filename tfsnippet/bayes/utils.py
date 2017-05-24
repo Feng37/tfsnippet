@@ -10,7 +10,7 @@ __all__ = [
 
 class StochasticObject(object):
     """Base interface for stochastic objects.
-    
+
     A stochastic object should be any object in a TensorFlow model,
     which has a normalized or un-normalized log-probability.
     """

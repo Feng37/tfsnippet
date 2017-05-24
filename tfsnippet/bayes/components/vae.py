@@ -7,11 +7,11 @@ __all__ = ['VAE']
 
 class VAE(Component, StochasticObject):
     """Variational auto-encoder.
-    
+
     This class provides a general implementation of the variational
     auto-encoder[1] and conditional variational auto-encoder[2].
-    
-    [1]	D. P. Kingma and M. Welling, “Auto-Encoding Variational Bayes,” vol. 
+
+    [1]	D. P. Kingma and M. Welling, “Auto-Encoding Variational Bayes,” vol.
         stat.ML. 21-Dec-2013.
     [2]	C. Doersch, “Tutorial on Variational Autoencoders.,” CoRR, 2016.
     """
