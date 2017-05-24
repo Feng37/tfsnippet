@@ -3,8 +3,8 @@ import tensorflow as tf
 
 __all__ = [
     'StochasticObject',
-    'gather_log_prob',
-    'log_prob_reduce_group_events',
+    'gather_log_lower_bound',
+    'reduce_log_lower_bound',
 ]
 
 
@@ -12,23 +12,23 @@ class StochasticObject(object):
     """Base interface for stochastic objects.
 
     A stochastic object should be any object in a TensorFlow model,
-    which has a normalized or un-normalized log-probability.
+    which has a log-probability lower-bound.
     """
 
     @property
-    def is_log_prob_normalized(self):
-        """Whether or not the log-probability is normalized?"""
+    def is_tight_log_lower_bound(self):
+        """Whether or not the log-probability lower-bound is tight?"""
         raise NotImplementedError()
 
-    def log_prob(self, group_event_ndims=None, name=None):
-        """Compute the log-probability of this stochastic object.
+    def log_lower_bound(self, group_event_ndims=None, name=None):
+        """Compute the log-probability lower-bound.
 
         Parameters
         ----------
         group_event_ndims : int
             If specify, this number of dimensions at the end of `batch_shape`
-            would be considered as a group of events, whose probabilities are
-            to be accounted together. (default None)
+            would be considered as a group of events, whose log-probability
+            lower-bounds are summed together. (default None)
 
         name : str
             Optional name of this operation.
@@ -36,20 +36,20 @@ class StochasticObject(object):
         Returns
         -------
         tf.Tensor
-            The log-probability of this stochastic object.
+            The log-probability lower-bound.
         """
         raise NotImplementedError()
 
 
-def gather_log_prob(tensors, name=None):
-    """Gather the log-probability of specified objects.
+def gather_log_lower_bound(tensors, name=None):
+    """Gather the log-probability lower-bounds of specified objects.
 
     Parameters
     ----------
     tensors : collections.Iterable[StochasticObject | tf.Tensor]
-        For `StochasticObject`, the `log_prob` method will be called
-        to get the log-probability.  Otherwise treated as pre-computed
-        log-probability.
+        For `StochasticObject`, the `log_lower_bound` method will be
+        called to get the lower-bound.  Otherwise treated as pre-computed
+        lower-bounds.
 
     name : str
         Optional name of this operation.
@@ -61,14 +61,14 @@ def gather_log_prob(tensors, name=None):
     """
     with tf.name_scope(name, default_name='local_log_prob', values=tensors):
         return tuple(
-            t.log_prob()
+            t.log_lower_bound()
             if isinstance(t, StochasticObject) else tf.convert_to_tensor(t)
             for t in tensors
         )
 
 
-def log_prob_reduce_group_events(log_prob, ndims, name=None):
-    """Reduce the dimensions of group events in log-probability.
+def reduce_log_lower_bound(log_prob, ndims, name=None):
+    """Reduce the dimensions of group events in log-probability lower-bounds.
 
     Parameters
     ----------

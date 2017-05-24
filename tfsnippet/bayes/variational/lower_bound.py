@@ -10,14 +10,14 @@ posterior of latent variables.
 
 import tensorflow as tf
 
-from ..utils import gather_log_prob
+from ..utils import gather_log_lower_bound
 
 __all__ = [
     'sgvb'
 ]
 
 
-def sgvb(model, variational, axis=None, name=None):
+def sgvb(model, variational, latent_axis=None, name=None):
     """SGVB estimator for the variational lower bound.
 
     The SGVB estimator[1], if given observed variable `x` and latent variable
@@ -42,15 +42,15 @@ def sgvb(model, variational, axis=None, name=None):
 
     Parameters
     ----------
-    model : collections.Iterable[StochasticTensor]
-        List of stochastic tensors, representing the posterior of observed
-        variables and the priors of latent variables.
+    model : collections.Iterable[StochasticObject | tf.Tensor]
+        List of stochastic objects or log-probability lower-bound tensors
+        from both observed and latent variables in the generative model.
 
-    variational : collections.Iterable[StochasticTensor]
-        List of stochastic tensors, representing the approximated posteriors
-        of latent variables.
+    variational : collections.Iterable[StochasticObject | tf.Tensor]
+        List of stochastic tensors or log-probability lower-bound tensors
+        from approximated latent variables.
 
-    axis : int | list[int] | tf.Tensor
+    latent_axis : int | list[int] | tf.Tensor
         The dimension(s) of samples, which should be averaged in order
         to compute the expectation of variational lower bound.
 
@@ -65,9 +65,9 @@ def sgvb(model, variational, axis=None, name=None):
         The computed variational lower bound.
     """
     with tf.name_scope(name, default_name='sgvb'):
-        model_log_prob = sum(gather_log_prob(model))
-        variational_entropy = -sum(gather_log_prob(variational))
+        model_log_prob = sum(gather_log_lower_bound(model))
+        variational_entropy = -sum(gather_log_lower_bound(variational))
         lower_bound = model_log_prob + variational_entropy
-        if axis is not None:
-            lower_bound = tf.reduce_mean(lower_bound, axis=axis)
+        if latent_axis is not None:
+            lower_bound = tf.reduce_mean(lower_bound, axis=latent_axis)
         return lower_bound

@@ -3,8 +3,7 @@ import unittest
 
 import numpy as np
 
-from tfsnippet.bayes.tensors import Normal
-from tfsnippet.bayes.variational import sgvb
+from tfsnippet.bayes import Normal, sgvb
 from tests.helper import TestCase
 
 
@@ -23,14 +22,14 @@ class LowerBoundTestCase(TestCase):
                 (a.log_prob() + b.log_prob() - c.log_prob()).eval()
             )
 
-            lower_bound = sgvb([a], [b, c], axis=0)
+            lower_bound = sgvb([a], [b, c], latent_axis=0)
             self.assertEqual(lower_bound.get_shape().as_list(), [3])
             np.testing.assert_almost_equal(
                 lower_bound.eval(),
                 (a.log_prob() - b.log_prob() - c.log_prob()).eval().reshape([3])
             )
 
-            lower_bound = sgvb([a], [b, c], axis=[0, 1])
+            lower_bound = sgvb([a], [b, c], latent_axis=[0, 1])
             self.assertEqual(lower_bound.get_shape().as_list(), [])
             np.testing.assert_almost_equal(
                 lower_bound.eval(),

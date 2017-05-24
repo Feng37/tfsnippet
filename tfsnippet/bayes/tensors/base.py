@@ -251,8 +251,14 @@ class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
         return self._computed_tensor
 
     @property
-    def is_log_prob_normalized(self):
+    def is_tight_log_lower_bound(self):
         return True
+
+    def log_lower_bound(self, group_event_ndims=None, name=None):
+        return self.log_prob(
+            group_event_ndims=group_event_ndims,
+            name=name or 'log_lower_bound'
+        )
 
     def log_prob(self, group_event_ndims=None, name=None):
         """Compute the log-likelihood of this stochastic tensor.
