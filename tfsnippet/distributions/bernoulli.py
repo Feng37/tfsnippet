@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import (get_preferred_tensor_dtype, reopen_variable_scope,
-                             is_deterministic_shape, ReshapeHelper,
+from tfsnippet.utils import (get_preferred_tensor_dtype,
+                             reopen_variable_scope,
+                             is_deterministic_shape,
                              maybe_explicit_broadcast)
 from .base import Distribution
 
@@ -164,21 +165,16 @@ class Bernoulli(Distribution):
         """Get the probabilities of being 1."""
         return self._probs
 
-    def _sample(self, sample_shape=()):
-        # check the arguments of `sample_shape`
-        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
-        static_sample_shape = helper.get_static_shape()
-        dynamic_sample_shape = helper.get_dynamic_shape()
+    def _sample_n(self, n):
+        # compute the shape of samples
+        if is_deterministic_shape([n]):
+            static_shape = tf.TensorShape([n])
+        else:
+            static_shape = tf.TensorShape([None])
+        static_shape = static_shape.concatenate(self.static_batch_shape)
+        dynamic_shape = tf.concat([[n], self.dynamic_batch_shape], axis=0)
 
         # derive the samples
-        static_shape = (
-            tf.TensorShape(static_sample_shape).
-                concatenate(self.static_batch_shape)
-        )
-        dynamic_shape = tf.concat(
-            [dynamic_sample_shape, self.dynamic_batch_shape],
-            axis=0
-        )
         uniform_samples = tf.random_uniform(
             dynamic_shape, minval=0., maxval=1., dtype=self.param_dtype)
         samples = tf.cast(
@@ -189,16 +185,23 @@ class Bernoulli(Distribution):
         return samples
 
     def _enum_sample(self):
-        batch_ndims = self.static_batch_shape.ndims
-        assert(batch_ndims is not None)
-        samples = tf.reshape(tf.constant([0, 1], dtype=self.dtype),
-                             [2] + [1] * batch_ndims)
-        samples = tf.tile(
-            samples,
-            tf.concat([[1], self.dynamic_batch_shape], axis=0)
+        # reshape the enumerated values to match the batch shape.
+        reshape_shape = tf.concat(
+            [[2], tf.ones(tf.stack([tf.size(self.dynamic_batch_shape)]),
+                          dtype=tf.int32)],
+            axis=0
         )
-        samples.set_shape(
-            tf.TensorShape([2]).concatenate(self.static_batch_shape))
+        samples = tf.reshape(tf.constant([0, 1], dtype=self.dtype),
+                             reshape_shape)
+
+        # tile the enumerated values along batch shape
+        tile_shape = tf.concat(
+            [[1], self.dynamic_batch_shape], axis=0)
+        samples = tf.tile(samples, tile_shape)
+
+        # fix the static shape of the samples
+        static_shape = tf.TensorShape([2])
+        samples.set_shape(static_shape.concatenate(self.static_batch_shape))
         return samples
 
     def _log_prob(self, x):

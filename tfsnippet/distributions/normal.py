@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.utils import (reopen_variable_scope, get_preferred_tensor_dtype,
-                             ReshapeHelper)
+                             is_deterministic_shape)
 from .base import Distribution
 
 __all__ = ['Normal']
@@ -192,29 +192,21 @@ class Normal(Distribution):
         """Get the log-precision of Normal distribution."""
         return self._log_prec
 
-    def _sample(self, sample_shape=()):
-        # check the arguments of `sample_shape`
-        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
-        static_sample_shape = helper.get_static_shape()
-        dynamic_sample_shape = helper.get_dynamic_shape()
+    def _sample_n(self, n):
+        # compute the shape of samples
+        if is_deterministic_shape([n]):
+            static_shape = tf.TensorShape([n])
+        else:
+            static_shape = tf.TensorShape([None])
+        static_shape = static_shape.concatenate(self.static_batch_shape)
+        dynamic_shape = tf.concat([[n], self.dynamic_batch_shape], axis=0)
 
         # derive the samples
-        static_shape = (
-            tf.TensorShape(static_sample_shape).
-                concatenate(self.static_batch_shape)
-        )
-        dynamic_shape = tf.concat(
-            [dynamic_sample_shape, self.dynamic_batch_shape],
-            axis=0
-        )
         samples = self.mean + self.stddev * (
             tf.random_normal(dynamic_shape, dtype=self.dtype)
         )
         samples.set_shape(static_shape)
         return samples
-
-    def _enum_sample(self):
-        raise RuntimeError('Normal distribution is not enumerable.')
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)

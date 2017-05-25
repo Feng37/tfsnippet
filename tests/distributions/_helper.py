@@ -41,12 +41,14 @@ class DistributionTestMixin(object):
         np.testing.assert_allclose(a, b, rtol=1e-3, atol=1e-5)
 
     # helper utilities
-    def get_samples_and_prob(self, sample_shape=(), **params):
+    def get_samples_and_prob(self, sample_shape=(), feed_dict=None, **params):
         tf.set_random_seed(1234)
         dist = self.dist_class(**params)
         x = dist.sample(sample_shape)
         prob, log_prob = dist.prob(x), dist.log_prob(x)
-        return get_default_session_or_error().run([x, prob, log_prob])
+        return get_default_session_or_error().run(
+            [x, prob, log_prob], feed_dict=feed_dict
+        )
 
     # pre-configured test cases
     def test_param_dtype(self):
@@ -123,6 +125,26 @@ class DistributionTestMixin(object):
             np.testing.assert_equal(dist.dynamic_batch_shape.eval(feed_dict),
                                     batch_shape)
 
+    def test_shapes_with_fully_dynamic_parameters(self):
+        with self.get_session():
+            params_ph = {
+                k: tf.placeholder(tf.float32)
+                for k, v in six.iteritems(self.simple_params)
+            }
+            params = {
+                k: np.tile(v, [3] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {params_ph[k]: params[k] for k in six.iterkeys(params)}
+            dist = self.dist_class(**params_ph)
+            value_shape, batch_shape = self.get_shapes_for_param(**params)
+
+            self.assertIsInstance(dist.static_batch_shape, tf.TensorShape)
+            self.assertIsNone(dist.static_batch_shape.ndims)
+            self.assertIsInstance(dist.dynamic_batch_shape, tf.Tensor)
+            np.testing.assert_equal(dist.dynamic_batch_shape.eval(feed_dict),
+                                    batch_shape)
+
     def test_sampling(self):
         with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(**self.simple_params)
@@ -182,6 +204,40 @@ class DistributionTestMixin(object):
             self.assert_allclose(prob, self.prob(x, **params))
             self.assert_allclose(log_prob, self.log_prob(x, **params))
 
+    def test_sampling_for_fully_dynamic_shape(self):
+        with self.get_session(use_gpu=True):
+            params = {
+                k: np.tile(v, [10] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+
+            # sample `x` from distribution with dynamic batch shape
+            tf.set_random_seed(1234)
+            params_ph = {
+                k: tf.placeholder(tf.float32)
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {
+                params_ph[k]: np.tile(
+                    self.simple_params[k],
+                    [10] + [1] * len(self.simple_params[k].shape)
+                )
+                for k in six.iterkeys(self.simple_params)
+            }
+            dist = self.dist_class(**params_ph)
+            x = dist.sample()
+            prob, log_prob = dist.prob(x), dist.log_prob(x)
+            x, prob, log_prob = get_default_session_or_error().run(
+                [x, prob, log_prob], feed_dict=feed_dict
+            )
+
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [10] + list(batch_shape + value_shape))
+            self.assert_allclose(prob, self.prob(x, **params))
+            self.assert_allclose(log_prob, self.log_prob(x, **params))
+
     def test_sampling_for_static_auxiliary_sample_shape(self):
         with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
@@ -200,6 +256,23 @@ class DistributionTestMixin(object):
         with self.get_session(use_gpu=True):
             x, prob, log_prob = self.get_samples_and_prob(
                 sample_shape=tf.constant([4, 5]), **self.simple_params
+            )
+            value_shape, batch_shape = \
+                self.get_shapes_for_param(**self.simple_params)
+            np.testing.assert_equal(
+                x.shape, [4, 5] + list(batch_shape + value_shape))
+            self.assert_allclose(
+                prob, self.prob(x, **self.simple_params))
+            self.assert_allclose(
+                log_prob, self.log_prob(x, **self.simple_params))
+
+    def test_sampling_for_fully_dynamic_auxiliary_sample_shape(self):
+        with self.get_session(use_gpu=True):
+            sample_shape_ph = tf.placeholder(tf.int32)
+            x, prob, log_prob = self.get_samples_and_prob(
+                sample_shape=sample_shape_ph,
+                feed_dict={sample_shape_ph: [4, 5]},
+                **self.simple_params
             )
             value_shape, batch_shape = \
                 self.get_shapes_for_param(**self.simple_params)
@@ -384,6 +457,28 @@ class EnumerableTestMixin(object):
             }
             params_ph = {
                 k: tf.placeholder(tf.float32, shape=[None] * (len(v.shape) + 1))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            feed_dict = {
+                params_ph[k]: np.tile(
+                    self.simple_params[k],
+                    [10] + [1] * len(self.simple_params[k].shape)
+                )
+                for k in six.iterkeys(self.simple_params)
+            }
+            dist = self.dist_class(**params_ph)
+            x = dist.enum_sample().eval(feed_dict)
+            np.testing.assert_equal(
+                x,  self.get_enum_samples_for_params(params))
+
+    def test_enum_sample_for_fully_dynamic_shape(self):
+        with self.get_session(use_gpu=True):
+            params = {
+                k: np.tile(v, [10] + [1] * len(v.shape))
+                for k, v in six.iteritems(self.simple_params)
+            }
+            params_ph = {
+                k: tf.placeholder(tf.float32)
                 for k, v in six.iteritems(self.simple_params)
             }
             feed_dict = {

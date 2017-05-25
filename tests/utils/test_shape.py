@@ -6,7 +6,6 @@ import tensorflow as tf
 
 from tfsnippet.utils import (get_dimension_size,
                              is_deterministic_shape,
-                             ReshapeHelper,
                              get_dynamic_tensor_shape,
                              maybe_explicit_broadcast)
 from tests.helper import TestCase
@@ -149,6 +148,8 @@ class ShapeTestCase(TestCase):
             [tf.placeholder(tf.int32, shape=()), 1],
             tf.placeholder(tf.float32, shape=(1, None)).get_shape(),
             tf.get_variable('shape', shape=(1,), dtype=tf.int32),
+            tf.placeholder(tf.int32),
+            [tf.placeholder(tf.int32), 1, tf.placeholder(tf.int32, ())],
         ]
         for v in non_deterministic_shape:
             self.assertFalse(
@@ -169,226 +170,14 @@ class ShapeTestCase(TestCase):
             tf.placeholder(tf.int32, shape=()),
             tf.placeholder(tf.int32, shape=(1, 2)),
             [tf.placeholder(tf.int32, shape=(1,))],
-            [tf.placeholder(tf.float32, shape=())]
+            [tf.placeholder(tf.float32, shape=())],
+            tf.placeholder(tf.float32),
+            [tf.placeholder(tf.float32), 1, tf.placeholder(tf.float32, ())],
         ]
         for v in not_shape_type:
             with self.assertRaises(TypeError,
                                    msg='%r is not a shape.' % (v,)):
                 is_deterministic_shape(v)
-
-    def test_ReshapeHelper(self):
-        with self.get_session():
-            helper = ReshapeHelper()
-
-            # test an empty reshape helper
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             ())
-
-            # test add empty shapes
-            helper.add(())
-            helper.add([])
-            helper.add_template(tf.placeholder(tf.float32, shape=[1, 2]),
-                                lambda s: s[:0])
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             ())
-
-            # test add an integer as dimension
-            helper.add(1)
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             (1,))
-
-            # test add a series of integers
-            helper.add([2, 3])
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1, 2, 3])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             (1, 2, 3))
-
-            # test add a deterministic tensor shape
-            x = tf.placeholder(dtype=tf.int32, shape=[None, 4, 5, 6])
-            helper.add_template(x, lambda v: v[1: 3])
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1, 2, 3, 4, 5])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             (1, 2, 3, 4, 5))
-
-            # test add non-deterministic tensor shape, which should cause error
-            for payload in [x.get_shape(), x.get_shape()[0]]:
-                with self.assertRaises(ValueError) as cm:
-                    helper.add(payload)
-                self.assertIn('You should use `add_template`',
-                              str(cm.exception))
-
-            # test add `-1`
-            helper.add(-1)
-            self.assertTrue(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1, 2, 3, 4, 5, None])
-            self.assertEqual(helper.get_dynamic_shape(),
-                             (1, 2, 3, 4, 5, -1))
-
-            # test add `-1` for the 2nd time, which should cause error
-            with self.assertRaises(ValueError) as cm:
-                helper.add(-1)
-            self.assertIn('"-1" can only appear for at most once',
-                          str(cm.exception))
-            with self.assertRaises(ValueError) as cm:
-                helper.add([1, -1, 2])
-            self.assertIn('"-1" can only appear for at most once',
-                          str(cm.exception))
-
-            # test add tensor as dimension
-            dim_1 = tf.placeholder(dtype=tf.int32, shape=())
-            helper.add(dim_1)
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1, 2, 3, 4, 5, None, None])
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({dim_1: 6})),
-                (1, 2, 3, 4, 5, -1, 6)
-            )
-
-            # test add tensor as shape
-            shape_1 = tf.placeholder(dtype=tf.int32, shape=(2,))
-            helper.add(shape_1)
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(helper.get_static_shape().as_list(),
-                             [1, 2, 3, 4, 5, None, None, None, None])
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({
-                    dim_1: 6, shape_1: [7, 8]
-                })),
-                (1, 2, 3, 4, 5, -1, 6, 7, 8)
-            )
-
-            # test to add a tuple of dimensions
-            dim_2 = tf.placeholder(dtype=tf.int32, shape=())
-            helper.add([dim_1, dim_2, 11])
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(
-                helper.get_static_shape().as_list(),
-                [1, 2, 3, 4, 5, None, None, None, None, None, None, 11]
-            )
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({
-                    dim_1: 6,
-                    dim_2: 10,
-                    shape_1: [7, 8],
-                })),
-                (1, 2, 3, 4, 5, -1, 6, 7, 8, 6, 10, 11)
-            )
-
-            # test add partial shape of `x`
-            helper.add_template(x, lambda s: s[: 2])
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(
-                helper.get_static_shape().as_list(),
-                [1, 2, 3, 4, 5, None, None, None, None, None, None, 11,
-                 None, 4]
-            )
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({
-                    dim_1: 6,
-                    dim_2: 10,
-                    shape_1: [7, 8],
-                    x: np.arange(120 * 9).reshape([-1, 4, 5, 6])
-                })),
-                (1, 2, 3, 4, 5, -1, 6, 7, 8, 6, 10, 11, 9, 4)
-            )
-
-            # test add dimension of `x`
-            helper.add_template(x, lambda s: s[0])
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(
-                helper.get_static_shape().as_list(),
-                [1, 2, 3, 4, 5, None, None, None, None, None, None, 11,
-                 None, 4, None]
-            )
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({
-                    dim_1: 6,
-                    dim_2: 10,
-                    shape_1: [7, 8],
-                    x: np.arange(120 * 9).reshape([-1, 4, 5, 6])
-                })),
-                (1, 2, 3, 4, 5, -1, 6, 7, 8, 6, 10, 11, 9, 4, 9)
-            )
-
-            # test add deterministic dimension of `x`
-            helper.add_template(x, lambda s: s[1])
-            self.assertFalse(helper.is_deterministic)
-            self.assertEqual(
-                helper.get_static_shape().as_list(),
-                [1, 2, 3, 4, 5, None, None, None, None, None, None, 11,
-                 None, 4, None, 4]
-            )
-            self.assertIsInstance(helper.get_dynamic_shape(),
-                                  tf.Tensor)
-            self.assertEqual(
-                tuple(helper.get_dynamic_shape().eval({
-                    dim_1: 6,
-                    dim_2: 10,
-                    shape_1: [7, 8],
-                    x: np.arange(120 * 9).reshape([-1, 4, 5, 6])
-                })),
-                (1, 2, 3, 4, 5, -1, 6, 7, 8, 6, 10, 11, 9, 4, 9, 4)
-            )
-
-            # test to add a shape piece with non-deterministic shape
-            # which should cause error
-            with self.assertRaises(ValueError) as cm:
-                helper.add(tf.placeholder(dtype=tf.int32, shape=(None,)))
-            self.assertIn(
-                'not deterministic, which is not supported',
-                str(cm.exception)
-            )
-
-            # test to disable "-1"
-            with self.assertRaises(ValueError) as cm:
-                ReshapeHelper(allow_negative_one=False).add(-1)
-            self.assertIn(
-                '"-1" is not allowed',
-                str(cm.exception)
-            )
-
-            # test a realistic example to reshape tensor
-            x = tf.placeholder(tf.float32, shape=[None, None, 2])
-            group_size = tf.placeholder(tf.int32, shape=())
-            helper = ReshapeHelper()
-            helper.add(1).add([group_size, -1]).add_template(x, lambda s: s[1:])
-            x_reshaped = helper.reshape(x)
-            self.assertEqual(
-                helper.get_static_shape().as_list(),
-                [1, None, None, None, 2]
-            )
-            np.testing.assert_equal(
-                x_reshaped.eval({
-                    x: np.arange(36).reshape([6, 3, 2]),
-                    group_size: 3
-                }),
-                np.arange(36).reshape([1, 3, 2, 3, 2])
-            )
 
     def test_maybe_explicit_broadcast(self):
         with self.get_session() as session:

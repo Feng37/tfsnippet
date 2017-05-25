@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
+import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import VarScopeObject, is_integer
+from tfsnippet.utils import (VarScopeObject, is_integer, is_deterministic_shape,
+                             is_dynamic_tensor_like)
 
 __all__ = ['Distribution']
 
@@ -183,7 +185,7 @@ class Distribution(VarScopeObject):
         """
         raise NotImplementedError()
 
-    def _sample(self, sample_shape=()):
+    def _sample_n(self, n):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
 
@@ -205,10 +207,47 @@ class Distribution(VarScopeObject):
             The random samples as tensor.
         """
         with tf.name_scope(name, default_name='sample'):
-            return self._sample(sample_shape)
+            # derive the samples using ``n = prod(sample_shape)``
+            if is_deterministic_shape(sample_shape):
+                ret = self._sample_n(np.prod(sample_shape, dtype=np.int32))
+                static_sample_shape = tf.TensorShape(sample_shape)
+            else:
+                if isinstance(sample_shape, (tuple, list)):
+                    static_sample_shape = tf.TensorShape(list(filter(
+                        lambda v: None if is_dynamic_tensor_like(v) else v,
+                        sample_shape
+                    )))
+                    sample_shape = tf.stack(sample_shape, axis=0)
+                else:
+                    static_sample_shape = tf.TensorShape(None)
+                ret = self._sample_n(tf.reduce_prod(sample_shape))
+
+            # reshape the samples
+            static_batch_shape = ret.get_shape()[1:]
+            with tf.name_scope('reshape'):
+                dynamic_shape = tf.concat(
+                    [sample_shape, tf.shape(ret)[1:]], axis=0)
+                ret = tf.reshape(ret, dynamic_shape)
+
+            # special fix: when `sample_shape` is a tensor, it would cause
+            #   `static_sample_shape` to carry no information.  We thus
+            #   re-capture the sample shape by query at the reshaped samples.
+            if static_batch_shape.ndims is not None and \
+                    ret.get_shape().ndims is not None and \
+                    static_sample_shape.ndims is None:
+                tail_ndims = static_batch_shape.ndims
+                if tail_ndims == 0:
+                    static_sample_shape = ret.get_shape()
+                else:
+                    static_sample_shape = ret.get_shape()[: -tail_ndims]
+
+            # fix the static shape of samples
+            ret.set_shape(static_sample_shape.concatenate(static_batch_shape))
+            return ret
 
     def _enum_sample(self):
-        raise NotImplementedError()
+        raise RuntimeError('%s distribution is not enumerable.' %
+                           self.__class__.__name__)
 
     def enum_sample(self, name=None):
         """Get enumeration "samples" from the distribution.

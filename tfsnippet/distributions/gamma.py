@@ -121,13 +121,9 @@ class Gamma(Distribution):
         """Get the inverse scale parameter of the Gamma distribution."""
         return self._beta
 
-    def _sample(self, sample_shape=()):
+    def _sample_n(self, n):
         return tf.random_gamma(
-            tf.convert_to_tensor(sample_shape, dtype=tf.int32),
-            alpha=self.alpha, beta=self.beta, dtype=self.dtype)
-
-    def _enum_sample(self):
-        raise RuntimeError('Gamma distribution is not enumerable.')
+            tf.stack([n]), alpha=self.alpha, beta=self.beta, dtype=self.dtype)
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)

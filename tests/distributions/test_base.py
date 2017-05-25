@@ -7,7 +7,7 @@ import tensorflow as tf
 from tfsnippet.distributions import Distribution
 from tfsnippet.utils import (reopen_variable_scope,
                              get_preferred_tensor_dtype,
-                             get_dynamic_tensor_shape)
+                             get_dynamic_tensor_shape, is_deterministic_shape)
 from tests.helper import TestCase
 
 
@@ -59,6 +59,32 @@ class _MyDistribution(Distribution):
     def _log_prob(self, x):
         return tf.reduce_sum(x * self.p, axis=-1)
 
+    def _sample_n(self, n):
+        ndims = self.p.get_shape().ndims
+        if ndims is not None:
+            rep = tf.stack([n] + [1] * ndims)
+        else:
+            rep = tf.concat(
+                [
+                    [n],
+                    tf.ones(
+                        tf.stack([tf.size(tf.shape(self.p))]),
+                        dtype=tf.int32
+                    )
+                ],
+                axis=0
+            )
+        ret = tf.tile(tf.expand_dims(self.p, axis=0), rep)
+
+        if is_deterministic_shape([n]):
+            static_shape = tf.TensorShape([n])
+        else:
+            static_shape = tf.TensorShape([None])
+        ret.set_shape(
+            static_shape.concatenate(
+                self.static_batch_shape.concatenate(self.static_value_shape)))
+        return ret
+
 
 class DistributionTestCase(TestCase):
 
@@ -76,6 +102,13 @@ class DistributionTestCase(TestCase):
         self.x3 = tf.placeholder(tf.float32, (None, 2, 3, 4))
 
         self.log_prob_data = np.sum(self.x_data * self.p_data, axis=-1)
+
+    def _sample(self, sample_shape):
+        p = self.p_data
+        return np.tile(
+            p.reshape([1] * len(sample_shape) + list(p.shape)),
+            list(sample_shape) + [1] * len(p.shape)
+        )
 
     def test_group_event_ndims(self):
         with self.get_session():
@@ -209,6 +242,71 @@ class DistributionTestCase(TestCase):
                 prob.eval(),
                 np.exp(self.log_prob_data[0, ...])
             )
+
+    def test_sample_for_static_params(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            for sample_shape in [(), (1,), (10,), (4, 5)]:
+                samples = dist.sample(sample_shape)
+                self.assertEqual(
+                    samples.get_shape().as_list(),
+                    list(sample_shape) + list(self.p_data.shape),
+                    msg='Shape for sample_shape %r is not correct.' %
+                        (sample_shape,)
+                )
+                np.testing.assert_almost_equal(
+                    samples.eval(), self._sample(sample_shape),
+                    err_msg='Samples for sample_shape %r is not correct.' %
+                            (sample_shape,)
+                )
+
+    def test_sample_for_dynamic_params(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p1)
+            for sample_shape in [(), (1,), (10,), (4, 5)]:
+                samples = dist.sample(tf.constant(sample_shape, dtype=tf.int32))
+                self.assertEqual(
+                    samples.get_shape().as_list(),
+                    list(sample_shape) + self.p1.get_shape().as_list(),
+                    msg='Shape for sample_shape %r is not correct.' %
+                        (sample_shape,)
+                )
+                np.testing.assert_almost_equal(
+                    samples.eval({self.p1: self.p_data}),
+                    self._sample(sample_shape),
+                    err_msg='Samples for sample_shape %r is not correct.' %
+                            (sample_shape,)
+                )
+
+    def test_sample_for_fully_dynamic_params(self):
+        with self.get_session():
+            p = tf.placeholder(tf.float32)
+            dist = _MyDistribution(p)
+            for sample_shape in [(), (1,), (10,), (4, 5)]:
+                sample_shape_ph = tf.placeholder(tf.int32)
+                samples = dist.sample(sample_shape_ph)
+                self.assertIsNone(
+                    samples.get_shape().ndims,
+                    msg='Shape for sample_shape %r is not correct.' %
+                        (sample_shape,)
+                )
+                np.testing.assert_almost_equal(
+                    samples.eval({p: self.p_data,
+                                  sample_shape_ph: sample_shape}),
+                    self._sample(sample_shape),
+                    err_msg='Samples for sample_shape %r is not correct.' %
+                            (sample_shape,)
+                )
+
+    def test_sample_error(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            with self.assertRaisesRegex(
+                    TypeError, '.* is not a shape object.'):
+                dist.sample(tf.constant(1))
+            with self.assertRaisesRegex(
+                    TypeError, '.* is not a shape object.'):
+                dist.sample('')
 
 
 if __name__ == '__main__':

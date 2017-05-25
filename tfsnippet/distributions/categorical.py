@@ -5,7 +5,7 @@ import tensorflow as tf
 from tfsnippet.utils import (get_preferred_tensor_dtype,
                              reopen_variable_scope,
                              is_deterministic_shape,
-                             ReshapeHelper, maybe_explicit_broadcast)
+                             maybe_explicit_broadcast)
 from .base import Distribution
 
 __all__ = [
@@ -152,57 +152,58 @@ class _BaseCategorical(Distribution):
         """Get the probabilities of Categorical distribution."""
         return self._probs
 
-    def _sample_sparse(self, sample_shape=(), dtype=None):
-        # check the arguments of `sample_shape`
-        helper = ReshapeHelper(allow_negative_one=False).add(sample_shape)
-        static_sample_shape = helper.get_static_shape()
-        dynamic_sample_shape = helper.get_dynamic_shape()
-        n_samples = (
-            np.prod(static_sample_shape.as_list())
-            if static_sample_shape.is_fully_defined()
-            else tf.reduce_prod(dynamic_sample_shape)
-        )
-
-        # derive the samples
+    def _sample_n_sparse(self, n, dtype=None):
+        # flatten the logits for feeding into `tf.multinomial`.
         if self.logits.get_shape().ndims == 2:
             logits_2d = self.logits
         else:
-            logits_2d = (
-                ReshapeHelper().
-                    add(-1).
-                    add_template(self.logits, lambda s: s[-1]).
-                    reshape(self.logits)
+            logits_2d = tf.reshape(
+                self.logits,
+                tf.stack([-1, tf.shape(self.logits)[-1]])
             )
-        samples = tf.multinomial(logits_2d, n_samples)
+            logits_2d.set_shape(
+                tf.TensorShape([None]).concatenate(
+                    self.logits.get_shape()[-1:]))
+
+        # derive the samples
+        samples = tf.multinomial(logits_2d, n)
         if dtype is not None:
             samples = tf.cast(samples, dtype=dtype)
-        samples = (
-            ReshapeHelper().
-                add(sample_shape).
-                add_template(self.logits, lambda s: s[:-1]).
-                reshape(tf.transpose(samples))
-        )
 
+        # reshape back into the requested shape
+        samples = tf.transpose(samples)
+        if is_deterministic_shape([n]):
+            static_shape = tf.TensorShape([n])
+        else:
+            static_shape = tf.TensorShape([None])
+        static_shape = static_shape.concatenate(self.logits.get_shape()[:-1])
+        dynamic_shape = tf.concat([[n], tf.shape(self.logits)[:-1]], axis=0)
+        samples = tf.reshape(samples, dynamic_shape)
+        samples.set_shape(static_shape)
         return samples
 
     def _enum_sample_sparse(self, dtype=None):
-        batch_ndims = self.static_batch_shape.ndims
-        assert(batch_ndims is not None)
-        samples = tf.reshape(
-            tf.range(0, self.n_categories, dtype=dtype),
-            tf.stack([self.n_categories] + [1] * batch_ndims)
+        # reshape the enumerated values to match the batch shape.
+        reshape_shape = tf.concat(
+            [[self.n_categories],
+             tf.ones(tf.stack([tf.size(self.dynamic_batch_shape)]),
+                     dtype=tf.int32)],
+            axis=0
         )
-        samples = tf.tile(
-            samples,
-            tf.concat([[1], self.dynamic_batch_shape], axis=0)
-        )
-        static_shape = (
-            tf.TensorShape([self.n_categories])
-            if is_deterministic_shape([self.n_categories])
-            else tf.TensorShape([None])
-        )
-        static_shape = static_shape.concatenate(self.static_batch_shape)
-        samples.set_shape(static_shape)
+        samples = tf.reshape(tf.range(0, self.n_categories, dtype=dtype),
+                             reshape_shape)
+
+        # tile the enumerated values along batch shape
+        tile_shape = tf.concat(
+            [[1], self.dynamic_batch_shape], axis=0)
+        samples = tf.tile(samples, tile_shape)
+
+        # fix the static shape of the samples
+        if is_deterministic_shape([self.n_categories]):
+            static_shape = tf.TensorShape([self.n_categories])
+        else:
+            static_shape = tf.TensorShape([None])
+        samples.set_shape(static_shape.concatenate(self.static_batch_shape))
         return samples
 
     def _analytic_kld(self, other):
@@ -289,8 +290,8 @@ class Categorical(_BaseCategorical):
     def static_value_shape(self):
         return tf.TensorShape([])
 
-    def _sample(self, sample_shape=()):
-        return self._sample_sparse(sample_shape, self.dtype)
+    def _sample_n(self, n):
+        return self._sample_n_sparse(n, self.dtype)
 
     def _enum_sample(self):
         return self._enum_sample_sparse(self.dtype)
@@ -410,8 +411,8 @@ class OneHotCategorical(_BaseCategorical):
     def static_value_shape(self):
         return self._static_value_shape
 
-    def _sample(self, sample_shape=()):
-        samples = self._sample_sparse(sample_shape, self.dtype)
+    def _sample_n(self, n):
+        samples = self._sample_n_sparse(n, self.dtype)
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 
@@ -421,32 +422,36 @@ class OneHotCategorical(_BaseCategorical):
         return samples
 
     def _log_prob_with_logits(self, x):
+        # flatten `x` and `logits` as requirement of
+        # `tf.nn.softmax_cross_entropy_with_logits`
         x = tf.cast(x, dtype=self.param_dtype)
-
         x, logits = maybe_explicit_broadcast(x, self.logits)
 
         if x.get_shape().ndims == 2:
             x_2d, logits_2d = x, logits
         else:
-            helper = (
-                ReshapeHelper().
-                    add(-1).
-                    add_template(x, lambda s: s[-1])
-            )
-            x_2d = helper.reshape(x)
-            logits_2d = helper.reshape(logits)
+            dynamic_shape = tf.stack([-1, tf.shape(x)[-1]], axis=0)
+            x_2d = tf.reshape(x, dynamic_shape)
+            logits_2d = tf.reshape(logits, dynamic_shape)
+
+            static_shape = (
+                tf.TensorShape([None]).concatenate(x.get_shape()[-1:]))
+            x_2d.set_shape(static_shape)
+            logits_2d.set_shape(static_shape)
+
+        # derive the flatten log p(x)
         log_p_2d = -tf.nn.softmax_cross_entropy_with_logits(
             labels=x_2d, logits=logits_2d,
         )
 
+        # reshape log p(x) back into desired shape
         if x.get_shape().ndims == 2:
             log_p = log_p_2d
         else:
-            log_p = (
-                ReshapeHelper().
-                    add_template(x, lambda s: s[: -1]).
-                    reshape(log_p_2d)
-            )
+            static_shape = x.get_shape()[: -1]
+            log_p = tf.reshape(log_p_2d, tf.shape(x)[: -1])
+            log_p.set_shape(static_shape)
+
         return log_p
 
     def _log_prob_with_probs(self, x):
