@@ -177,8 +177,10 @@ def explicit_broadcast(x, y, tail_no_broadcast_ndims=None, name=None):
                 return a * ones
 
             def with_tail_no_broadcast_ndims():
-                a = lift_shape_for_tail_no_broadcast_ndims(x, y)
-                b = lift_shape_for_tail_no_broadcast_ndims(y, a)
+                a = tf.convert_to_tensor(x)
+                b = tf.convert_to_tensor(y)
+                a = lift_shape_for_tail_no_broadcast_ndims(a, b)
+                b = lift_shape_for_tail_no_broadcast_ndims(b, a)
                 return a, b
 
             def without_tail_no_broadcast_ndims():
