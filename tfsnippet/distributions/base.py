@@ -52,23 +52,59 @@ class Distribution(VarScopeObject):
         self._group_event_ndims = group_event_ndims
 
     @property
+    def group_event_ndims(self):
+        """Get the number of dimensions to be considered as events group.
+
+        Returns
+        -------
+        int | None
+            The number of dimensions.  If `group_event_ndims` is not
+            specified in the constructor, will return None.
+        """
+        return self._group_event_ndims
+
+    @property
     def dtype(self):
-        """Get the data type of samples."""
+        """Get the data type of samples.
+
+        Returns
+        -------
+        tf.DType
+            Data type of the samples.
+        """
         raise NotImplementedError()
 
     @property
     def param_dtype(self):
-        """Get the data type of parameter(s)."""
+        """Get the data type of parameter(s).
+
+        Returns
+        -------
+        tf.DType
+            Data type of the parameter(s).
+        """
         raise NotImplementedError()
 
     @property
     def is_continuous(self):
-        """Whether or not the distribution is continuous?"""
+        """Whether or not the distribution is continuous?
+
+        Returns
+        -------
+        bool
+            A boolean indicating whether the distribution is continuous.
+        """
         raise NotImplementedError()
 
     @property
     def is_reparameterized(self):
-        """Whether or not the distribution is re-parameterized?"""
+        """Whether or not the distribution is re-parameterized?
+
+        Returns
+        -------
+        bool
+            A boolean indicating whether the distribution is re-parameterized.
+        """
         raise NotImplementedError()
 
     @property
@@ -79,6 +115,11 @@ class Distribution(VarScopeObject):
         Enumerable distributions could derive a special set of "samples",
         such that the probability of every possible value against each
         individual set of parameters could be computed.
+
+        Returns
+        -------
+        bool
+            A boolean indicating whether the distribution is enumerable.
 
         See Also
         --------
@@ -97,18 +138,6 @@ class Distribution(VarScopeObject):
             If the distribution is not enumerable, it should return None.
         """
         raise NotImplementedError()
-
-    @property
-    def group_event_ndims(self):
-        """Get the number of dimensions to be considered as events group.
-
-        Returns
-        -------
-        int | None
-            The number of dimensions.  If `group_event_ndims` is not
-            specified in the constructor, will return None.
-        """
-        return self._group_event_ndims
 
     @property
     def dynamic_batch_shape(self):

@@ -15,11 +15,6 @@ class StochasticObject(object):
     which has a log-probability lower-bound.
     """
 
-    @property
-    def is_tight_log_lower_bound(self):
-        """Whether or not the log-probability lower-bound is tight?"""
-        raise NotImplementedError()
-
     def log_lower_bound(self, group_event_ndims=None, name=None):
         """Compute the log-probability lower-bound.
 

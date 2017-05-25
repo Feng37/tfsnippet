@@ -203,6 +203,11 @@ class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
         return self._distrib
 
     @property
+    def dtype(self):
+        """Get the data type of this stochastic tensor."""
+        return self._distrib.dtype
+
+    @property
     def param_dtype(self):
         """Get the data type of parameter(s)."""
         return self._distrib.param_dtype
@@ -243,11 +248,6 @@ class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
             If the stochastic tensor is not enumerable, it should return None.
         """
         return self._distrib.enum_value_count
-
-    @property
-    def dtype(self):
-        """Get the data type of this stochastic tensor."""
-        return self._distrib.dtype
 
     @property
     def sample_num(self):
@@ -291,10 +291,6 @@ class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):
             else:
                 self._computed_tensor = self._sample_tensor()
         return self._computed_tensor
-
-    @property
-    def is_tight_log_lower_bound(self):
-        return True
 
     def log_lower_bound(self, group_event_ndims=None, name=None):
         return self.log_prob(
