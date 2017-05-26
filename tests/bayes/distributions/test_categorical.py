@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import six
 import numpy as np
+import six
 import tensorflow as tf
 
-from tfsnippet.distributions import Categorical, OneHotCategorical
-from tests.distributions._helper import (DistributionTestMixin,
-                                         AnalyticKldTestMixin,
-                                         EnumerableTestMixin,
-                                         big_number_verify)
+from tfsnippet.bayes import Categorical, OneHotCategorical
 from tests.helper import TestCase
+from ._helper import (DistributionTestMixin,
+                      AnalyticKldTestMixin,
+                      EnumerableTestMixin,
+                      big_number_verify)
 
 
 def _softmax(x):

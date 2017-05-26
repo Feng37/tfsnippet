@@ -3,7 +3,87 @@ import six
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.utils import get_default_session_or_error
+from tfsnippet.utils import (get_default_session_or_error,
+                             reopen_variable_scope,
+                             get_preferred_tensor_dtype,
+                             get_dynamic_tensor_shape,
+                             is_deterministic_shape)
+from tfsnippet.bayes import Distribution
+
+
+class _MyDistribution(Distribution):
+
+    def __init__(self, p, group_event_ndims=None):
+        super(_MyDistribution, self).__init__(
+            group_event_ndims=group_event_ndims)
+
+        with reopen_variable_scope(self.variable_scope):
+            self.p = p = tf.convert_to_tensor(
+                p, dtype=get_preferred_tensor_dtype(p))
+
+            # get the shapes of parameter
+            self._static_value_shape = p.get_shape()[-1:]
+            self._dynamic_value_shape = tf.convert_to_tensor(
+                get_dynamic_tensor_shape(p, lambda s: s[-1:])
+            )
+
+            self._static_batch_shape = p.get_shape()[: -1]
+            self._dynamic_batch_shape = tf.convert_to_tensor(
+                get_dynamic_tensor_shape(p, lambda s: s[: -1])
+            )
+
+    @property
+    def dtype(self):
+        return self.p.dtype.base_dtype
+
+    @property
+    def dynamic_value_shape(self):
+        return self._dynamic_value_shape
+
+    @property
+    def static_value_shape(self):
+        return self._static_value_shape
+
+    @property
+    def dynamic_batch_shape(self):
+        return self._dynamic_batch_shape
+
+    @property
+    def static_batch_shape(self):
+        return self._static_batch_shape
+
+    @property
+    def is_enumerable(self):
+        return False
+
+    def _log_prob(self, x):
+        return tf.reduce_sum(x * self.p, axis=-1)
+
+    def _sample_n(self, n):
+        ndims = self.p.get_shape().ndims
+        if ndims is not None:
+            rep = tf.stack([n] + [1] * ndims)
+        else:
+            rep = tf.concat(
+                [
+                    [n],
+                    tf.ones(
+                        tf.stack([tf.size(tf.shape(self.p))]),
+                        dtype=tf.int32
+                    )
+                ],
+                axis=0
+            )
+        ret = tf.tile(tf.expand_dims(self.p, axis=0), rep)
+
+        if is_deterministic_shape([n]):
+            static_shape = tf.TensorShape([n])
+        else:
+            static_shape = tf.TensorShape([None])
+        ret.set_shape(
+            static_shape.concatenate(
+                self.static_batch_shape.concatenate(self.static_value_shape)))
+        return ret
 
 
 def big_number_verify(x, mean, stddev, scale, n_samples):

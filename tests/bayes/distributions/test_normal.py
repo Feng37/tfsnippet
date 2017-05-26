@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
+import copy
 import unittest
 
-import copy
-import six
 import numpy as np
+import six
 
-from tfsnippet.distributions import Normal
-from tests.distributions._helper import (DistributionTestMixin,
-                                         BigNumberVerifyTestMixin,
-                                         AnalyticKldTestMixin)
+from tfsnippet.bayes import Normal
 from tests.helper import TestCase
+from ._helper import (DistributionTestMixin,
+                      BigNumberVerifyTestMixin,
+                      AnalyticKldTestMixin)
 
 
 class NormalTestCase(TestCase,

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from .tensors import *
-from .utils import *
+from .distributions import *
 from .variational import *
+from .stochastic import *
+from .utils import *

@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-import six
 import unittest
+
 import numpy as np
+import six
 import tensorflow as tf
 
-from tfsnippet.distributions import Bernoulli
-from tests.distributions._helper import (DistributionTestMixin,
-                                         BigNumberVerifyTestMixin,
-                                         AnalyticKldTestMixin,
-                                         EnumerableTestMixin)
+from tfsnippet.bayes import Bernoulli
 from tests.helper import TestCase
+from ._helper import (DistributionTestMixin,
+                      BigNumberVerifyTestMixin,
+                      AnalyticKldTestMixin,
+                      EnumerableTestMixin)
 
 
 class BernoulliTestCase(TestCase,

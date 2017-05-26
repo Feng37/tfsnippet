@@ -4,9 +4,8 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.bayes import StochasticTensor
-from tfsnippet.distributions import Normal, Bernoulli
-from tests.distributions.test_base import _MyDistribution
+from tfsnippet.bayes import StochasticTensor, Normal, Bernoulli
+from tests.bayes.distributions._helper import _MyDistribution
 from tests.helper import TestCase
 
 

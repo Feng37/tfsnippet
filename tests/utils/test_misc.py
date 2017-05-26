@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import six
 import numpy as np
+import six
 import tensorflow as tf
 
+from tests.helper import TestCase
 from tfsnippet.bayes import StochasticTensor
-from tfsnippet.distributions import Normal
+from tfsnippet.bayes import Normal
 from tfsnippet.utils import (is_integer, get_preferred_tensor_dtype, is_float,
                              is_dynamic_tensor_like,
                              convert_to_tensor_if_dynamic, MetricAccumulator,
                              humanize_duration)
-from tests.helper import TestCase
 
 
 class MiscTestCase(TestCase):

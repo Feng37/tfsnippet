@@ -1,14 +1,44 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.distributions import Distribution
+from tfsnippet.bayes import Distribution
 from tfsnippet.utils import (VarScopeObject,
                              is_integer,
                              reopen_variable_scope,
                              TensorArithmeticMixin)
-from ..utils import StochasticObject
 
-__all__ = ['StochasticTensor']
+__all__ = [
+    'StochasticObject',
+    'StochasticTensor',
+]
+
+
+class StochasticObject(object):
+    """Base interface for stochastic objects.
+
+    A stochastic object should be any object in a TensorFlow model,
+    which has a log-probability lower-bound.
+    """
+
+    def log_lower_bound(self, group_event_ndims=None, name=None):
+        """Compute the log-probability lower-bound.
+
+        Parameters
+        ----------
+        group_event_ndims : int
+            If specify, this number of dimensions at the end of `batch_shape`
+            would be considered as a group of events, whose log-probability
+            lower-bounds are summed together. (default None)
+
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tf.Tensor
+            The log-probability lower-bound.
+        """
+        raise NotImplementedError()
 
 
 class StochasticTensor(VarScopeObject, StochasticObject, TensorArithmeticMixin):

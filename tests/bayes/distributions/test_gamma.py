@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import six
 import numpy as np
+import six
 from scipy.special import gammaln, digamma
 
-from tfsnippet.distributions import Gamma
-from tests.distributions._helper import (DistributionTestMixin,
-                                         BigNumberVerifyTestMixin,
-                                         AnalyticKldTestMixin)
+from tfsnippet.bayes import Gamma
 from tests.helper import TestCase
+from ._helper import (DistributionTestMixin,
+                      BigNumberVerifyTestMixin,
+                      AnalyticKldTestMixin)
 
 
 class GammaTestCase(TestCase,

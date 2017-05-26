@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from tfsnippet.bayes import Normal, sgvb
+from tfsnippet.bayes import Normal, StochasticTensor, sgvb
 from tests.helper import TestCase
 
 
@@ -11,9 +11,12 @@ class SgvbTestCase(TestCase):
 
     def test_sgvb(self):
         with self.get_session():
-            a = Normal(0., 1., observed=np.asarray([[0., 1., 2.]]))
-            b = Normal(1., 2., observed=np.asarray([[1., 2., 3.]]))
-            c = Normal(2., 3., observed=np.asarray([[2., 3., 4.]]))
+            a = StochasticTensor(
+                Normal(0., 1.), observed=np.asarray([[0., 1., 2.]]))
+            b = StochasticTensor(
+                Normal(1., 2.), observed=np.asarray([[1., 2., 3.]]))
+            c = StochasticTensor(
+                Normal(2., 3.), observed=np.asarray([[2., 3., 4.]]))
 
             lower_bound = sgvb([a, b], [c])
             self.assertEqual(lower_bound.get_shape().as_list(), [1, 3])

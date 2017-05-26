@@ -1,39 +1,12 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
+from .stochastic import StochasticObject
+
 __all__ = [
-    'StochasticObject',
     'gather_log_lower_bound',
     'reduce_log_lower_bound',
 ]
-
-
-class StochasticObject(object):
-    """Base interface for stochastic objects.
-
-    A stochastic object should be any object in a TensorFlow model,
-    which has a log-probability lower-bound.
-    """
-
-    def log_lower_bound(self, group_event_ndims=None, name=None):
-        """Compute the log-probability lower-bound.
-
-        Parameters
-        ----------
-        group_event_ndims : int
-            If specify, this number of dimensions at the end of `batch_shape`
-            would be considered as a group of events, whose log-probability
-            lower-bounds are summed together. (default None)
-
-        name : str
-            Optional name of this operation.
-
-        Returns
-        -------
-        tf.Tensor
-            The log-probability lower-bound.
-        """
-        raise NotImplementedError()
 
 
 def gather_log_lower_bound(tensors, name=None):
