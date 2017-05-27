@@ -32,7 +32,7 @@ class Distribution(VarScopeObject):
 
     Parameters
     ----------
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
@@ -42,15 +42,7 @@ class Distribution(VarScopeObject):
     """
 
     def __init__(self, group_event_ndims=None, name=None, default_name=None):
-        if group_event_ndims is not None:
-            if not is_integer(group_event_ndims) or group_event_ndims < 0:
-                raise TypeError(
-                    '`group_event_ndims` must be a non-negative integer '
-                    'constant.'
-                )
-
         super(Distribution, self).__init__(name=name, default_name=default_name)
-        # TODO: support dynamic `group_event_ndims` if necessary
         self._group_event_ndims = group_event_ndims
 
     def __call__(self, n_samples=None, observed=None, group_event_ndims=None,
@@ -66,7 +58,7 @@ class Distribution(VarScopeObject):
         observed : tf.Tensor | np.ndarray | float | int
             The observations.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
         name : str
@@ -226,7 +218,7 @@ class Distribution(VarScopeObject):
             The shape of the samples, as a tuple of integers / 0-d tensors,
             or a 1-d tensor.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
         name : str
@@ -302,7 +294,7 @@ class Distribution(VarScopeObject):
             specified number of samples will be taken, while the shape
             will equal to ``(n_samples,) + batch_shape + value_shape``.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
             
         name : str
@@ -336,7 +328,7 @@ class Distribution(VarScopeObject):
         observed : tf.Tensor | np.ndarray | float | int
             The observations.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
         
         Returns
@@ -366,7 +358,7 @@ class Distribution(VarScopeObject):
         observed : tf.Tensor | np.ndarray | float | int
             The observations.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
             
         name : str
@@ -398,7 +390,7 @@ class Distribution(VarScopeObject):
 
         Parameters
         ----------
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
     
         name : str
@@ -439,7 +431,7 @@ class Distribution(VarScopeObject):
         x : tf.Tensor
             The samples to be tested.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
 
@@ -470,11 +462,22 @@ class Distribution(VarScopeObject):
                     (log_prob_shape, self.static_batch_shape)
                 )
 
-            if group_event_ndims:
-                log_prob = tf.reduce_sum(
-                    log_prob,
-                    axis=tf.range(-group_event_ndims, 0)
-                )
+            # reduce the dimensions of group event
+            def f(ndims):
+                return tf.reduce_sum(log_prob, axis=tf.range(-ndims, 0))
+
+            if group_event_ndims is not None:
+                if is_integer(group_event_ndims):
+                    if group_event_ndims > 0:
+                        log_prob = f(group_event_ndims)
+                else:
+                    group_event_ndims = tf.convert_to_tensor(group_event_ndims,
+                                                             dtype=tf.int32)
+                    return tf.cond(
+                        group_event_ndims > 0,
+                        lambda: f(group_event_ndims),
+                        lambda: log_prob
+                    )
             return log_prob
 
     def prob(self, x, group_event_ndims=None, name=None):
@@ -492,7 +495,7 @@ class Distribution(VarScopeObject):
         x : tf.Tensor
             The samples to be tested.
 
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specified, will override the attribute `group_event_ndims`
             of this distribution object.
 

@@ -33,17 +33,11 @@ class DistributionTestCase(TestCase):
             list(sample_shape) + [1] * len(p.shape)
         )
 
-    def test_group_event_ndims(self):
+    def test_group_event_ndims_attributes(self):
         with self.get_session():
             p_data = np.arange(1, 25, dtype=np.float32).reshape([2, 3, 4])
-
-            # test the group_event_ndims attribute
             self.assertIsNone(_MyDistribution(p_data).group_event_ndims)
             self.assertEqual(_MyDistribution(p_data, 2).group_event_ndims, 2)
-            with self.assertRaises(TypeError):
-                _MyDistribution(p_data, -1)
-            with self.assertRaises(TypeError):
-                _MyDistribution(p_data, tf.placeholder(tf.int32, ()))
 
     def test_log_prob_with_static_data(self):
         with self.get_session():

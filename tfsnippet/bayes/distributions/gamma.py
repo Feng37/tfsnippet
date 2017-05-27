@@ -25,7 +25,7 @@ class Gamma(Distribution):
 
         Note that the range of `beta` is :math:`(0, \\infty)`.
 
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)

@@ -23,7 +23,7 @@ class StochasticObject(object):
 
         Parameters
         ----------
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specify, this number of dimensions at the end of `batch_shape`
             would be considered as a group of events, whose log-probability
             lower-bounds are summed together. (default None)
@@ -61,7 +61,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         The observation of this stochastic tensor.
         One and only one of `samples`, `observed` should be specified.
 
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, override the default `group_event_ndims` of `distribution`.
         This argument can further be overrided by `group_event_ndims` argument
         of `prob` and `log_prob` method.
@@ -175,7 +175,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
         Parameters
         ----------
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specified, will override the `group_event_ndims` configured
             in both this stochastic tensor and the distribution.
 
@@ -199,7 +199,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
         Parameters
         ----------
-        group_event_ndims : int
+        group_event_ndims : int | tf.Tensor
             If specified, will override the `group_event_ndims` configured
             in both this stochastic tensor and the distribution.
 

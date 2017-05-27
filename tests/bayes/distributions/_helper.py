@@ -410,6 +410,30 @@ class DistributionTestMixin(object):
             self.assert_allclose(log_prob, self.log_prob(
                 x, group_event_ndims=1, **self.extended_dimensional_params))
 
+    def test_prob_with_group_event_ndims_dynamic_0(self):
+        with self.get_session(use_gpu=True):
+            ndims = tf.placeholder(tf.int32)
+            x, prob, log_prob = self.get_samples_and_prob(
+                group_event_ndims=ndims, feed_dict={ndims: 0},
+                **self.extended_dimensional_params
+            )
+            self.assert_allclose(prob, self.prob(
+                x, group_event_ndims=0, **self.extended_dimensional_params))
+            self.assert_allclose(log_prob, self.log_prob(
+                x, group_event_ndims=0, **self.extended_dimensional_params))
+
+    def test_prob_with_group_event_ndims_dynamic_1(self):
+        with self.get_session(use_gpu=True):
+            ndims = tf.placeholder(tf.int32)
+            x, prob, log_prob = self.get_samples_and_prob(
+                group_event_ndims=ndims, feed_dict={ndims: 1},
+                **self.extended_dimensional_params
+            )
+            self.assert_allclose(prob, self.prob(
+                x, group_event_ndims=1, **self.extended_dimensional_params))
+            self.assert_allclose(log_prob, self.log_prob(
+                x, group_event_ndims=1, **self.extended_dimensional_params))
+
     def test_prob_with_higher_dimensional_params(self):
         with self.get_session(use_gpu=True):
             x, _, _ = self.get_samples_and_prob(

@@ -39,7 +39,7 @@ class _BaseCategorical(Distribution):
                      \\text{probs} &= \\text{softmax} (\\text{logits})
                 \\end{aligned}
 
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
@@ -250,7 +250,7 @@ class Categorical(_BaseCategorical):
     dtype : tf.DType | np.dtype | str
         The data type of samples from the distribution. (default is `tf.int32`)
 
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
@@ -358,7 +358,7 @@ class OneHotCategorical(_BaseCategorical):
     dtype : tf.DType | np.dtype | str
         The data type of samples from the distribution. (default is `tf.int32`)
 
-    group_event_ndims : int
+    group_event_ndims : int | tf.Tensor
         If specify, this number of dimensions at the end of `batch_shape`
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
