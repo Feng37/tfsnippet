@@ -7,10 +7,10 @@ import tensorflow as tf
 
 from tfsnippet.bayes import Bernoulli
 from tests.helper import TestCase
-from ._helper import (DistributionTestMixin,
-                      BigNumberVerifyTestMixin,
-                      AnalyticKldTestMixin,
-                      EnumerableTestMixin)
+from tests.bayes.distributions._helper import (DistributionTestMixin,
+                                               BigNumberVerifyTestMixin,
+                                               AnalyticKldTestMixin,
+                                               EnumerableTestMixin)
 
 
 class BernoulliTestCase(TestCase,
@@ -66,7 +66,7 @@ class BernoulliTestCase(TestCase,
     def get_enum_value_count_for_params(self, params):
         return 2
 
-    def get_enum_samples_for_params(self, params):
+    def get_enum_observe_for_params(self, params):
         x = np.asarray([0, 1], dtype=np.int32)
         x = x.reshape([2] + [1] * len(params['logits'].shape))
         x = np.tile(x, (1,) + params['logits'].shape)

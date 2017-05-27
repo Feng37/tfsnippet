@@ -106,35 +106,6 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         # Necessary to support Python's collection membership operators
         return id(self) == id(other)
 
-    def __getattr__(self, name):
-        return getattr(self.__wrapped__, name)
-
-    def __setattr__(self, name, value):
-        if name.startswith('_self_') or name == '__wrapped__':
-            object.__setattr__(self, name, value)
-        elif hasattr(type(self), name):
-            object.__setattr__(self, name, value)
-        else:
-            setattr(self.__wrapped__, name, value)
-
-    def __delattr__(self, name):
-        if name.startswith('_self_'):
-            object.__delattr__(self, name)
-        elif name == '__wrapped__':
-            raise TypeError('__wrapped__ must be an object')
-        elif hasattr(type(self), name):
-            object.__delattr__(self, name)
-        else:
-            delattr(self.__wrapped__, name)
-
-    def _as_graph_element(self, allow_tensor=True, allow_operation=True):
-        # this method brings support to ``session.run(...)`` and other
-        # related methods which expects a graph element.
-        if not allow_tensor:
-            raise RuntimeError('`allow_tensor` is False but `StochasticTensor` '
-                               'can only be casted to a `tf.Tensor`.')
-        return self.__wrapped__
-
     @property
     def is_observed(self):
         """Whether or not this stochastic tensor is observed?"""
@@ -178,7 +149,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
         See Also
         --------
-        Distribution.enum_sample
+        Distribution.enum_observe
         """
         return self.distribution.is_enumerable
 
@@ -247,6 +218,58 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
             self.__wrapped__, group_event_ndims=group_event_ndims,
             name=name
         )
+
+    # mimic `tf.Tensor` interface
+    def __dir__(self):
+        ret = list(set(dir(self.__wrapped__) + object.__dir__(self)))
+        return ret
+
+    def __getattr__(self, name):
+        return getattr(self.__wrapped__, name)
+
+    def __setattr__(self, name, value):
+        if name.startswith('_self_') or name == '__wrapped__':
+            object.__setattr__(self, name, value)
+        elif hasattr(type(self), name):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self.__wrapped__, name, value)
+
+    def __delattr__(self, name):
+        if name.startswith('_self_'):
+            object.__delattr__(self, name)
+        elif hasattr(type(self), name):
+            object.__delattr__(self, name)
+        else:
+            delattr(self.__wrapped__, name)
+
+    def __iter__(self):
+        raise TypeError('`StochasticTensor` object is not iterable.')
+
+    def __bool__(self):
+        raise TypeError(
+            'Using a `StochasticTensor` as a Python `bool` is not allowed. '
+            'Use `if t is not None:` instead of `if t:` to test if a '
+            'tensor is defined, and use TensorFlow ops such as '
+            'tf.cond to execute subgraphs conditioned on the value of '
+            'a tensor.'
+        )
+
+    def __nonzero__(self):
+        raise TypeError(
+            'Using a `StochasticTensor` as a Python `bool` is not allowed. '
+            'Use `if t is not None:` instead of `if t:` to test if a '
+            'tensor is defined, and use TensorFlow ops such as '
+            'tf.cond to execute subgraphs conditioned on the value of '
+            'a tensor.'
+        )
+
+    def _as_graph_element(self, allow_tensor=True, allow_operation=True):
+        # this method brings support to ``session.run(...)`` and other
+        # related methods which expects a graph element.
+        if not allow_tensor:
+            raise RuntimeError('Can not convert a Tensor into a Operation.')
+        return self.__wrapped__
 
 
 def _to_tensor(value, dtype=None, name=None, as_ref=False):

@@ -4,8 +4,9 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
+from tfsnippet.bayes import StochasticTensor
 from tests.helper import TestCase
-from ._helper import _MyDistribution
+from tests.bayes.distributions._helper import _MyDistribution
 
 
 class DistributionTestCase(TestCase):
@@ -165,11 +166,24 @@ class DistributionTestCase(TestCase):
                 np.exp(self.log_prob_data[0, ...])
             )
 
-    def test_sample_for_static_params(self):
+    def test_sample_for_hybird_shape(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            n = tf.placeholder(tf.int32)
+            samples = dist.sample([4, n])
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [4, None] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval({n: 5}), self._sample([4, 5]))
+
+    def test_sample_for_static_shape(self):
         with self.get_session():
             dist = _MyDistribution(self.p_data)
             for sample_shape in [(), (1,), (10,), (4, 5)]:
                 samples = dist.sample(sample_shape)
+                self.assertIsInstance(samples, StochasticTensor)
                 self.assertEqual(
                     samples.get_shape().as_list(),
                     list(sample_shape) + list(self.p_data.shape),
@@ -182,7 +196,7 @@ class DistributionTestCase(TestCase):
                             (sample_shape,)
                 )
 
-    def test_sample_for_dynamic_params(self):
+    def test_sample_for_dynamic_shape(self):
         with self.get_session():
             dist = _MyDistribution(self.p1)
             for sample_shape in [(), (1,), (10,), (4, 5)]:
@@ -200,7 +214,7 @@ class DistributionTestCase(TestCase):
                             (sample_shape,)
                 )
 
-    def test_sample_for_fully_dynamic_params(self):
+    def test_sample_for_fully_dynamic_shape(self):
         with self.get_session():
             p = tf.placeholder(tf.float32)
             dist = _MyDistribution(p)
@@ -230,7 +244,101 @@ class DistributionTestCase(TestCase):
                     TypeError, '.* is not a shape object.'):
                 dist.sample('')
 
+    def test_sample_n_None(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            samples = dist.sample_n()
+            self.assertIsInstance(samples, StochasticTensor)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval(), self._sample(()))
+
+    def test_sample_n_1(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            samples = dist.sample_n(1)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [1] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval(), self._sample([1]))
+
+    def test_sample_n_10(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            samples = dist.sample_n(10)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [10] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval(), self._sample([10]))
+
+    def test_sample_n_dynamic(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            n = tf.placeholder(tf.int32, shape=())
+            samples = dist.sample_n(n)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [None] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval({n: 10}), self._sample([10]))
+
+    def test_sample_n_fully_dynamic(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            n = tf.placeholder(tf.int32)
+            samples = dist.sample_n(n)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [None] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval({n: 10}), self._sample([10]))
+
+    def test_sample_n_0(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            samples = dist.sample_n(0)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [0] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval(), self._sample([0]))
+
+    def test_sample_n_dynamic_0(self):
+        with self.get_session():
+            dist = _MyDistribution(self.p_data)
+            n = tf.placeholder(tf.int32)
+            samples = dist.sample_n(n)
+            self.assertEqual(
+                samples.get_shape().as_list(),
+                [None] + list(self.p_data.shape)
+            )
+            np.testing.assert_almost_equal(
+                samples.eval({n: 0}), self._sample([0]))
+
+    def test_observe(self):
+        dist = _MyDistribution(self.p_data)
+        samples = dist.observe(self.x_data)
+        self.assertIsInstance(samples, StochasticTensor)
+        with self.get_session():
+            np.testing.assert_almost_equal(samples.eval(), self.x_data)
+
+    def test_error_enum_observe(self):
+        dist = _MyDistribution(self.p_data)
+        self.assertFalse(dist.is_enumerable)
+        with self.assertRaisesRegex(
+                RuntimeError, '_MyDistribution is not enumerable.'):
+            _ = dist.enum_observe()
+
 
 if __name__ == '__main__':
     unittest.main()
-    tf.Session().run()

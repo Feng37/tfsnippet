@@ -429,12 +429,9 @@ class DistributionTestMixin(object):
         if not self.is_enumerable:
             dist = self.dist_class(**self.simple_params)
             self.assertIsNone(dist.enum_value_count)
-            msg = (
-                '%s distribution is not enumerable.' %
-                self.dist_class.__name__
-            )
+            msg = '%s is not enumerable.' % self.dist_class.__name__
             with self.assertRaisesRegex(RuntimeError, msg):
-                dist.enum_sample()
+                dist.enum_observe()
 
 
 class BigNumberVerifyTestMixin(object):
@@ -500,7 +497,7 @@ class EnumerableTestMixin(object):
     def get_enum_value_count_for_params(self, params):
         raise NotImplementedError()
 
-    def get_enum_samples_for_params(self, params):
+    def get_enum_observe_for_params(self, params):
         raise NotImplementedError()
 
     # pre-configured test cases
@@ -512,24 +509,24 @@ class EnumerableTestMixin(object):
                 self.get_enum_value_count_for_params(self.simple_params)
             )
 
-    def test_enum_sample(self):
+    def test_enum_observe(self):
         with self.get_session():
             dist = self.dist_class(**self.simple_params)
             np.testing.assert_equal(
-                dist.enum_sample().eval(),
-                self.get_enum_samples_for_params(self.simple_params)
+                dist.enum_observe().eval(),
+                self.get_enum_observe_for_params(self.simple_params)
             )
 
-    def test_enum_sample_for_extended_dimensional_params(self):
+    def test_enum_observe_for_extended_dimensional_params(self):
         with self.get_session():
             dist = self.dist_class(**self.extended_dimensional_params)
             np.testing.assert_equal(
-                dist.enum_sample().eval(),
-                self.get_enum_samples_for_params(
+                dist.enum_observe().eval(),
+                self.get_enum_observe_for_params(
                     self.extended_dimensional_params)
             )
 
-    def test_enum_sample_for_dynamic_shape(self):
+    def test_enum_observe_for_dynamic_shape(self):
         with self.get_session(use_gpu=True):
             params = {
                 k: np.tile(v, [10] + [1] * len(v.shape))
@@ -547,11 +544,11 @@ class EnumerableTestMixin(object):
                 for k in six.iterkeys(self.simple_params)
             }
             dist = self.dist_class(**params_ph)
-            x = dist.enum_sample().eval(feed_dict)
+            x = dist.enum_observe().eval(feed_dict)
             np.testing.assert_equal(
-                x,  self.get_enum_samples_for_params(params))
+                x,  self.get_enum_observe_for_params(params))
 
-    def test_enum_sample_for_fully_dynamic_shape(self):
+    def test_enum_observe_for_fully_dynamic_shape(self):
         with self.get_session(use_gpu=True):
             params = {
                 k: np.tile(v, [10] + [1] * len(v.shape))
@@ -569,6 +566,6 @@ class EnumerableTestMixin(object):
                 for k in six.iterkeys(self.simple_params)
             }
             dist = self.dist_class(**params_ph)
-            x = dist.enum_sample().eval(feed_dict)
+            x = dist.enum_observe().eval(feed_dict)
             np.testing.assert_equal(
-                x,  self.get_enum_samples_for_params(params))
+                x,  self.get_enum_observe_for_params(params))

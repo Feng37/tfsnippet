@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-import six
 import numpy as np
 import tensorflow as tf
 
 from tfsnippet.bayes import StochasticTensor, Normal
 from tests.bayes.distributions._helper import _MyDistribution
 from tests.helper import TestCase
-from ._div_op import regular_div, floor_div
-from ._true_div_op import true_div
 
 
 class StochasticTensorTestCase(TestCase):
@@ -53,6 +50,65 @@ class StochasticTensorTestCase(TestCase):
                 self.assertEqual(getattr(distrib, k), getattr(t, k),
                                  msg='attribute %r mismatch.' % k)
 
+    def test_prob_and_log_prob(self):
+        with self.get_session():
+            distrib = Normal(
+                np.asarray(0., dtype=np.float32),
+                np.asarray([1.0, 2.0, 3.0], dtype=np.float32)
+            )
+            observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
+            t = StochasticTensor(distrib, observed=observed)
+            np.testing.assert_almost_equal(
+                t.prob().eval(), distrib.prob(observed).eval())
+            np.testing.assert_almost_equal(
+                t.log_prob().eval(), distrib.log_prob(observed).eval())
+
+    def test_prob_and_log_prob_with_default_group_event_ndims(self):
+        with self.get_session():
+            distrib = Normal(
+                np.asarray(0., dtype=np.float32),
+                np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
+                group_event_ndims=1
+            )
+            observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
+            t = StochasticTensor(distrib, observed=observed)
+            np.testing.assert_almost_equal(
+                t.prob().eval(), distrib.prob(observed).eval())
+            np.testing.assert_almost_equal(
+                t.log_prob().eval(), distrib.log_prob(observed).eval())
+
+    def test_prob_and_log_prob_overriding_group_event_ndims(self):
+        with self.get_session():
+            distrib = Normal(
+                np.asarray(0., dtype=np.float32),
+                np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
+                group_event_ndims=1
+            )
+            observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
+
+            # overriding at constructor
+            t = StochasticTensor(distrib, observed=observed,
+                                 group_event_ndims=2)
+            np.testing.assert_almost_equal(
+                t.prob().eval(),
+                distrib.prob(observed, group_event_ndims=2).eval()
+            )
+            np.testing.assert_almost_equal(
+                t.log_prob().eval(),
+                distrib.log_prob(observed, group_event_ndims=2).eval()
+            )
+
+            # overriding at prob
+            t = StochasticTensor(distrib, observed=observed)
+            np.testing.assert_almost_equal(
+                t.prob(group_event_ndims=2).eval(),
+                distrib.prob(observed, group_event_ndims=2).eval()
+            )
+            np.testing.assert_almost_equal(
+                t.log_prob(group_event_ndims=2).eval(),
+                distrib.log_prob(observed, group_event_ndims=2).eval()
+            )
+
     def test_dynamic_dimension_replaced_by_observed_shape(self):
         distrib = _MyDistribution(tf.placeholder(tf.float32, (None, 3, 4)))
         t = StochasticTensor(
@@ -69,6 +125,22 @@ class StochasticTensorTestCase(TestCase):
         self.assertEqual(self.distrib.dtype, tf.float32)
         self.assertEqual(t.dtype, tf.int32)
 
+    def test_disallowed_op(self):
+        with self.assertRaisesRegex(
+                TypeError, '`StochasticTensor` object is not iterable.'):
+            _ = iter(StochasticTensor(self.distrib, tf.constant(1)))
+
+        with self.assertRaisesRegex(
+                TypeError, 'Using a `StochasticTensor` as a Python `bool` '
+                           'is not allowed.'):
+            _ = not StochasticTensor(self.distrib, tf.constant(1))
+
+        with self.assertRaisesRegex(
+                TypeError, 'Using a `StochasticTensor` as a Python `bool` '
+                           'is not allowed.'):
+            if StochasticTensor(self.distrib, tf.constant(1)):
+                pass
+
     def test_construction_error(self):
         with self.assertRaisesRegex(
                 ValueError, 'One and only one of `samples`, `observed` '
@@ -80,7 +152,7 @@ class StochasticTensorTestCase(TestCase):
                            'but got .*'):
             _ = StochasticTensor('', tf.constant(1.))
 
-    def test_to_tensor(self):
+    def test_convert_to_tensor(self):
         with self.get_session():
             t = StochasticTensor(self.distrib, 1.)
             self.assertIsInstance(tf.convert_to_tensor(t), tf.Tensor)
@@ -95,225 +167,92 @@ class StochasticTensorTestCase(TestCase):
                 dtype=tf.int32
             )
 
+    def test_as_graph_element(self):
+        g = tf.get_default_graph()
+        t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
+        self.assertIs(t._as_graph_element(), t.__wrapped__)
+        self.assertIs(g.as_graph_element(t), t.__wrapped__)
+
+        with self.assertRaisesRegex(
+                RuntimeError, 'Can not convert a Tensor into a Operation.'):
+            _ = t._as_graph_element(allow_tensor=False)
+
     def test_session_run(self):
         with self.get_session() as sess:
-            t = StochasticTensor(self.distrib, tf.constant([1, 2, 3]))
-            np.testing.assert_equal(sess.run(t), [1, 2, 3])
+            t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
+            np.testing.assert_almost_equal(sess.run(t), [1., 2., 3.])
 
-
-class StochasticTensorArithTestCase(TestCase):
-
-    def _setUp(self):
-        self.distrib = _MyDistribution(
-            np.arange(24, dtype=np.float32).reshape([2, 3, 4]))
-
-    def test_prerequisite(self):
-        if six.PY2:
-            self.assertAlmostEqual(regular_div(3, 2), 1)
-            self.assertAlmostEqual(regular_div(3.3, 1.6), 2.0625)
-        else:
-            self.assertAlmostEqual(regular_div(3, 2), 1.5)
-            self.assertAlmostEqual(regular_div(3.3, 1.6), 2.0625)
-        self.assertAlmostEqual(true_div(3, 2), 1.5)
-        self.assertAlmostEqual(true_div(3.3, 1.6), 2.0625)
-        self.assertAlmostEqual(floor_div(3, 2), 1)
-        self.assertAlmostEqual(floor_div(3.3, 1.6), 2.0)
-
-    def test_unary_op(self):
-        def check_op(name, func, x):
-            x_tensor = tf.convert_to_tensor(x)
-            ans = func(x_tensor)
-            res = tf.convert_to_tensor(
-                func(StochasticTensor(self.distrib, x_tensor)))
-            self.assertEqual(
-                res.dtype, ans.dtype,
-                msg='Result dtype does not match answer after unary operator '
-                    '%s is applied: %r vs %r (x is %r).' %
-                    (name, res.dtype, ans.dtype, x)
+    def test_get_attributes(self):
+        t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
+        members = dir(t)
+        for member in ['dtype', 'log_prob', '__wrapped__']:
+            self.assertIn(
+                member, members,
+                msg='%r should in dir(t), but not.' % (members,)
             )
-            res_val = res.eval()
-            ans_val = ans.eval()
-            np.testing.assert_equal(
-                res_val, ans_val,
-                err_msg='Result value does not match answer after unary '
-                        'operator %s is applied: %r vs %r (x is %r).' %
-                        (name, res_val, ans_val, x)
+            self.assertTrue(
+                hasattr(t, member),
+                msg='StochasticTensor should has member %r, but not.' %
+                    (member,)
             )
 
-        with self.get_session():
-            int_data = np.asarray([1, -2, 3], dtype=np.int32)
-            float_data = np.asarray([1.1, -2.2, 3.3], dtype=np.float32)
-            bool_data = np.asarray([True, False, True], dtype=np.bool)
+    def test_set_attributes(self):
+        t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
 
-            check_op('abs', abs, int_data)
-            check_op('abs', abs, float_data)
-            check_op('neg', (lambda v: -v), int_data)
-            check_op('neg', (lambda v: -v), float_data)
-            check_op('invert', (lambda v: ~v), bool_data)
+        self.assertTrue(hasattr(t, '_self_is_observed'))
+        self.assertFalse(hasattr(t.__wrapped__, '_self_is_observed'))
+        t._self_is_observed = 123
+        self.assertEqual(t._self_is_observed, 123)
+        self.assertFalse(hasattr(t.__wrapped__, '_self_is_observed'))
 
-    def test_binary_op(self):
-        def check_op(name, func, x, y):
-            x_tensor = tf.convert_to_tensor(x)
-            y_tensor = tf.convert_to_tensor(y)
-            ans = func(x_tensor, y_tensor)
-            res_1 = tf.convert_to_tensor(
-                func(StochasticTensor(self.distrib, x_tensor), y_tensor))
-            res_2 = tf.convert_to_tensor(
-                func(x_tensor, StochasticTensor(self.distrib, y_tensor)))
-            res_3 = tf.convert_to_tensor(
-                func(StochasticTensor(self.distrib, x_tensor),
-                     StochasticTensor(self.distrib, y_tensor)))
+        self.assertTrue(hasattr(t, 'log_prob'))
+        self.assertFalse(hasattr(t.__wrapped__, 'log_prob'))
+        t.log_prob = 456
+        self.assertEqual(t.log_prob, 456)
+        self.assertTrue(hasattr(t, 'log_prob'))
+        self.assertFalse(hasattr(t.__wrapped__, 'log_prob'))
 
-            for tag, res in [('left', res_1), ('right', res_2),
-                             ('both', res_3)]:
-                self.assertEqual(
-                    res.dtype, ans.dtype,
-                    msg='Result dtype does not match answer after %s binary '
-                        'operator %s is applied: %r vs %r (x is %r, y is %r).'
-                        % (tag, name, res.dtype, ans.dtype, x, y)
-                )
-                res_val = res.eval()
-                ans_val = ans.eval()
-                np.testing.assert_equal(
-                    res_val, ans_val,
-                    err_msg='Result value does not match answer after %s '
-                            'binary operator %s is applied: %r vs %r '
-                            '(x is %r, y is %r).' %
-                            (tag, name, res_val, ans_val, x, y)
-                )
+        self.assertTrue(hasattr(t, 'get_shape'))
+        self.assertTrue(hasattr(t.__wrapped__, 'get_shape'))
+        t.get_shape = 789
+        self.assertEqual(t.get_shape, 789)
+        self.assertEqual(t.__wrapped__.get_shape, 789)
+        self.assertTrue(hasattr(t, 'get_shape'))
+        self.assertTrue(hasattr(t.__wrapped__, 'get_shape'))
 
-        def run_ops(x, y, ops):
-            for name, func in six.iteritems(ops):
-                check_op(name, func, x, y)
+        t.abc = 1001
+        self.assertEqual(t.abc, 1001)
+        self.assertEqual(t.__wrapped__.abc, 1001)
+        self.assertTrue(hasattr(t, 'abc'))
+        self.assertTrue(hasattr(t.__wrapped__, 'abc'))
 
-        arith_ops = {
-            'add': lambda x, y: x + y,
-            'sub': lambda x, y: x - y,
-            'mul': lambda x, y: x * y,
-            'div': regular_div,
-            'truediv': true_div,
-            'floordiv': floor_div,
-            'mod': lambda x, y: x % y,
-        }
+        t.__wrapped__.xyz = 2002
+        self.assertEqual(t.xyz, 2002)
+        self.assertEqual(t.__wrapped__.xyz, 2002)
+        self.assertTrue(hasattr(t, 'xyz'))
+        self.assertTrue(hasattr(t.__wrapped__, 'xyz'))
 
-        logical_ops = {
-            'and': lambda x, y: x & y,
-            'or': lambda x, y: x | y,
-            'xor': lambda x, y: x ^ y,
-        }
+    def test_del_attributes(self):
+        t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
 
-        relation_ops = {
-            'lt': lambda x, y: x < y,
-            'le': lambda x, y: x <= y,
-            'gt': lambda x, y: x > y,
-            'ge': lambda x, y: x >= y,
-        }
+        del t._self_is_observed
+        self.assertFalse(hasattr(t, '_self_is_observed'))
+        self.assertFalse(hasattr(t.__wrapped__, '_self_is_observed'))
 
-        with self.get_session():
-            # arithmetic operators
-            run_ops(np.asarray([-4, 5, 6], dtype=np.int32),
-                    np.asarray([1, -2, 3], dtype=np.int32),
-                    arith_ops)
-            run_ops(np.asarray([-4.4, 5.5, 6.6], dtype=np.float32),
-                    np.asarray([1.1, -2.2, 3.3], dtype=np.float32),
-                    arith_ops)
+        t.abc = 1001
+        del t.abc
+        self.assertFalse(hasattr(t, 'abc'))
+        self.assertFalse(hasattr(t.__wrapped__, 'abc'))
 
-            # it seems that tf.pow(x, y) does not support negative integers
-            # yet, so we individually test this operator here.
-            check_op('pow',
-                     (lambda x, y: x ** y),
-                     np.asarray([-4, 5, 6], dtype=np.int32),
-                     np.asarray([1, 2, 3], dtype=np.int32))
-            check_op('pow',
-                     (lambda x, y: x ** y),
-                     np.asarray([-4.4, 5.5, 6.6], dtype=np.float32),
-                     np.asarray([1.1, -2.2, 3.3], dtype=np.float32))
+        t.__wrapped__.xyz = 2002
+        del t.xyz
+        self.assertFalse(hasattr(t, 'xyz'))
+        self.assertFalse(hasattr(t.__wrapped__, 'xyz'))
 
-            # logical operators
-            run_ops(np.asarray([True, False, True, False], dtype=np.bool),
-                    np.asarray([True, True, False, False], dtype=np.bool),
-                    logical_ops)
-
-            # relation operators
-            run_ops(np.asarray([1, -2, 3, -4, 5, 6, -4, 5, 6], dtype=np.int32),
-                    np.asarray([1, -2, 3, 1, -2, 3, -4, 5, 6], dtype=np.int32),
-                    relation_ops)
-            run_ops(
-                np.asarray([1.1, -2.2, 3.3, -4.4, 5.5, 6.6, -4.4, 5.5, 6.6],
-                           dtype=np.float32),
-                np.asarray([1.1, -2.2, 3.3, 1.1, -2.2, 3.3, -4.4, 5.5, 6.6],
-                           dtype=np.float32),
-                relation_ops
-            )
-
-    def test_getitem(self):
-        def check_getitem(x, y, xx, yy):
-            ans = tf.convert_to_tensor(x[y])
-            res = xx[yy]
-
-            self.assertEqual(
-                res.dtype, ans.dtype,
-                msg='Result dtype does not match answer after getitem '
-                    'is applied: %r vs %r (x is %r, y is %r, xx is %r, '
-                    'yy is %r).' % (res.dtype, ans.dtype, x, y, xx, yy)
-            )
-            res_val = res.eval()
-            ans_val = ans.eval()
-            np.testing.assert_equal(
-                res_val, ans_val,
-                err_msg='Result value does not match answer after '
-                        'getitem is applied: %r vs %r (x is %r, y is %r, '
-                        'xx is %r, yy is %r).' %
-                        (res_val, ans_val, x, y, xx, yy)
-            )
-
-        class _SliceGenerator(object):
-            def __getitem__(self, item):
-                return item
-        sg = _SliceGenerator()
-
-        with self.get_session():
-            data = np.asarray([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.int32)
-            indices_or_slices = [
-                0,
-                -1,
-                # TensorFlow has not supported array index yet.
-                # np.asarray([0, 3, 2, 6], dtype=np.int32),
-                # np.asarray([-1, -2, -3], dtype=np.int32),
-                sg[0:],
-                sg[:1],
-                sg[:: 2],
-                sg[-1:],
-                sg[: -1],
-                sg[:: -1],
-            ]
-            for s in indices_or_slices:
-                x_tensor = tf.convert_to_tensor(data)
-                x_simple_tensor = StochasticTensor(self.distrib, x_tensor)
-                check_getitem(data, s, x_simple_tensor, s)
-
-                if not isinstance(s, slice):
-                    y_tensor = tf.convert_to_tensor(s)
-                    y_simple_tensor = StochasticTensor(self.distrib, y_tensor)
-                    check_getitem(data, s, x_simple_tensor, y_tensor)
-                    check_getitem(data, s, x_simple_tensor, y_simple_tensor)
-                    check_getitem(data, s, x_tensor, y_simple_tensor)
-
-    def test_disallowed_op(self):
-        with self.assertRaisesRegex(
-                TypeError, "'Tensor' object is not iterable."):
-            _ = iter(StochasticTensor(self.distrib, tf.constant(1)))
-
-        with self.assertRaisesRegex(
-                TypeError, "Using a `tf.Tensor` as a Python `bool` is not "
-                           "allowed."):
-            _ = not StochasticTensor(self.distrib, tf.constant(1))
-
-        with self.assertRaisesRegex(
-                TypeError, "Using a `tf.Tensor` as a Python `bool` is not "
-                           "allowed."):
-            if StochasticTensor(self.distrib, tf.constant(1)):
-                pass
+        t.log_prob = 123
+        del t.log_prob
+        self.assertFalse(hasattr(t.__wrapped__, 'log_prob'))
+        self.assertNotEqual(t.log_prob, 123)
 
 
 if __name__ == '__main__':

@@ -7,9 +7,9 @@ import six
 
 from tfsnippet.bayes import Normal
 from tests.helper import TestCase
-from ._helper import (DistributionTestMixin,
-                      BigNumberVerifyTestMixin,
-                      AnalyticKldTestMixin)
+from tests.bayes.distributions._helper import (DistributionTestMixin,
+                                               BigNumberVerifyTestMixin,
+                                               AnalyticKldTestMixin)
 
 
 class NormalTestCase(TestCase,

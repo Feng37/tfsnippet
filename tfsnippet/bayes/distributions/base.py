@@ -125,7 +125,7 @@ class Distribution(VarScopeObject):
 
         See Also
         --------
-        enum_sample
+        enum_observe
         """
         raise NotImplementedError()
 
@@ -185,19 +185,6 @@ class Distribution(VarScopeObject):
         """
         raise NotImplementedError()
 
-    def observe(self, observed):
-        """Create a `StochasticTensor` with specified observations.
-        
-        Parameters
-        ----------
-        
-        
-        Returns
-        -------
-        StochasticTensor
-            The stochastic tensor.
-        """
-
     def _sample_n(self, n):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
@@ -226,7 +213,7 @@ class Distribution(VarScopeObject):
                 static_sample_shape = tf.TensorShape(sample_shape)
             else:
                 if isinstance(sample_shape, (tuple, list)):
-                    static_sample_shape = tf.TensorShape(list(filter(
+                    static_sample_shape = tf.TensorShape(list(map(
                         lambda v: None if is_dynamic_tensor_like(v) else v,
                         sample_shape
                     )))
@@ -236,7 +223,7 @@ class Distribution(VarScopeObject):
                 ret = self._sample_n(tf.reduce_prod(sample_shape))
 
             # reshape the samples
-            static_batch_shape = ret.get_shape()[1:]
+            tail_shape = ret.get_shape()[1:]
             with tf.name_scope('reshape'):
                 dynamic_shape = tf.concat(
                     [sample_shape, tf.shape(ret)[1:]], axis=0)
@@ -245,17 +232,17 @@ class Distribution(VarScopeObject):
             # special fix: when `sample_shape` is a tensor, it would cause
             #   `static_sample_shape` to carry no information.  We thus
             #   re-capture the sample shape by query at the reshaped samples.
-            if static_batch_shape.ndims is not None and \
+            if tail_shape.ndims is not None and \
                     ret.get_shape().ndims is not None and \
                     static_sample_shape.ndims is None:
-                tail_ndims = static_batch_shape.ndims
+                tail_ndims = tail_shape.ndims
                 if tail_ndims == 0:
                     static_sample_shape = ret.get_shape()
                 else:
                     static_sample_shape = ret.get_shape()[: -tail_ndims]
 
             # fix the static shape of samples
-            ret.set_shape(static_sample_shape.concatenate(static_batch_shape))
+            ret.set_shape(static_sample_shape.concatenate(tail_shape))
             from ..stochastic import StochasticTensor
             return StochasticTensor(
                 self,
@@ -301,16 +288,33 @@ class Distribution(VarScopeObject):
                 group_event_ndims=self.group_event_ndims
             )
 
-    def _enum_sample(self):
-        raise RuntimeError('%s distribution is not enumerable.' %
+    def observe(self, observed):
+        """Create a `StochasticTensor` with specified observations.
+        
+        Parameters
+        ----------
+        observed : tf.Tensor | np.ndarray | float | int
+            The observation following this distribution.
+        
+        Returns
+        -------
+        tfsnippet.bayes.StochasticTensor
+            The stochastic tensor.
+        """
+        from ..stochastic import StochasticTensor
+        return StochasticTensor(self, observed=observed)
+
+    def _enum_observe(self):
+        raise RuntimeError('%s is not enumerable.' %
                            self.__class__.__name__)
 
-    def enum_sample(self, name=None):
-        """Get enumeration "samples" from the distribution.
+    def enum_observe(self, name=None):
+        """Enumerate possible values as observations.
 
-        The returned samples should be of shape ``(enum_value_count,) +
-        batch_shape + value_shape``, where `enum_value_count` is the count
-        of possible values from this distribution.
+        The returned `StochasticTensor` should in the shape of 
+        ``(enum_value_count,) + batch_shape + value_shape``, where
+        `enum_value_count` is the count of possible values from this
+        distribution.
 
         Parameters
         ----------
@@ -327,11 +331,11 @@ class Distribution(VarScopeObject):
         RuntimeError
             If the distribution is not enumerable.
         """
-        with tf.name_scope(name, default_name='enum_sample'):
+        with tf.name_scope(name, default_name='enum_observe'):
             from ..stochastic import StochasticTensor
             return StochasticTensor(
                 self,
-                samples=self._enum_sample(),
+                samples=self._enum_observe(),
                 group_event_ndims=self.group_event_ndims
             )
 

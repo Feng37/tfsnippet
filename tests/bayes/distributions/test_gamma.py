@@ -7,9 +7,9 @@ from scipy.special import gammaln, digamma
 
 from tfsnippet.bayes import Gamma
 from tests.helper import TestCase
-from ._helper import (DistributionTestMixin,
-                      BigNumberVerifyTestMixin,
-                      AnalyticKldTestMixin)
+from tests.bayes.distributions._helper import (DistributionTestMixin,
+                                               BigNumberVerifyTestMixin,
+                                               AnalyticKldTestMixin)
 
 
 class GammaTestCase(TestCase,

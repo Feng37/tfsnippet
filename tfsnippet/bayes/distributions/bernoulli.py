@@ -184,7 +184,7 @@ class Bernoulli(Distribution):
         samples.set_shape(static_shape)
         return samples
 
-    def _enum_sample(self):
+    def _enum_observe(self):
         # reshape the enumerated values to match the batch shape.
         reshape_shape = tf.concat(
             [[2], tf.ones(tf.stack([tf.size(self.dynamic_batch_shape)]),

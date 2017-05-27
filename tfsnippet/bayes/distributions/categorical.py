@@ -182,7 +182,7 @@ class _BaseCategorical(Distribution):
         samples.set_shape(static_shape)
         return samples
 
-    def _enum_sample_sparse(self, dtype=None):
+    def _enum_observe_sparse(self, dtype=None):
         # reshape the enumerated values to match the batch shape.
         reshape_shape = tf.concat(
             [[self.n_categories],
@@ -293,8 +293,8 @@ class Categorical(_BaseCategorical):
     def _sample_n(self, n):
         return self._sample_n_sparse(n, self.dtype)
 
-    def _enum_sample(self):
-        return self._enum_sample_sparse(self.dtype)
+    def _enum_observe(self):
+        return self._enum_observe_sparse(self.dtype)
 
     def _log_prob_with_logits(self, x):
         x = tf.convert_to_tensor(x)
@@ -416,8 +416,8 @@ class OneHotCategorical(_BaseCategorical):
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 
-    def _enum_sample(self):
-        samples = self._enum_sample_sparse(self.dtype)
+    def _enum_observe(self):
+        samples = self._enum_observe_sparse(self.dtype)
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 
