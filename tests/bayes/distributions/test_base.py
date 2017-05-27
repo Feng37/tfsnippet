@@ -345,6 +345,19 @@ class DistributionTestCase(TestCase):
         with self.get_session():
             np.testing.assert_almost_equal(samples.eval(), self.p_data)
 
+    def test_call(self):
+        dist = _MyDistribution(self.p_data)
+
+        samples = dist(10)
+        self.assertIsInstance(samples, StochasticTensor)
+        self.assertEqual(samples.get_shape(), [10, 2, 3, 4])
+
+        samples = dist(10, observed=self.p_data)
+        self.assertIsInstance(samples, StochasticTensor)
+        self.assertEqual(samples.get_shape(), list(self.p_data.shape))
+        with self.get_session():
+            np.testing.assert_almost_equal(samples.eval(), self.p_data)
+
     def test_error_enum_observe(self):
         dist = _MyDistribution(self.p_data)
         self.assertFalse(dist.is_enumerable)

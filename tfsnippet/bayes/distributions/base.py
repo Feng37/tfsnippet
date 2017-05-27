@@ -53,6 +53,34 @@ class Distribution(VarScopeObject):
         # TODO: support dynamic `group_event_ndims` if necessary
         self._group_event_ndims = group_event_ndims
 
+    def __call__(self, n_samples=None, observed=None, group_event_ndims=None,
+                 name=None):
+        """Create a `StochasticTensor` with random samples or observations.
+
+        Parameters
+        ----------
+        n_samples : int | tf.Tensor | None
+            Generate this number of samples via `sample_n` method, unless
+            `observed` is specified.
+
+        observed : tf.Tensor | np.ndarray | float | int
+            The observations.
+
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
+
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tfsnippet.bayes.StochasticTensor
+            The random samples or observations as tensor.
+        """
+        return self.sample_or_observe(n_samples=n_samples, observed=observed,
+                                      group_event_ndims=group_event_ndims,
+                                      name=name)
+
     @property
     def group_event_ndims(self):
         """Get the number of dimensions to be considered as events group.
