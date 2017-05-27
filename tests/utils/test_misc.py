@@ -55,7 +55,7 @@ class MiscTestCase(TestCase):
     def test_is_dynamic_tensor_like(self):
         for v in [tf.placeholder(tf.int32, ()),
                   tf.get_variable('v', shape=(), dtype=tf.int32),
-                  StochasticTensor(Normal(0., 1.))]:
+                  StochasticTensor(Normal(0., 1.), 1.)]:
             self.assertTrue(
                 is_dynamic_tensor_like(v),
                 msg='%r should be interpreted as a dynamic tensor.' %
@@ -72,15 +72,14 @@ class MiscTestCase(TestCase):
     def test_convert_to_tensor_if_dynamic(self):
         for v in [tf.placeholder(tf.int32, ()),
                   tf.get_variable('v', shape=(), dtype=tf.int32),
-                  StochasticTensor(Normal(0., 1.))]:
+                  StochasticTensor(Normal(0., 1.), 1.)]:
             self.assertIsInstance(
                 convert_to_tensor_if_dynamic(v),
                 tf.Tensor
             )
         for v in [1, 1.0, object(), (), [], {},
                   np.array([1, 2, 3])]:
-            self.assertIs(
-                convert_to_tensor_if_dynamic(v), v)
+            self.assertIs(convert_to_tensor_if_dynamic(v), v)
 
     def test_preferred_tensor_dtype(self):
         for dtype in [tf.int16, tf.int32, tf.float32, tf.float64]:

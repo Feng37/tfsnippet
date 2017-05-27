@@ -185,6 +185,19 @@ class Distribution(VarScopeObject):
         """
         raise NotImplementedError()
 
+    def observe(self, observed):
+        """Create a `StochasticTensor` with specified observations.
+        
+        Parameters
+        ----------
+        
+        
+        Returns
+        -------
+        StochasticTensor
+            The stochastic tensor.
+        """
+
     def _sample_n(self, n):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
@@ -203,8 +216,8 @@ class Distribution(VarScopeObject):
 
         Returns
         -------
-        tf.Tensor
-            The random samples as tensor.
+        tfsnippet.bayes.StochasticTensor
+            The random samples as `StochasticTensor`.
         """
         with tf.name_scope(name, default_name='sample'):
             # derive the samples using ``n = prod(sample_shape)``
@@ -243,7 +256,50 @@ class Distribution(VarScopeObject):
 
             # fix the static shape of samples
             ret.set_shape(static_sample_shape.concatenate(static_batch_shape))
-            return ret
+            from ..stochastic import StochasticTensor
+            return StochasticTensor(
+                self,
+                samples=ret,
+                group_event_ndims=self.group_event_ndims
+            )
+
+    def sample_n(self, n_samples=None, name=None):
+        """Get random samples from the distribution.
+        
+        The different between this method and `sample` is that, this method
+        expects a 0-d tensor as the count of samples, but `sample` expects
+        a 1-d tensor as the shape of samples.
+        
+        Parameters
+        ----------
+        n_samples : int | tf.Tensor | None
+            The number of samples to take.
+            
+            If not specified, only one sample will be taken correspond
+            to each set of parameter, while the shape of samples will
+            equal to ``batch_shape + value_shape``.  Otherwise the
+            specified number of samples will be taken, while the shape
+            will equal to ``(n_samples,) + batch_shape + value_shape``.
+            
+        name : str
+            Optional name of this operation.
+            
+        Returns
+        -------
+        tfsnippet.bayes.StochasticTensor
+            The random samples as tensor.
+        """
+        with tf.name_scope(name, default_name='sample_n'):
+            if n_samples is None:
+                samples = tf.squeeze(self._sample_n(1), 0)
+            else:
+                samples = self._sample_n(n_samples)
+            from ..stochastic import StochasticTensor
+            return StochasticTensor(
+                self,
+                samples=samples,
+                group_event_ndims=self.group_event_ndims
+            )
 
     def _enum_sample(self):
         raise RuntimeError('%s distribution is not enumerable.' %
@@ -263,7 +319,7 @@ class Distribution(VarScopeObject):
 
         Returns
         -------
-        tf.Tensor
+        tfsnippet.bayes.StochasticTensor
             The enumeration "samples" as tensor.
 
         Raises
@@ -272,7 +328,12 @@ class Distribution(VarScopeObject):
             If the distribution is not enumerable.
         """
         with tf.name_scope(name, default_name='enum_sample'):
-            return self._enum_sample()
+            from ..stochastic import StochasticTensor
+            return StochasticTensor(
+                self,
+                samples=self._enum_sample(),
+                group_event_ndims=self.group_event_ndims
+            )
 
     def _log_prob(self, x):
         # `@instance_reuse` decorator should not be applied to this method.

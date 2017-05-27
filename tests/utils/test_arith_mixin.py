@@ -24,7 +24,7 @@ class _SimpleTensor(TensorArithmeticMixin):
 def _to_tensor(value, dtype=None, name=None, as_ref=False):
     if dtype and not dtype.is_compatible_with(value.dtype):
         raise ValueError('Incompatible type conversion requested to type '
-                         '%s for variable of type %s' %
+                         '%s for tensor of type %s' %
                          (dtype.name, value.dtype.name))
     if as_ref:
         raise ValueError('%r: Ref type not supported.' % value)

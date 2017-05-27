@@ -233,3 +233,4 @@ class DistributionTestCase(TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+    tf.Session().run()

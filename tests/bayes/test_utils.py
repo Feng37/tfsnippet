@@ -13,9 +13,9 @@ class GatherLogLowerBoundTestCase(TestCase):
 
     def test_basic(self):
         with self.get_session() as sess:
-            a = StochasticTensor(
-                Normal(0., [1., 2., 3.]), sample_num=16, group_event_ndims=1)
-            b = StochasticTensor(Normal(1., 2.), sample_num=16)
+            a = Normal(0., np.asarray([1., 2., 3.]),
+                       group_event_ndims=1).sample_n(16)
+            b = Normal(1., 2.).sample_n(16)
             a_prob, b_prob = gather_log_lower_bound([a, b])
 
             self.assertIsInstance(a_prob, tf.Tensor)
