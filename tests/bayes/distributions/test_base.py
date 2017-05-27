@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from tfsnippet.bayes import StochasticTensor
+from tfsnippet.bayes import StochasticTensor, Bernoulli
 from tests.helper import TestCase
 from tests.bayes.distributions._helper import _MyDistribution
 
@@ -332,12 +332,62 @@ class DistributionTestCase(TestCase):
         with self.get_session():
             np.testing.assert_almost_equal(samples.eval(), self.x_data)
 
+    def test_sample_or_observe(self):
+        dist = _MyDistribution(self.p_data)
+
+        samples = dist.sample_or_observe(10)
+        self.assertIsInstance(samples, StochasticTensor)
+        self.assertEqual(samples.get_shape(), [10, 2, 3, 4])
+
+        samples = dist.sample_or_observe(10, observed=self.p_data)
+        self.assertIsInstance(samples, StochasticTensor)
+        self.assertEqual(samples.get_shape(), list(self.p_data.shape))
+        with self.get_session():
+            np.testing.assert_almost_equal(samples.eval(), self.p_data)
+
     def test_error_enum_observe(self):
         dist = _MyDistribution(self.p_data)
         self.assertFalse(dist.is_enumerable)
         with self.assertRaisesRegex(
                 RuntimeError, '_MyDistribution is not enumerable.'):
             _ = dist.enum_observe()
+
+    def test_override_group_event_ndims_in_sample(self):
+        dist = _MyDistribution(self.p_data, group_event_ndims=1)
+
+        self.assertEqual(
+            dist.sample((1, 2)).group_event_ndims, 1)
+        self.assertEqual(
+            dist.sample((1, 2), group_event_ndims=0).group_event_ndims, 0)
+
+        self.assertEqual(
+            dist.sample_n(10).group_event_ndims, 1)
+        self.assertEqual(
+            dist.sample_n(10, group_event_ndims=2).group_event_ndims, 2)
+
+        self.assertEqual(
+            dist.observe(0.).group_event_ndims, 1)
+        self.assertEqual(
+            dist.observe(0., group_event_ndims=3).group_event_ndims, 3)
+
+        self.assertEqual(
+            dist.sample_or_observe().group_event_ndims, 1)
+        self.assertEqual(
+            dist.sample_or_observe(group_event_ndims=2).group_event_ndims, 2)
+
+        self.assertEqual(
+            dist.sample_or_observe(observed=self.p_data).group_event_ndims, 1)
+        self.assertEqual(
+            dist.sample_or_observe(observed=self.p_data, group_event_ndims=2).
+                group_event_ndims,
+            2
+        )
+
+        dist = Bernoulli(0., group_event_ndims=1)
+        self.assertEqual(
+            dist.enum_observe().group_event_ndims, 1)
+        self.assertEqual(
+            dist.enum_observe(group_event_ndims=4).group_event_ndims, 4)
 
 
 if __name__ == '__main__':

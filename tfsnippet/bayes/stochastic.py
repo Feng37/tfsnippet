@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import six
 import tensorflow as tf
 
 from tfsnippet.utils import TensorArithmeticMixin
@@ -43,12 +44,10 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
     A `StochasticTensor` should be created by methods of a `Distribution`,
     and represents a sampled or observed random variable in the model.
-    Although it stands for a random variable, it is actually a standard
-    tensor in TensorFlow graph, where the randomness is achieved by random
-    sampling.  That is to say, every `StochasticTensor` is equivalent
-    to a set of random samples from the given `distribution`.
-    The samples are stored so that every stochastic tensor should
-    always represent the same set of samples.
+    Although it stands for a random variable, it is actually acts as a
+    wrapper for an instance of `tf.Tensor`, where the randomness is achieved
+    by random sampling.  All the attributes and methods of the wrapped
+    `tf.Tensor` could be accessed through `StochasticTensor` object.
 
     Parameters
     ----------
@@ -221,7 +220,42 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
     # mimic `tf.Tensor` interface
     def __dir__(self):
-        ret = list(set(dir(self.__wrapped__) + object.__dir__(self)))
+        if six.PY3:
+            ret = object.__dir__(self)
+        else:
+            # code is based on
+            # http://www.quora.com/How-dir-is-implemented-Is-there-any-PEP-related-to-that
+            def get_attrs(obj):
+                import types
+                if not hasattr(obj, '__dict__'):
+                    return []  # slots only
+                if not isinstance(obj.__dict__, (dict, types.DictProxyType)):
+                    raise TypeError("%s.__dict__ is not a dictionary"
+                                    "" % obj.__name__)
+                return obj.__dict__.keys()
+
+            def dir2(obj):
+                attrs = set()
+                if not hasattr(obj, '__bases__'):
+                    # obj is an instance
+                    if not hasattr(obj, '__class__'):
+                        # slots
+                        return sorted(get_attrs(obj))
+                    klass = obj.__class__
+                    attrs.update(get_attrs(klass))
+                else:
+                    # obj is a class
+                    klass = obj
+
+                for cls in klass.__bases__:
+                    attrs.update(get_attrs(cls))
+                    attrs.update(dir2(cls))
+                attrs.update(get_attrs(obj))
+                return list(attrs)
+
+            ret = dir2(self)
+
+        ret = list(set(dir(self.__wrapped__) + ret))
         return ret
 
     def __getattr__(self, name):

@@ -189,7 +189,7 @@ class Distribution(VarScopeObject):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
 
-    def sample(self, sample_shape=(), name=None):
+    def sample(self, sample_shape=(), group_event_ndims=None, name=None):
         """Get random samples from the distribution.
 
         Parameters
@@ -197,6 +197,9 @@ class Distribution(VarScopeObject):
         sample_shape : tuple[int | tf.Tensor] | tf.Tensor
             The shape of the samples, as a tuple of integers / 0-d tensors,
             or a 1-d tensor.
+
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
 
         name : str
             Optional name of this operation.
@@ -206,6 +209,7 @@ class Distribution(VarScopeObject):
         tfsnippet.bayes.StochasticTensor
             The random samples as `StochasticTensor`.
         """
+        from ..stochastic import StochasticTensor
         with tf.name_scope(name, default_name='sample'):
             # derive the samples using ``n = prod(sample_shape)``
             if is_deterministic_shape(sample_shape):
@@ -243,14 +247,16 @@ class Distribution(VarScopeObject):
 
             # fix the static shape of samples
             ret.set_shape(static_sample_shape.concatenate(tail_shape))
-            from ..stochastic import StochasticTensor
+
+            if group_event_ndims is None:
+                group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
                 samples=ret,
-                group_event_ndims=self.group_event_ndims
+                group_event_ndims=group_event_ndims
             )
 
-    def sample_n(self, n_samples=None, name=None):
+    def sample_n(self, n_samples=None, group_event_ndims=None, name=None):
         """Get random samples from the distribution.
         
         The different between this method and `sample` is that, this method
@@ -267,6 +273,9 @@ class Distribution(VarScopeObject):
             equal to ``batch_shape + value_shape``.  Otherwise the
             specified number of samples will be taken, while the shape
             will equal to ``(n_samples,) + batch_shape + value_shape``.
+
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
             
         name : str
             Optional name of this operation.
@@ -276,25 +285,31 @@ class Distribution(VarScopeObject):
         tfsnippet.bayes.StochasticTensor
             The random samples as tensor.
         """
+        from ..stochastic import StochasticTensor
         with tf.name_scope(name, default_name='sample_n'):
             if n_samples is None:
                 samples = tf.squeeze(self._sample_n(1), 0)
             else:
                 samples = self._sample_n(n_samples)
-            from ..stochastic import StochasticTensor
+
+            if group_event_ndims is None:
+                group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
                 samples=samples,
-                group_event_ndims=self.group_event_ndims
+                group_event_ndims=group_event_ndims
             )
 
-    def observe(self, observed):
+    def observe(self, observed, group_event_ndims=None):
         """Create a `StochasticTensor` with specified observations.
         
         Parameters
         ----------
         observed : tf.Tensor | np.ndarray | float | int
-            The observation following this distribution.
+            The observations.
+
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
         
         Returns
         -------
@@ -302,13 +317,50 @@ class Distribution(VarScopeObject):
             The stochastic tensor.
         """
         from ..stochastic import StochasticTensor
-        return StochasticTensor(self, observed=observed)
+        if group_event_ndims is None:
+            group_event_ndims = self.group_event_ndims
+        return StochasticTensor(
+            self,
+            observed=observed,
+            group_event_ndims=group_event_ndims
+        )
+
+    def sample_or_observe(self, n_samples=None, observed=None,
+                          group_event_ndims=None, name=None):
+        """Create a `StochasticTensor` with random samples or observations.
+        
+        Parameters
+        ----------
+        n_samples : int | tf.Tensor | None
+            Generate this number of samples via `sample_n` method, unless
+            `observed` is specified.
+            
+        observed : tf.Tensor | np.ndarray | float | int
+            The observations.
+
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
+            
+        name : str
+            Optional name of this operation.
+            
+        Returns
+        -------
+        tfsnippet.bayes.StochasticTensor
+            The random samples or observations as tensor.
+        """
+        if observed is None:
+            return self.sample_n(
+                n_samples, group_event_ndims=group_event_ndims, name=name)
+        else:
+            return self.observe(
+                observed, group_event_ndims=group_event_ndims)
 
     def _enum_observe(self):
         raise RuntimeError('%s is not enumerable.' %
                            self.__class__.__name__)
 
-    def enum_observe(self, name=None):
+    def enum_observe(self, group_event_ndims=None, name=None):
         """Enumerate possible values as observations.
 
         The returned `StochasticTensor` should in the shape of 
@@ -318,25 +370,30 @@ class Distribution(VarScopeObject):
 
         Parameters
         ----------
+        group_event_ndims : int
+            If specify, override the default `group_event_ndims`.
+    
         name : str
             Optional name of this operation.
 
         Returns
         -------
         tfsnippet.bayes.StochasticTensor
-            The enumeration "samples" as tensor.
+            The enumerated values as observations.
 
         Raises
         ------
         RuntimeError
             If the distribution is not enumerable.
         """
+        from ..stochastic import StochasticTensor
         with tf.name_scope(name, default_name='enum_observe'):
-            from ..stochastic import StochasticTensor
+            if group_event_ndims is None:
+                group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
                 samples=self._enum_observe(),
-                group_event_ndims=self.group_event_ndims
+                group_event_ndims=group_event_ndims
             )
 
     def _log_prob(self, x):
