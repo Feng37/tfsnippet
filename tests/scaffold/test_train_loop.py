@@ -255,8 +255,8 @@ class TrainLoopTestCase(TestCase):
                 loop.print_logs()
         self.assertMatches('\n'.join(logs), re.compile(
             r'^'
-            r'\[Epoch 1/1\] epoch time: 0\.0[34]\d* sec; '
-            r'x timer: 0\.01\d* sec; y time: 0\.02\d* sec'
+            r'\[Epoch 1/1\] epoch time: 0\.0[345]\d* sec; '
+            r'x timer: 0\.01\d* sec; y time: 0\.0[23]\d* sec'
             r'$'
         ))
 
