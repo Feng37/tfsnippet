@@ -58,7 +58,9 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         The samples of this stochastic tensor.
 
     observed : tf.Tensor | np.ndarray | float | int
-        The observation of this stochastic tensor.
+        The observation of this stochastic tensor.  Data type of this
+        tensor will be casted to `distribution.dtype`.
+
         One and only one of `samples`, `observed` should be specified.
 
     group_event_ndims : int | tf.Tensor
@@ -80,14 +82,16 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
             tensor = observed
             is_observed = True
 
-        if isinstance(tensor, StochasticTensor):
-            tensor = tensor.__wrapped__
-        if not isinstance(tensor, tf.Tensor):
-            tensor = tf.convert_to_tensor(tensor)
-
         if not isinstance(distribution, Distribution):
             raise TypeError('`distribution` is expected to be a Distribution '
                             'but got %r.' % (distribution,))
+
+        if isinstance(tensor, StochasticTensor):
+            tensor = tensor.__wrapped__
+        if not isinstance(tensor, tf.Tensor):
+            tensor = tf.convert_to_tensor(tensor, distribution.dtype)
+        if tensor.dtype != distribution.dtype:
+            tensor = tf.cast(tensor, dtype=distribution.dtype)
 
         self.__wrapped__ = tensor
         self._self_is_observed = is_observed
@@ -116,7 +120,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
         Returns
         -------
-        int | None
+        int | tf.Tensor | None
             The number of dimensions.  If `group_event_ndims` is not
             specified in the constructor, will return None.
         """

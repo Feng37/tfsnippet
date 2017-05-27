@@ -117,13 +117,13 @@ class StochasticTensorTestCase(TestCase):
         )
         self.assertEqual(t.get_shape().as_list(), [2, 3, None])
 
-    def test_dtype_replaced_by_observation(self):
+    def test_observation_dtype_cast(self):
         t = StochasticTensor(
             self.distrib,
             observed=tf.placeholder(tf.int32)
         )
         self.assertEqual(self.distrib.dtype, tf.float32)
-        self.assertEqual(t.dtype, tf.int32)
+        self.assertEqual(t.dtype, tf.float32)
 
     def test_disallowed_op(self):
         with self.assertRaisesRegex(

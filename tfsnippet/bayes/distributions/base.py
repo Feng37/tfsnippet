@@ -79,7 +79,7 @@ class Distribution(VarScopeObject):
 
         Returns
         -------
-        int | None
+        int | tf.Tensor | None
             The number of dimensions.  If `group_event_ndims` is not
             specified in the constructor, will return None.
         """
@@ -209,12 +209,12 @@ class Distribution(VarScopeObject):
         # `@instance_reuse` decorator should not be applied to this method.
         raise NotImplementedError()
 
-    def sample(self, sample_shape=(), group_event_ndims=None, name=None):
+    def sample(self, shape=(), group_event_ndims=None, name=None):
         """Get random samples from the distribution.
 
         Parameters
         ----------
-        sample_shape : tuple[int | tf.Tensor] | tf.Tensor
+        shape : tuple[int | tf.Tensor] | tf.Tensor
             The shape of the samples, as a tuple of integers / 0-d tensors,
             or a 1-d tensor.
 
@@ -231,26 +231,26 @@ class Distribution(VarScopeObject):
         """
         from ..stochastic import StochasticTensor
         with tf.name_scope(name, default_name='sample'):
-            # derive the samples using ``n = prod(sample_shape)``
-            if is_deterministic_shape(sample_shape):
-                ret = self._sample_n(np.prod(sample_shape, dtype=np.int32))
-                static_sample_shape = tf.TensorShape(sample_shape)
+            # derive the samples using ``n = prod(shape)``
+            if is_deterministic_shape(shape):
+                ret = self._sample_n(np.prod(shape, dtype=np.int32))
+                static_sample_shape = tf.TensorShape(shape)
             else:
-                if isinstance(sample_shape, (tuple, list)):
+                if isinstance(shape, (tuple, list)):
                     static_sample_shape = tf.TensorShape(list(map(
                         lambda v: None if is_dynamic_tensor_like(v) else v,
-                        sample_shape
+                        shape
                     )))
-                    sample_shape = tf.stack(sample_shape, axis=0)
+                    shape = tf.stack(shape, axis=0)
                 else:
                     static_sample_shape = tf.TensorShape(None)
-                ret = self._sample_n(tf.reduce_prod(sample_shape))
+                ret = self._sample_n(tf.reduce_prod(shape))
 
             # reshape the samples
             tail_shape = ret.get_shape()[1:]
             with tf.name_scope('reshape'):
                 dynamic_shape = tf.concat(
-                    [sample_shape, tf.shape(ret)[1:]], axis=0)
+                    [shape, tf.shape(ret)[1:]], axis=0)
                 ret = tf.reshape(ret, dynamic_shape)
 
             # special fix: when `sample_shape` is a tensor, it would cause
@@ -276,30 +276,30 @@ class Distribution(VarScopeObject):
                 group_event_ndims=group_event_ndims
             )
 
-    def sample_n(self, n_samples=None, group_event_ndims=None, name=None):
+    def sample_n(self, n=None, group_event_ndims=None, name=None):
         """Get random samples from the distribution.
-        
+
         The different between this method and `sample` is that, this method
         expects a 0-d tensor as the count of samples, but `sample` expects
         a 1-d tensor as the shape of samples.
-        
+
         Parameters
         ----------
-        n_samples : int | tf.Tensor | None
+        n : int | tf.Tensor | None
             The number of samples to take.
-            
+
             If not specified, only one sample will be taken correspond
             to each set of parameter, while the shape of samples will
             equal to ``batch_shape + value_shape``.  Otherwise the
             specified number of samples will be taken, while the shape
-            will equal to ``(n_samples,) + batch_shape + value_shape``.
+            will equal to ``(n,) + batch_shape + value_shape``.
 
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
-            
+
         name : str
             Optional name of this operation.
-            
+
         Returns
         -------
         tfsnippet.bayes.StochasticTensor
@@ -307,10 +307,10 @@ class Distribution(VarScopeObject):
         """
         from ..stochastic import StochasticTensor
         with tf.name_scope(name, default_name='sample_n'):
-            if n_samples is None:
+            if n is None:
                 samples = tf.squeeze(self._sample_n(1), 0)
             else:
-                samples = self._sample_n(n_samples)
+                samples = self._sample_n(n)
 
             if group_event_ndims is None:
                 group_event_ndims = self.group_event_ndims
@@ -322,7 +322,7 @@ class Distribution(VarScopeObject):
 
     def observe(self, observed, group_event_ndims=None):
         """Create a `StochasticTensor` with specified observations.
-        
+
         Parameters
         ----------
         observed : tf.Tensor | np.ndarray | float | int
@@ -330,7 +330,7 @@ class Distribution(VarScopeObject):
 
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
-        
+
         Returns
         -------
         tfsnippet.bayes.StochasticTensor
@@ -348,22 +348,22 @@ class Distribution(VarScopeObject):
     def sample_or_observe(self, n_samples=None, observed=None,
                           group_event_ndims=None, name=None):
         """Create a `StochasticTensor` with random samples or observations.
-        
+
         Parameters
         ----------
         n_samples : int | tf.Tensor | None
             Generate this number of samples via `sample_n` method, unless
             `observed` is specified.
-            
+
         observed : tf.Tensor | np.ndarray | float | int
             The observations.
 
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
-            
+
         name : str
             Optional name of this operation.
-            
+
         Returns
         -------
         tfsnippet.bayes.StochasticTensor
@@ -383,7 +383,7 @@ class Distribution(VarScopeObject):
     def enum_observe(self, group_event_ndims=None, name=None):
         """Enumerate possible values as observations.
 
-        The returned `StochasticTensor` should in the shape of 
+        The returned `StochasticTensor` should in the shape of
         ``(enum_value_count,) + batch_shape + value_shape``, where
         `enum_value_count` is the count of possible values from this
         distribution.
@@ -392,7 +392,7 @@ class Distribution(VarScopeObject):
         ----------
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
-    
+
         name : str
             Optional name of this operation.
 
