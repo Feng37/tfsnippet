@@ -293,7 +293,7 @@ class Categorical(_BaseCategorical):
     def _sample_n(self, n):
         return self._sample_n_sparse(n, self.dtype)
 
-    def _enum_observe(self):
+    def _enum_values(self):
         return self._enum_observe_sparse(self.dtype)
 
     def _log_prob_with_logits(self, x):
@@ -416,7 +416,7 @@ class OneHotCategorical(_BaseCategorical):
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 
-    def _enum_observe(self):
+    def _enum_values(self):
         samples = self._enum_observe_sparse(self.dtype)
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples

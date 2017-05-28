@@ -536,8 +536,20 @@ class EnumerableTestMixin(object):
     def test_enum_observe(self):
         with self.get_session():
             dist = self.dist_class(**self.simple_params)
+            t = dist.enum_observe()
+            self.assertTrue(t.is_observed)
             np.testing.assert_equal(
-                dist.enum_observe().eval(),
+                t.eval(),
+                self.get_enum_observe_for_params(self.simple_params)
+            )
+
+    def test_enum_sample(self):
+        with self.get_session():
+            dist = self.dist_class(**self.simple_params)
+            t = dist.enum_sample()
+            self.assertFalse(t.is_observed)
+            np.testing.assert_equal(
+                t.eval(),
                 self.get_enum_observe_for_params(self.simple_params)
             )
 

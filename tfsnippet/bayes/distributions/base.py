@@ -376,9 +376,45 @@ class Distribution(VarScopeObject):
             return self.observe(
                 observed, group_event_ndims=group_event_ndims)
 
-    def _enum_observe(self):
+    def _enum_values(self):
         raise RuntimeError('%s is not enumerable.' %
                            self.__class__.__name__)
+
+    def enum_sample(self, group_event_ndims=None, name=None):
+        """Enumerate possible values as samples.
+
+        The returned `StochasticTensor` should in the shape of
+        ``(enum_value_count,) + batch_shape + value_shape``, where
+        `enum_value_count` is the count of possible values from this
+        distribution.
+
+        Parameters
+        ----------
+        group_event_ndims : int | tf.Tensor
+            If specify, override the default `group_event_ndims`.
+
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tfsnippet.bayes.StochasticTensor
+            The enumerated values as samples.
+
+        Raises
+        ------
+        RuntimeError
+            If the distribution is not enumerable.
+        """
+        from ..stochastic import StochasticTensor
+        with tf.name_scope(name, default_name='enum_observe'):
+            if group_event_ndims is None:
+                group_event_ndims = self.group_event_ndims
+            return StochasticTensor(
+                self,
+                samples=self._enum_values(),
+                group_event_ndims=group_event_ndims
+            )
 
     def enum_observe(self, group_event_ndims=None, name=None):
         """Enumerate possible values as observations.
@@ -412,7 +448,7 @@ class Distribution(VarScopeObject):
                 group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
-                samples=self._enum_observe(),
+                observed=self._enum_values(),
                 group_event_ndims=group_event_ndims
             )
 

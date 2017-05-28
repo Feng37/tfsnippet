@@ -358,6 +358,9 @@ class DistributionTestCase(TestCase):
         with self.assertRaisesRegex(
                 RuntimeError, '_MyDistribution is not enumerable.'):
             _ = dist.enum_observe()
+        with self.assertRaisesRegex(
+                RuntimeError, '_MyDistribution is not enumerable.'):
+            _ = dist.enum_sample()
 
     def test_override_group_event_ndims_in_sample(self):
         dist = _MyDistribution(self.p_data, group_event_ndims=1)
@@ -395,6 +398,10 @@ class DistributionTestCase(TestCase):
             dist.enum_observe().group_event_ndims, 1)
         self.assertEqual(
             dist.enum_observe(group_event_ndims=4).group_event_ndims, 4)
+        self.assertEqual(
+            dist.enum_sample().group_event_ndims, 1)
+        self.assertEqual(
+            dist.enum_sample(group_event_ndims=4).group_event_ndims, 4)
 
 
 if __name__ == '__main__':
