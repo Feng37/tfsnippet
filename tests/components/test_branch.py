@@ -33,6 +33,13 @@ class DictMapperTestCase(TestCase):
              'linear/fully_connected/weights:0']
         )
 
+    def test_invalid_key(self):
+        for k in ['.', '', '90ab', 'abc.def']:
+            with self.assertRaisesRegex(
+                ValueError, 'The key for `DictMapper` must be a valid '
+                            'Python identifier.*'):
+                _ = DictMapper({k: lambda x: x})
+
 
 if __name__ == '__main__':
     unittest.main()
