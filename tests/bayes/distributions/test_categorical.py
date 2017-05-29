@@ -67,7 +67,7 @@ class _CategoricalTestMixin(DistributionTestMixin,
         logits = params['logits']
         return logits.shape[-1]
 
-    def get_enum_observe_sparse_for_params(self, params):
+    def get_enum_values_sparse_for_params(self, params):
         n_categories = params['logits'].shape[-1]
         x = np.arange(n_categories, dtype=np.int32)
         x = x.reshape([n_categories] + [1] * len(params['logits'].shape[:-1]))
@@ -165,8 +165,8 @@ class CategoricalTestCase(TestCase, _CategoricalTestMixin):
     def get_shapes_for_param(self, **params):
         return (), params['logits'].shape[:-1]
 
-    def get_enum_observe_for_params(self, params):
-        return self.get_enum_observe_sparse_for_params(params)
+    def get_enum_values_for_params(self, params):
+        return self.get_enum_values_sparse_for_params(params)
 
     def log_prob(self, x, group_event_ndims=None, **params):
         logits = params['logits']
@@ -203,9 +203,9 @@ class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
     def get_shapes_for_param(self, **params):
         return params['logits'].shape[-1:], params['logits'].shape[:-1]
 
-    def get_enum_observe_for_params(self, params):
+    def get_enum_values_for_params(self, params):
         eye = np.eye(params['logits'].shape[-1])[
-            self.get_enum_observe_sparse_for_params(params)
+            self.get_enum_values_sparse_for_params(params)
         ]
         return eye.astype(np.int32)
 

@@ -55,7 +55,7 @@ class Distribution(VarScopeObject):
             Generate this number of samples via `sample_n` method, unless
             `observed` is specified.
 
-        observed : tf.Tensor | np.ndarray | float | int
+        observed : tf.Tensor | np.ndarray
             The observations.
 
         group_event_ndims : int | tf.Tensor
@@ -145,7 +145,7 @@ class Distribution(VarScopeObject):
 
         See Also
         --------
-        enum_observe
+        enum_values
         """
         raise NotImplementedError()
 
@@ -325,7 +325,7 @@ class Distribution(VarScopeObject):
 
         Parameters
         ----------
-        observed : tf.Tensor | np.ndarray | float | int
+        observed : tf.Tensor | np.ndarray
             The observations.
 
         group_event_ndims : int | tf.Tensor
@@ -355,7 +355,7 @@ class Distribution(VarScopeObject):
             Generate this number of samples via `sample_n` method, unless
             `observed` is specified.
 
-        observed : tf.Tensor | np.ndarray | float | int
+        observed : tf.Tensor | np.ndarray
             The observations.
 
         group_event_ndims : int | tf.Tensor
@@ -380,8 +380,8 @@ class Distribution(VarScopeObject):
         raise RuntimeError('%s is not enumerable.' %
                            self.__class__.__name__)
 
-    def enum_sample(self, group_event_ndims=None, name=None):
-        """Enumerate possible values as samples.
+    def enum_values(self, group_event_ndims=None, as_observed=False, name=None):
+        """Enumerate possible values as `StochasticTensor`.
 
         The returned `StochasticTensor` should in the shape of
         ``(enum_value_count,) + batch_shape + value_shape``, where
@@ -392,6 +392,14 @@ class Distribution(VarScopeObject):
         ----------
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
+
+        as_observed : bool
+            Whether or not to feed the enumerated values as observed?
+            (default False)
+
+            If set to True, the returned `StochasticTensor` will be
+            observed (that is, ``is_observed = True``).  Otherwise
+            the enumerated values will be treated as random samples.
 
         name : str
             Optional name of this operation.
@@ -407,49 +415,20 @@ class Distribution(VarScopeObject):
             If the distribution is not enumerable.
         """
         from ..stochastic import StochasticTensor
-        with tf.name_scope(name, default_name='enum_observe'):
+        with tf.name_scope(name, default_name='enum_values'):
             if group_event_ndims is None:
                 group_event_ndims = self.group_event_ndims
+            enum_values = self._enum_values()
+
+            if as_observed:
+                feed_args = {'observed': enum_values}
+            else:
+                feed_args = {'samples': enum_values}
+
             return StochasticTensor(
                 self,
-                samples=self._enum_values(),
-                group_event_ndims=group_event_ndims
-            )
-
-    def enum_observe(self, group_event_ndims=None, name=None):
-        """Enumerate possible values as observations.
-
-        The returned `StochasticTensor` should in the shape of
-        ``(enum_value_count,) + batch_shape + value_shape``, where
-        `enum_value_count` is the count of possible values from this
-        distribution.
-
-        Parameters
-        ----------
-        group_event_ndims : int | tf.Tensor
-            If specify, override the default `group_event_ndims`.
-
-        name : str
-            Optional name of this operation.
-
-        Returns
-        -------
-        tfsnippet.bayes.StochasticTensor
-            The enumerated values as observations.
-
-        Raises
-        ------
-        RuntimeError
-            If the distribution is not enumerable.
-        """
-        from ..stochastic import StochasticTensor
-        with tf.name_scope(name, default_name='enum_observe'):
-            if group_event_ndims is None:
-                group_event_ndims = self.group_event_ndims
-            return StochasticTensor(
-                self,
-                observed=self._enum_values(),
-                group_event_ndims=group_event_ndims
+                group_event_ndims=group_event_ndims,
+                **feed_args
             )
 
     def _log_prob(self, x):

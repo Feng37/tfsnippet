@@ -54,10 +54,10 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
     distribution : Distribution | () -> Distribution
         The distribution that derives this stochastic tensor.
 
-    samples : tf.Tensor | np.ndarray | float | int
+    samples : tf.Tensor | np.ndarray
         The samples of this stochastic tensor.
 
-    observed : tf.Tensor | np.ndarray | float | int
+    observed : tf.Tensor | np.ndarray
         The observation of this stochastic tensor.  Data type of this
         tensor will be casted to `distribution.dtype`.
 
@@ -152,7 +152,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
 
         See Also
         --------
-        Distribution.enum_observe
+        Distribution.enum_values
         """
         return self.distribution.is_enumerable
 

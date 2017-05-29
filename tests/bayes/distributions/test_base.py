@@ -352,15 +352,15 @@ class DistributionTestCase(TestCase):
         with self.get_session():
             np.testing.assert_almost_equal(samples.eval(), self.p_data)
 
-    def test_error_enum_observe(self):
+    def test_error_enum_values(self):
         dist = _MyDistribution(self.p_data)
         self.assertFalse(dist.is_enumerable)
         with self.assertRaisesRegex(
                 RuntimeError, '_MyDistribution is not enumerable.'):
-            _ = dist.enum_observe()
+            _ = dist.enum_values()
         with self.assertRaisesRegex(
                 RuntimeError, '_MyDistribution is not enumerable.'):
-            _ = dist.enum_sample()
+            _ = dist.enum_values()
 
     def test_override_group_event_ndims_in_sample(self):
         dist = _MyDistribution(self.p_data, group_event_ndims=1)
@@ -395,13 +395,9 @@ class DistributionTestCase(TestCase):
 
         dist = Bernoulli(0., group_event_ndims=1)
         self.assertEqual(
-            dist.enum_observe().group_event_ndims, 1)
+            dist.enum_values().group_event_ndims, 1)
         self.assertEqual(
-            dist.enum_observe(group_event_ndims=4).group_event_ndims, 4)
-        self.assertEqual(
-            dist.enum_sample().group_event_ndims, 1)
-        self.assertEqual(
-            dist.enum_sample(group_event_ndims=4).group_event_ndims, 4)
+            dist.enum_values(group_event_ndims=4).group_event_ndims, 4)
 
 
 if __name__ == '__main__':

@@ -19,14 +19,14 @@ class Sequential(Component):
     sequential networks.  Following code demonstrates an example of
     using this wrapper:
 
-        from tfsnippet import components as comp
+        from tfsnippet.components import Linear
 
         mlp = Sequential([
-            comp.Linear(100),
+            Linear(100),
             tf.nn.relu,
-            comp.Linear(100),
+            Linear(100),
             tf.nn.relu,
-            comp.Linear(1),
+            Linear(1),
             tf.nn.sigmoid
         ])
 
@@ -61,11 +61,11 @@ class Sequential(Component):
         if not layers:
             raise ValueError('`components` must not be empty.')
         super(Sequential, self).__init__(name=name, default_name=default_name)
-        self.components = layers
+        self._layers = layers
 
     def _call(self, inputs):
         outputs = inputs
-        for i, c in enumerate(self.components):
+        for i, c in enumerate(self._layers):
             with tf.variable_scope('layer%d' % i):
                 outputs = c(outputs)
         return outputs
