@@ -38,6 +38,9 @@ class Normal(Distribution):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -46,7 +49,7 @@ class Normal(Distribution):
     """
 
     def __init__(self, mean, stddev=None, logstd=None, group_event_ndims=None,
-                 name=None, default_name=None):
+                 check_numerics=False, name=None, default_name=None):
         # check the arguments
         if (stddev is None and logstd is None) or \
                 (stddev is not None and logstd is not None):
@@ -58,6 +61,7 @@ class Normal(Distribution):
                             'numbers.')
 
         super(Normal, self).__init__(group_event_ndims=group_event_ndims,
+                                     check_numerics=check_numerics,
                                      name=name,
                                      default_name=default_name)
 
@@ -92,24 +96,36 @@ class Normal(Distribution):
                 )
 
                 # derive the attributes of this Normal distribution
+
                 if self._stdx_is_log:
-                    self._stddev = tf.exp(self._stdx, name='stddev')
-                    self._logstd = tf.identity(self._stdx, name='logstd')
-                    self._var = tf.exp(
-                        tf.constant(2., dtype=dtype) * self._logstd,
-                        name='variance'
+                    self._stddev = self._do_check_numerics(
+                        tf.exp(self._stdx, name='stddev'), 'stddev')
+                    self._logstd = self._stdx
+                    self._var = self._do_check_numerics(
+                        tf.exp(
+                            tf.constant(2., dtype=dtype) * self._logstd,
+                            name='variance'
+                        ),
+                        'variance'
                     )
-                    self._precision = tf.exp(
-                        tf.constant(-2., dtype=dtype) * self._logstd,
-                        name='precision'
+                    self._precision = self._do_check_numerics(
+                        tf.exp(
+                            tf.constant(-2., dtype=dtype) * self._logstd,
+                            name='precision'
+                        ),
+                        'precision'
                     )
                 else:
-                    self._stddev = tf.identity(self._stdx, name='stddev')
-                    self._logstd = tf.log(self._stdx, name='logstd')
+                    self._stddev = self._stdx
+                    self._logstd = self._do_check_numerics(
+                        tf.log(self._stdx, name='logstd'), 'logstd')
                     self._var = tf.square(self._stddev, name='variance')
-                    self._precision = tf.divide(
-                        tf.constant(1., dtype=dtype), self._var,
-                        name='precision'
+                    self._precision = self._do_check_numerics(
+                        tf.divide(
+                            tf.constant(1., dtype=dtype), self._var,
+                            name='precision'
+                        ),
+                        'precision'
                     )
                 self._logvar = tf.multiply(
                     tf.constant(2., dtype=dtype), self._logstd,

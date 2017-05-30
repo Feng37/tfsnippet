@@ -44,6 +44,9 @@ class _BaseCategorical(Distribution):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -52,7 +55,7 @@ class _BaseCategorical(Distribution):
     """
 
     def __init__(self, logits=None, probs=None, group_event_ndims=None,
-                 name=None, default_name=None):
+                 check_numerics=False, name=None, default_name=None):
         # check the arguments
         if (logits is None and probs is None) or \
                 (logits is not None and probs is not None):
@@ -69,6 +72,7 @@ class _BaseCategorical(Distribution):
 
         super(_BaseCategorical, self).__init__(
             group_event_ndims=group_event_ndims,
+            check_numerics=check_numerics,
             name=name,
             default_name=default_name
         )
@@ -79,13 +83,24 @@ class _BaseCategorical(Distribution):
                 if logits is not None:
                     logits = tf.convert_to_tensor(logits, dtype=param_dtype)
                     probs = tf.nn.softmax(logits, name='probs_given_logits')
-                    self._probs_is_derived = True
+                    probs_clipped = probs
+                    probs_is_derived = True
                 else:
                     probs = tf.convert_to_tensor(probs, dtype=param_dtype)
-                    logits = tf.log(probs, name='logits_given_probs')
-                    self._probs_is_derived = False
+                    probs_eps = (
+                        1e-11 if probs.dtype == tf.float64 else 1e-7)
+                    probs_clipped = tf.clip_by_value(
+                        probs, probs_eps, 1 - probs_eps
+                    )
+                    logits = self._do_check_numerics(
+                        tf.log(probs, name='logits_given_probs'),
+                        'logits'
+                    )
+                    probs_is_derived = False
                 self._logits = logits
                 self._probs = probs
+                self._probs_is_derived = probs_is_derived
+                self._probs_clipped = probs_clipped
 
                 # derive the shape and data types of parameters
                 logits_shape = logits.get_shape()
@@ -213,12 +228,15 @@ class _BaseCategorical(Distribution):
             if self._probs_is_derived:
                 log_probs1 = tf.nn.log_softmax(self.logits)
             else:
-                log_probs1 = tf.log(self.probs)
+                log_probs1 = self._do_check_numerics(
+                    tf.log(self._probs_clipped), 'log(p)'
+                )
 
             if other._probs_is_derived:
                 log_probs2 = tf.nn.log_softmax(other.logits)
             else:
-                log_probs2 = tf.log(other.probs)
+                log_probs2 = other._do_check_numerics(
+                    tf.log(other._probs_clipped), 'log(p)')
 
             return tf.reduce_sum(
                 probs1 * (log_probs1 - log_probs2), axis=-1)
@@ -255,6 +273,9 @@ class Categorical(_BaseCategorical):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -263,7 +284,8 @@ class Categorical(_BaseCategorical):
     """
 
     def __init__(self, logits=None, probs=None, dtype=None,
-                 group_event_ndims=None, name=None, default_name=None):
+                 group_event_ndims=None, check_numerics=False,
+                 name=None, default_name=None):
         if dtype is None:
             dtype = tf.int32
         else:
@@ -273,6 +295,7 @@ class Categorical(_BaseCategorical):
             logits=logits,
             probs=probs,
             group_event_ndims=group_event_ndims,
+            check_numerics=check_numerics,
             name=name,
             default_name=default_name
         )
@@ -320,7 +343,11 @@ class Categorical(_BaseCategorical):
             self.n_categories,
             dtype=self.param_dtype
         )
-        return tf.reduce_sum(x * tf.log(self.probs), axis=-1)
+        log_p = self._do_check_numerics(
+            tf.log(self._probs_clipped),
+            'log(p)'
+        )
+        return tf.reduce_sum(x * log_p, axis=-1)
 
     def _log_prob(self, x):
         if self._probs_is_derived:
@@ -363,6 +390,9 @@ class OneHotCategorical(_BaseCategorical):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -371,7 +401,8 @@ class OneHotCategorical(_BaseCategorical):
     """
 
     def __init__(self, logits=None, probs=None, dtype=None,
-                 group_event_ndims=None, name=None, default_name=None):
+                 group_event_ndims=None, check_numerics=False,
+                 name=None, default_name=None):
         if dtype is None:
             dtype = tf.int32
         else:
@@ -381,6 +412,7 @@ class OneHotCategorical(_BaseCategorical):
             logits=logits,
             probs=probs,
             group_event_ndims=group_event_ndims,
+            check_numerics=check_numerics,
             name=name,
             default_name=default_name
         )
@@ -456,7 +488,11 @@ class OneHotCategorical(_BaseCategorical):
 
     def _log_prob_with_probs(self, x):
         x = tf.cast(x, dtype=self.param_dtype)
-        return tf.reduce_sum(x * tf.log(self.probs), axis=-1)
+        log_p = self._do_check_numerics(
+            tf.log(self._probs_clipped),
+            'log(p)'
+        )
+        return tf.reduce_sum(x * log_p, axis=-1)
 
     def _log_prob(self, x):
         if self._probs_is_derived:

@@ -30,6 +30,9 @@ class Gamma(Distribution):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -38,7 +41,7 @@ class Gamma(Distribution):
     """
 
     def __init__(self, alpha, beta, group_event_ndims=None,
-                 name=None, default_name=None):
+                 check_numerics=False, name=None, default_name=None):
         # check the arguments
         dtype = get_preferred_tensor_dtype(alpha)
         if not dtype.is_floating:
@@ -46,6 +49,7 @@ class Gamma(Distribution):
                             'numbers.')
 
         super(Gamma, self).__init__(group_event_ndims=group_event_ndims,
+                                    check_numerics=check_numerics,
                                     name=name,
                                     default_name=default_name)
 
@@ -127,16 +131,37 @@ class Gamma(Distribution):
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)
+        log_beta = self._do_check_numerics(tf.log(self.beta), 'log(beta)')
+        log_x = self._do_check_numerics(tf.log(x), 'log(x)')
+        lgamma_alpha = self._do_check_numerics(
+            tf.lgamma(self.alpha), 'lgamma(alpha)'
+        )
         return (
-            self.alpha * tf.log(self.beta) + (self.alpha - 1) * tf.log(x) -
-            self.beta * x - tf.lgamma(self.alpha)
+            self.alpha * log_beta + (self.alpha - 1) * log_x -
+            self.beta * x - lgamma_alpha
         )
 
     def _analytic_kld(self, other):
         if isinstance(other, Gamma):
+            self_digamma_alpha = self._do_check_numerics(
+                tf.digamma(self.alpha), 'digamma(alpha)'
+            )
+            self_lgamma_alpha = self._do_check_numerics(
+                tf.lgamma(self.alpha), 'lgamma(alpha)'
+            )
+            self_log_beta = self._do_check_numerics(
+                tf.log(self.beta), 'log(beta)'
+            )
+            other_lgamma_alpha = other._do_check_numerics(
+                tf.lgamma(other.alpha), 'lgamma(alpha)'
+            )
+            other_log_beta = other._do_check_numerics(
+                tf.log(other.beta), 'log(beta)'
+            )
+
             return (
-                ((self.alpha - other.alpha) * tf.digamma(self.alpha)) -
-                tf.lgamma(self.alpha) + tf.lgamma(other.alpha) +
-                other.alpha * (tf.log(self.beta) - tf.log(other.beta)) +
+                ((self.alpha - other.alpha) * self_digamma_alpha) -
+                self_lgamma_alpha + other_lgamma_alpha +
+                other.alpha * (self_log_beta - other_log_beta) +
                 self.alpha * (other.beta / self.beta - 1.)
             )

@@ -236,6 +236,15 @@ class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
                     self.big_number_scale, self.big_number_samples
                 )
 
+    def test_boundary_values_of_probs(self):
+        with self.get_session():
+            dist = self.dist_class(probs=[0., 1.])
+            np.testing.assert_almost_equal(dist.probs.eval(), [0., 1.])
+            np.testing.assert_almost_equal(dist.logits[1].eval(), 0.)
+            np.testing.assert_almost_equal(dist.prob([1, 0]).eval(), 0.)
+            np.testing.assert_almost_equal(dist.prob([0, 1]).eval(), 1.)
+            np.testing.assert_almost_equal(dist.log_prob([0, 1]).eval(), 0.)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -145,6 +145,19 @@ class BernoulliTestCase(TestCase,
                 self.analytic_kld(self.simple_params, self.kld_simple_params)
             )
 
+    def test_boundary_values_of_probs(self):
+        with self.get_session():
+            dist = self.dist_class(probs=0.)
+            np.testing.assert_almost_equal(dist.probs.eval(), 0.)
+            np.testing.assert_almost_equal(dist.prob(0).eval(), 1.)
+            np.testing.assert_almost_equal(dist.prob(1).eval(), 0.)
+            np.testing.assert_almost_equal(dist.log_prob(0).eval(), 0.)
+            dist = self.dist_class(probs=1.)
+            np.testing.assert_almost_equal(dist.probs.eval(), 1.)
+            np.testing.assert_almost_equal(dist.prob(0).eval(), 0.)
+            np.testing.assert_almost_equal(dist.prob(1).eval(), 1.)
+            np.testing.assert_almost_equal(dist.log_prob(1).eval(), 0.)
+
 
 if __name__ == '__main__':
     unittest.main()

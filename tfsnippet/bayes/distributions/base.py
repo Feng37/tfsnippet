@@ -37,13 +37,18 @@ class Distribution(VarScopeObject):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name, default_name : str
         Optional name or default name of this distribution.
     """
 
-    def __init__(self, group_event_ndims=None, name=None, default_name=None):
+    def __init__(self, group_event_ndims=None, check_numerics=False,
+                 name=None, default_name=None):
         super(Distribution, self).__init__(name=name, default_name=default_name)
         self._group_event_ndims = group_event_ndims
+        self._check_numerics = check_numerics
 
     def __call__(self, n_samples=None, observed=None, group_event_ndims=None,
                  name=None):
@@ -72,6 +77,16 @@ class Distribution(VarScopeObject):
         return self.sample_or_observe(n_samples=n_samples, observed=observed,
                                       group_event_ndims=group_event_ndims,
                                       name=name)
+
+    def _do_check_numerics(self, x, name):
+        if self._check_numerics:
+            message = '%r of %r has nan or inf value' % (
+                name, self.variable_scope.name
+            )
+            with tf.control_dependencies(
+                    [tf.check_numerics(x, message)]):
+                return tf.identity(x)
+        return x
 
     @property
     def group_event_ndims(self):

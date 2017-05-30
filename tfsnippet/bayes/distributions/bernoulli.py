@@ -41,6 +41,9 @@ class Bernoulli(Distribution):
         would be considered as a group of events, whose probabilities are
         to be accounted together. (default None)
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     name : str
         Name of this normal distribution.
 
@@ -49,7 +52,8 @@ class Bernoulli(Distribution):
     """
 
     def __init__(self, logits=None, probs=None, dtype=None,
-                 group_event_ndims=None, name=None, default_name=None):
+                 group_event_ndims=None, check_numerics=False,
+                 name=None, default_name=None):
         # check the arguments
         if (logits is None and probs is None) or \
                 (logits is not None and probs is not None):
@@ -70,6 +74,7 @@ class Bernoulli(Distribution):
 
         super(Bernoulli, self).__init__(
             group_event_ndims=group_event_ndims,
+            check_numerics=check_numerics,
             name=name,
             default_name=default_name,
         )
@@ -81,13 +86,22 @@ class Bernoulli(Distribution):
                     logits = tf.convert_to_tensor(logits, dtype=param_dtype,
                                                   name='logits')
                     probs = tf.nn.sigmoid(logits, 'probs')
+                    probs_clipped = probs
                     probs_is_derived = True
                 else:
                     probs = tf.convert_to_tensor(probs, dtype=param_dtype,
                                                  name='probs')
-                    logits = tf.subtract(
-                        tf.log(probs), tf.log1p(-probs),
-                        name='logits'
+                    probs_eps = (
+                        1e-11 if probs.dtype == tf.float64 else 1e-7)
+                    probs_clipped = tf.clip_by_value(
+                        probs, probs_eps, 1 - probs_eps
+                    )
+                    logits = self._do_check_numerics(
+                        tf.subtract(
+                            tf.log(probs_clipped), tf.log1p(-probs_clipped),
+                            name='logits'
+                        ),
+                        'logits'
                     )
                     probs_is_derived = False
 
@@ -105,6 +119,7 @@ class Bernoulli(Distribution):
 
                 # derive various distribution attributes
                 self._probs = probs
+                self._probs_clipped = probs_clipped
                 self._probs_is_derived = probs_is_derived
 
                 # set other attributes
@@ -209,14 +224,18 @@ class Bernoulli(Distribution):
         if self._probs_is_derived:
             logits = self.logits
             x, logits = maybe_explicit_broadcast(x, logits)
-            return -tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=x, logits=logits
+            return self._do_check_numerics(
+                -tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=x, logits=logits
+                ),
+                'log_prob'
             )
         else:
             # TODO: check whether this is better than using derived logits.
-            log_p = tf.log(self.probs)
-            log_one_minus_p = tf.log1p(-self.probs)
-            return x * log_p + (1. - x) * log_one_minus_p
+            log_p = tf.log(self._probs_clipped)
+            log_one_minus_p = tf.log1p(-self._probs_clipped)
+            return self._do_check_numerics(
+                x * log_p + (1. - x) * log_one_minus_p, 'log_prob')
 
     def _analytic_kld(self, other):
         def get_log_probs(o):
@@ -224,8 +243,10 @@ class Bernoulli(Distribution):
                 log_p = -tf.nn.softplus(-o.logits)
                 log_one_minus_p = -tf.nn.softplus(o.logits)
             else:
-                log_p = tf.log(o.probs)
-                log_one_minus_p = tf.log1p(-o.probs)
+                log_p = o._do_check_numerics(tf.log(o._probs_clipped), 'log(p)')
+                log_one_minus_p = o._do_check_numerics(
+                    tf.log1p(-o._probs_clipped), 'log(1-p)'
+                )
             return log_p, log_one_minus_p
 
         if isinstance(other, Bernoulli):

@@ -399,6 +399,15 @@ class DistributionTestCase(TestCase):
         self.assertEqual(
             dist.enum_values(group_event_ndims=4).group_event_ndims, 4)
 
+    def test_check_numerics(self):
+        distrib = _MyDistribution(self.p_data, check_numerics=True)
+        x = distrib._do_check_numerics(tf.constant(0.) / tf.constant(0.),
+                                       'x')
+        with self.get_session():
+            with self.assertRaisesRegex(
+                    Exception, "'x' of 'my_distribution' has nan or inf value"):
+                _ = x.eval()
+
 
 if __name__ == '__main__':
     unittest.main()

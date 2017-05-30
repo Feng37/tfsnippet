@@ -13,9 +13,9 @@ from tfsnippet.bayes import Distribution
 
 class _MyDistribution(Distribution):
 
-    def __init__(self, p, group_event_ndims=None):
+    def __init__(self, p, group_event_ndims=None, check_numerics=False):
         super(_MyDistribution, self).__init__(
-            group_event_ndims=group_event_ndims)
+            group_event_ndims=group_event_ndims, check_numerics=check_numerics)
 
         with reopen_variable_scope(self.variable_scope):
             self.p = p = tf.convert_to_tensor(
