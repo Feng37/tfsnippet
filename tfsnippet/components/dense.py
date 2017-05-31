@@ -96,6 +96,12 @@ class Linear(Dense):
     num_outputs : int
         The number of output units in the layer.
 
+    normalizer_params : dict[str, any]
+        Normalization function named parameters. (default None)
+
+    weights_initializer : any
+        An initializer for the weights. (default `layers.xavier_initializer`)
+
     weights_initializer
         An initializer for the weights. (default `layers.xavier_initializer`)
 
@@ -119,6 +125,8 @@ class Linear(Dense):
 
     def __init__(self,
                  num_outputs,
+                 normalizer_fn=None,
+                 normalizer_params=None,
                  weights_initializer=layers.xavier_initializer(),
                  weights_regularizer=None,
                  biases_initializer=tf.zeros_initializer(),
@@ -129,6 +137,8 @@ class Linear(Dense):
         super(Linear, self).__init__(
             num_outputs=num_outputs,
             activation_fn=None,
+            normalizer_fn=normalizer_fn,
+            normalizer_params=normalizer_params,
             weights_initializer=weights_initializer,
             weights_regularizer=weights_regularizer,
             biases_initializer=biases_initializer,
