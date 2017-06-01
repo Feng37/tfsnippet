@@ -364,8 +364,24 @@ class _TrainLoop(object):
         """
         self._summary_writer.add_summary(summary, global_step=self.step)
 
-    def println(self, message):
+    def println(self, message, with_tag=False):
         """Print `message` via `print_function`."""
+        if with_tag:
+            def format_tag(v, max_v, name):
+                if max_v is not None:
+                    return '%s %d/%d' % (name, v, max_v)
+                return '%s %d' % (name, v)
+
+            if self._within_step:
+                tag = '%s, %s' % (
+                    format_tag(self._epoch, self._max_epoch, 'Epoch'),
+                    format_tag(self._step, self._max_step, 'Step'),
+                )
+            elif self._within_epoch:
+                tag = format_tag(self._epoch, self._max_epoch, 'Epoch')
+            else:
+                self._require_context()
+            message = '[%s] %s' % (tag, message)
         self._print_function(message)
 
     def print_training_summary(self):
@@ -393,27 +409,18 @@ class _TrainLoop(object):
         committed as metric immediately when this method is called.
         So it must be called at the end of an epoch or a step.
         """
-        def format_tag(v, max_v, name):
-            if max_v is not None:
-                return '%s %d/%d' % (name, v, max_v)
-            return '%s %d' % (name, v)
-
         if self._within_step:
-            tag = '%s, %s' % (
-                format_tag(self._epoch, self._max_epoch, 'Epoch'),
-                format_tag(self._step, self._max_step, 'Step'),
-            )
             self._commit_step_start_time()
             metrics = self._step_metrics
         elif self._within_epoch:
-            tag = format_tag(self._epoch, self._max_epoch, 'Epoch')
             self._commit_epoch_start_time()
             metrics = self._epoch_metrics
         else:
             self._require_context()
 
         best_mark = ' (*)' if self._is_best_valid_metric else ''
-        self.println('[%s] %s%s' % (tag, metrics.format_logs(), best_mark))
+        self.println('%s%s' % (metrics.format_logs(), best_mark),
+                     with_tag=True)
         self._is_best_valid_metric = False
         metrics.clear()
 

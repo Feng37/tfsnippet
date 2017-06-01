@@ -96,7 +96,6 @@ class Normal(Distribution):
                 )
 
                 # derive the attributes of this Normal distribution
-
                 if self._stdx_is_log:
                     self._stddev = self._do_check_numerics(
                         tf.exp(self._stdx, name='stddev'), 'stddev')
