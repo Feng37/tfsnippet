@@ -303,7 +303,8 @@ class _TrainLoop(object):
         self._require_context()
         acc = MetricAccumulator()
         yield acc
-        self.add_metrics(metrics={metric_name: acc.mean})
+        if acc.has_value:
+            self.add_metrics(metrics={metric_name: acc.mean})
 
     def add_metrics(self, metrics=None, **kwargs):
         """Add metric values.
