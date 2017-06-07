@@ -5,8 +5,9 @@ from tfsnippet.utils import (VarScopeObject,
                              instance_reuse,
                              maybe_explicit_broadcast)
 from ..distributions import Distribution
-from ..stochastic import StochasticObject, StochasticTensor
 from ..layers import StochasticLayer
+from ..stochastic import StochasticObject, StochasticTensor
+from ..utils import gather_log_lower_bound
 from ..variational import sgvb
 
 __all__ = ['VAE', 'DerivedVAE']
@@ -34,19 +35,25 @@ class DerivedVAE(StochasticObject):
     z_posterior : StochasticTensor | None
         The variational posterior z `StochasticTensor`, or None not derived.
 
-    log_lower_bound : tf.Tensor
-        The log lower-bound of the derived variational auto-encoder.
-
-        It may or may not contain the latent dimension, which depends
-        on the arguments used to derive this variational auto-encoder.
+    z_axis : int | tf.Tensor | None
+        The axis of z samples.  None if no explicit sampling axis.
+        (default None)
     """
 
-    def __init__(self, vae, x, z, z_posterior, log_lower_bound):
+    def __init__(self, vae, x=None, z=None, z_posterior=None, z_axis=None):
+        if (z is None and x is not None) or (z is not None and x is None):
+            raise ValueError('`z` and `x` must be both specified or neither '
+                             'specified.')
+        if x is None and z is None and z_posterior is None:
+            raise ValueError('At least `x` and `z`, or `z_posterior` '
+                             'should be specified.')
         self._vae = vae
         self._x = x
         self._z = z
         self._z_posterior = z_posterior
-        self._log_lower_bound = log_lower_bound
+        self._z_axis = z_axis
+
+        self._log_lower_bound = None  # cached log lower-bound
 
     @property
     def vae(self):
@@ -68,9 +75,25 @@ class DerivedVAE(StochasticObject):
         """Get the variational posterior z `StochasticTensor` object."""
         return self._z_posterior
 
+    @property
+    def z_axis(self):
+        """Get the axis of z samples."""
+        return self._z_axis
+
     def log_lower_bound(self, name=None):
-        """Get the log lower-bound of this derived variational auto-encoder."""
-        return self._log_lower_bound
+        """Get the log lower-bound of this derived variational auto-encoder.
+
+        The sampling axis of log lower-bound will be averaged out, so that
+        the log lower-bound would be pseudo :math:`log p(x)`.  To get the
+        log lower-bound with un-reduced sampling axis, you may call
+        `VAE.compute_log_lower_bound` manually.
+
+        Returns
+        -------
+        tf.Tensor
+            The computed log lower-bound.
+        """
+        return self.vae.compute_log_lower_bound(self, reduce_z_axis=True)
 
 
 class VAE(VarScopeObject):
@@ -109,9 +132,8 @@ class VAE(VarScopeObject):
 
         Note that `group_event_ndims` will always be set to 1.
 
-    approximator
-        The variational approximator for deriving log lower-bound.
-        (default `tfsnippet.bayes.sgvb`)
+    lower_bound_algo
+        The algorithm for deriving log lower-bound (default `sgvb`)
 
         A variational approximator is a function which accepts arguments
         (model, variational, latent_axis) and produces the log lower-bound
@@ -128,7 +150,7 @@ class VAE(VarScopeObject):
     """
 
     def __init__(self, x_net, x_layer, z_net, z_layer, z_prior,
-                 approximator=sgvb, z_samples=None, x_samples=None,
+                 lower_bound_algo=sgvb, z_samples=None, x_samples=None,
                  name=None, default_name=None):
         super(VAE, self).__init__(name=name, default_name=default_name)
         self._x_net = x_net
@@ -136,11 +158,55 @@ class VAE(VarScopeObject):
         self._z_net = z_net
         self._z_layer = z_layer
         self._z_prior = z_prior
-        self._approximator = approximator
+        self._lower_bound_algo = lower_bound_algo
         self._z_samples = z_samples
         self._x_samples = x_samples
 
-    @instance_reuse(scope='model')
+    @instance_reuse
+    def compute_log_lower_bound(self, derived, reduce_z_axis=True):
+        """Compute the log lower-bound for derived VAE.
+
+        If the derived VAE is a reconstructed VAE (i.e., z is sampled
+        from :math:`q(z|x)`), then `lower_bound_algo` is used to derive
+        the approximated log lower-bound.
+
+        If `z_posterior` is not derived, while only x and z are given,
+        then the joint log-probability of x and z are computed.
+
+        Otherwise if only `z_posterior` is derived, then :math:`q(z|x)`
+        is used as the log lower-bound.
+
+        Parameters
+        ----------
+        derived : DerivedVAE
+            The derived variational auto-encoder.
+
+        reduce_z_axis : bool
+            Whether or not to reduce the sampling dimension of z?
+            (default True)
+
+        Returns
+        -------
+        tf.Tensor
+            The log lower-bound of the derived VAE.
+        """
+        if derived.z_posterior is not None:
+            if derived.x is not None:
+                assert(derived.z is not None)
+                ret = self._lower_bound_algo(
+                    model=[derived.x, derived.z],
+                    variational=[derived.z_posterior],
+                )
+            else:
+                assert(derived.z is None)
+                ret = derived.z_posterior.log_prob()
+        else:
+            ret = sum(gather_log_lower_bound([derived.x, derived.z]))
+        if derived.z_axis is not None and reduce_z_axis:
+            ret = tf.reduce_mean(ret, axis=derived.z_axis)
+        return ret
+
+    @instance_reuse
     def model(self, z, y=None, x=None, z_samples=NOT_SPECIFIED,
               x_samples=NOT_SPECIFIED):
         """Derive the `StochasticTensor` objects of generation network.
@@ -194,7 +260,7 @@ class VAE(VarScopeObject):
 
         return z, x
 
-    @instance_reuse(scope='variational')
+    @instance_reuse
     def variational(self, x, y=None, z=None, z_samples=NOT_SPECIFIED):
         """Derive the `StochasticTensor` objects of variational network.
 
@@ -239,7 +305,7 @@ class VAE(VarScopeObject):
 
     @instance_reuse(scope='reconstruct')
     def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED,
-                    x_samples=NOT_SPECIFIED, reduce_latent=True):
+                    x_samples=NOT_SPECIFIED):
         """Derive the variational auto-encoder for x reconstruction.
 
         Parameters
@@ -260,10 +326,6 @@ class VAE(VarScopeObject):
         x_samples : int | tf.Tensor | None
             If specified, override `x_samples` specified in the constructor.
 
-        reduce_latent : bool
-            Whether or not to reduce the latent dimension of log lower-bound?
-            (default True)
-
         Returns
         -------
         DerivedVAE
@@ -273,19 +335,17 @@ class VAE(VarScopeObject):
         z_posterior = self.variational(x, y=y, n_samples=z_samples)
         z, x = self.model(z_posterior, y=y, n_samples=x_samples)
 
-        if reduce_latent:
-            if z_samples is None:
-                latent_axis = None
-            elif x_samples is not None:
-                latent_axis = 1
+        if z_samples is not None:
+            # todo: get a better way to determine the z-axis
+            z_ndims = z.get_shape().ndims
+            if z_ndims is None:
+                z_ndims = tf.size(tf.shape(z))
+                with tf.control_dependencies([tf.assert_greater(z_ndims, 0)]):
+                    z_ndims = tf.identity(z_ndims)
             else:
-                latent_axis = 0
+                assert(z_ndims != 0)
+            z_ndims = -z_ndims
         else:
-            latent_axis = None
-        log_lower_bound = self._approximator(
-            model=[x, z],
-            variational=[z_posterior],
-            latent_axis=latent_axis,
-        )
+            z_ndims = None
 
-        return DerivedVAE(self, x=x, z=z, log_lower_bound=log_lower_bound)
+        return DerivedVAE(self, x=x, z=z, z_axis=z_ndims)
