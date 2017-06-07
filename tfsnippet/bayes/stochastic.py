@@ -18,13 +18,18 @@ class StochasticObject(object):
     which has a log-probability lower-bound.
     """
 
-    def log_lower_bound(self, name=None):
+    def log_lower_bound(self, reduce_latent_axis=True, name=None):
         """Compute the log-probability lower-bound.
 
         Parameters
         ----------
         name : str
             Optional name of this operation.
+            
+        reduce_latent_axis : bool
+            Whether or not to average out the log lower-bounds along
+            the sampling dimensions of latent variables?
+            (default True)
 
         Returns
         -------
@@ -157,7 +162,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         """Whether or not the distribution is re-parameterized?"""
         return self.distribution.is_reparameterized
 
-    def log_lower_bound(self, name=None):
+    def log_lower_bound(self, reduce_latent_axis=True, name=None):
         return self.log_prob(name=name or 'log_lower_bound')
 
     def log_prob(self, name=None):
