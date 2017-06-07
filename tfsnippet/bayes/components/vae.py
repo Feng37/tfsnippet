@@ -93,28 +93,30 @@ class DerivedVAE(StochasticObject):
         tf.Tensor
             The computed log lower-bound.
         """
-        with tf.name_scope(name, default_name='log_lower_bound'):
-            if reduce_latent_axis:
-                latent_axis = self.latent_axis
-            else:
-                latent_axis = None
-
-            if self.z_posterior is not None:
-                if self.x is not None:
-                    assert(self.z is not None)
-                    ret = self.vae._lower_bound_algo(
-                        model=[self.x, self.z],
-                        variational=[self.z_posterior],
-                        latent_axis=latent_axis
-                    )
+        if self._log_lower_bound is None:
+            with tf.name_scope(name, default_name='log_lower_bound'):
+                if reduce_latent_axis:
+                    latent_axis = self.latent_axis
                 else:
-                    assert(self.z is None)
-                    ret = self.z_posterior.log_prob()
-            else:
-                ret = sum(gather_log_lower_bound([self.x, self.z]))
-                if latent_axis is not None:
-                    ret = tf.reduce_mean(ret, axis=latent_axis)
-        return ret
+                    latent_axis = None
+
+                if self.z_posterior is not None:
+                    if self.x is not None:
+                        assert(self.z is not None)
+                        ret = self.vae.variational_solver(
+                            model=[self.x, self.z],
+                            variational=[self.z_posterior],
+                            latent_axis=latent_axis
+                        )
+                    else:
+                        assert(self.z is None)
+                        ret = self.z_posterior.log_prob()
+                else:
+                    ret = sum(gather_log_lower_bound([self.x, self.z]))
+                    if latent_axis is not None:
+                        ret = tf.reduce_mean(ret, axis=latent_axis)
+            self._log_lower_bound = ret
+        return self._log_lower_bound
 
 
 class VAE(VarScopeObject):
@@ -153,7 +155,7 @@ class VAE(VarScopeObject):
 
         Note that `group_event_ndims` will always be set to 1.
 
-    lower_bound_algo
+    variational_solver
         The algorithm for deriving log lower-bound (default `sgvb`)
 
         A variational approximator is a function which accepts arguments
@@ -163,15 +165,12 @@ class VAE(VarScopeObject):
     z_samples : int | tf.Tensor | None
         The number of z samples to take.  (default None)
 
-    x_samples : int | tf.Tensor | None
-        The number of x samples to take.  (default None)
-
     name, default_name : str
         Optional name and default name of this VAE.
     """
 
     def __init__(self, x_net, x_layer, z_net, z_layer, z_prior,
-                 lower_bound_algo=sgvb, z_samples=None, x_samples=None,
+                 variational_solver=sgvb, z_samples=None,
                  name=None, default_name=None):
         super(VAE, self).__init__(name=name, default_name=default_name)
         self._x_net = x_net
@@ -179,13 +178,17 @@ class VAE(VarScopeObject):
         self._z_net = z_net
         self._z_layer = z_layer
         self._z_prior = z_prior
-        self._lower_bound_algo = lower_bound_algo
+        self._variational_solver = variational_solver
         self._z_samples = z_samples
-        self._x_samples = x_samples
+
+    @property
+    def variational_solver(self):
+        """Get the algorithm for deriving log lower-bound."""
+        return self._variational_solver
 
     @instance_reuse
     def model(self, z, y=None, x=None, z_samples=NOT_SPECIFIED,
-              x_samples=NOT_SPECIFIED):
+              x_samples=None):
         """Derive the `StochasticTensor` objects of generation network.
 
         Parameters
@@ -207,7 +210,8 @@ class VAE(VarScopeObject):
             If specified, override `z_samples` specified in the constructor.
 
         x_samples : int | tf.Tensor | None
-            If specified, override `x_samples` specified in the constructor.
+            Specify the number of samples to take for output x.
+            (default None)
 
         Returns
         -------
@@ -228,12 +232,8 @@ class VAE(VarScopeObject):
             )
         x_params = self._x_net(features)
 
-        if x_samples is NOT_SPECIFIED:
-            x_samples = self._x_samples
         x = self._x_layer(
-            x_params, n_samples=x_samples, observed=x, group_event_ndims=1,
-            name='x'
-        )
+            x_params, n_samples=x_samples, observed=x, group_event_ndims=1)
 
         return z, x
 
@@ -268,7 +268,7 @@ class VAE(VarScopeObject):
             features = x
         else:
             features = tf.concat(
-                maybe_explicit_broadcast([x, y], tail_no_broadcast_ndims=1),
+                maybe_explicit_broadcast(x, y, tail_no_broadcast_ndims=1),
                 axis=-1
             )
         z_params = self._z_net(features)
@@ -276,13 +276,11 @@ class VAE(VarScopeObject):
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
         return self._z_layer(
-            z_params, n_samples=z_samples, observed=z, group_event_ndims=1,
-            name='z'
-        )
+            z_params, n_samples=z_samples, observed=z, group_event_ndims=1)
 
-    @instance_reuse(scope='reconstruct')
-    def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED,
-                    x_samples=NOT_SPECIFIED, latent_axis=NOT_SPECIFIED):
+    @instance_reuse
+    def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED, x_samples=None,
+                    observe_x=False, latent_axis=NOT_SPECIFIED):
         """Derive the variational auto-encoder for x reconstruction.
 
         Parameters
@@ -301,7 +299,15 @@ class VAE(VarScopeObject):
             If specified, override `z_samples` specified in the constructor.
 
         x_samples : int | tf.Tensor | None
-            If specified, override `x_samples` specified in the constructor.
+            Specify the number of samples to take for x.
+            (default None)
+            
+        observe_x : bool
+            Whether or not to fix observed x in output `StochasticTensor`?
+    
+            If True, the output x `StochasticTensor` will observe `x`.
+            Otherwise the output x will have random samples.
+            (default False)
             
         latent_axis : int | tuple[int] | tf.Tensor | None
             The axis(es) to be considered as the sampling dimensions of z.
@@ -318,8 +324,6 @@ class VAE(VarScopeObject):
             The derived `StochasticTensor` objects as well as the log
             lower-bound of this variational auto-encoder.
         """
-        if x_samples is NOT_SPECIFIED:
-            x_samples = self._x_samples
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
 
@@ -332,7 +336,9 @@ class VAE(VarScopeObject):
             else:
                 latent_axis = None
 
-        z_posterior = self.variational(x, y=y, n_samples=z_samples)
-        z, x = self.model(z_posterior, y=y, n_samples=x_samples)
+        z_posterior = self.variational(x, y=y, z_samples=z_samples)
+        z, x = self.model(z_posterior, y=y, x=x if observe_x else None,
+                          z_samples=z_samples, x_samples=x_samples)
 
-        return DerivedVAE(self, x=x, z=z, latent_axis=latent_axis)
+        return DerivedVAE(self, x=x, z=z, z_posterior=z_posterior,
+                          latent_axis=latent_axis)
