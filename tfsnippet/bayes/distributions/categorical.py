@@ -131,14 +131,6 @@ class _BaseCategorical(Distribution):
         return False
 
     @property
-    def is_enumerable(self):
-        return True
-
-    @property
-    def enum_value_count(self):
-        return self._n_categories
-
-    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 
@@ -195,30 +187,6 @@ class _BaseCategorical(Distribution):
         dynamic_shape = tf.concat([[n], tf.shape(self.logits)[:-1]], axis=0)
         samples = tf.reshape(samples, dynamic_shape)
         samples.set_shape(static_shape)
-        return samples
-
-    def _enum_values_sparse(self, dtype=None):
-        # reshape the enumerated values to match the batch shape.
-        reshape_shape = tf.concat(
-            [[self.n_categories],
-             tf.ones(tf.stack([tf.size(self.dynamic_batch_shape)]),
-                     dtype=tf.int32)],
-            axis=0
-        )
-        samples = tf.reshape(tf.range(0, self.n_categories, dtype=dtype),
-                             reshape_shape)
-
-        # tile the enumerated values along batch shape
-        tile_shape = tf.concat(
-            [[1], self.dynamic_batch_shape], axis=0)
-        samples = tf.tile(samples, tile_shape)
-
-        # fix the static shape of the samples
-        if is_deterministic_shape([self.n_categories]):
-            static_shape = tf.TensorShape([self.n_categories])
-        else:
-            static_shape = tf.TensorShape([None])
-        samples.set_shape(static_shape.concatenate(self.static_batch_shape))
         return samples
 
     def _analytic_kld(self, other):
@@ -315,9 +283,6 @@ class Categorical(_BaseCategorical):
 
     def _sample_n(self, n):
         return self._sample_n_sparse(n, self.dtype)
-
-    def _enum_values(self):
-        return self._enum_values_sparse(self.dtype)
 
     def _log_prob_with_logits(self, x):
         x = tf.convert_to_tensor(x)
@@ -445,11 +410,6 @@ class OneHotCategorical(_BaseCategorical):
 
     def _sample_n(self, n):
         samples = self._sample_n_sparse(n, self.dtype)
-        samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
-        return samples
-
-    def _enum_values(self):
-        samples = self._enum_values_sparse(self.dtype)
         samples = tf.one_hot(samples, self.n_categories, dtype=self.dtype)
         return samples
 

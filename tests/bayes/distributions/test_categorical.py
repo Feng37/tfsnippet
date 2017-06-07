@@ -9,7 +9,6 @@ from tfsnippet.bayes import Categorical, OneHotCategorical
 from tests.helper import TestCase
 from tests.bayes.distributions._helper import (DistributionTestMixin,
                                                AnalyticKldTestMixin,
-                                               EnumerableTestMixin,
                                                big_number_verify)
 
 
@@ -23,8 +22,7 @@ def _log_softmax(x):
 
 
 class _CategoricalTestMixin(DistributionTestMixin,
-                            AnalyticKldTestMixin,
-                            EnumerableTestMixin):
+                            AnalyticKldTestMixin):
 
     simple_params = {
         'logits': np.asarray(
@@ -49,7 +47,6 @@ class _CategoricalTestMixin(DistributionTestMixin,
     }
     is_continuous = False
     is_reparameterized = False
-    is_enumerable = True
 
     def get_dtype_for_param_dtype(self, param_dtype):
         return tf.int32
@@ -62,17 +59,6 @@ class _CategoricalTestMixin(DistributionTestMixin,
 
     big_number_samples = 10000
     big_number_scale = 5.0
-
-    def get_enum_value_count_for_params(self, params):
-        logits = params['logits']
-        return logits.shape[-1]
-
-    def get_enum_values_sparse_for_params(self, params):
-        n_categories = params['logits'].shape[-1]
-        x = np.arange(n_categories, dtype=np.int32)
-        x = x.reshape([n_categories] + [1] * len(params['logits'].shape[:-1]))
-        x = np.tile(x, (1,) + params['logits'].shape[:-1])
-        return x
 
     def test_construction_error(self):
         with self.get_session():
@@ -165,9 +151,6 @@ class CategoricalTestCase(TestCase, _CategoricalTestMixin):
     def get_shapes_for_param(self, **params):
         return (), params['logits'].shape[:-1]
 
-    def get_enum_values_for_params(self, params):
-        return self.get_enum_values_sparse_for_params(params)
-
     def log_prob(self, x, group_event_ndims=None, **params):
         logits = params['logits']
         x = x.astype(np.int32)
@@ -202,12 +185,6 @@ class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
 
     def get_shapes_for_param(self, **params):
         return params['logits'].shape[-1:], params['logits'].shape[:-1]
-
-    def get_enum_values_for_params(self, params):
-        eye = np.eye(params['logits'].shape[-1])[
-            self.get_enum_values_sparse_for_params(params)
-        ]
-        return eye.astype(np.int32)
 
     def log_prob(self, x, group_event_ndims=None, **params):
         logits = params['logits']

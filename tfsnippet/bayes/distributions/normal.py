@@ -149,14 +149,6 @@ class Normal(Distribution):
         return True
 
     @property
-    def is_enumerable(self):
-        return False
-
-    @property
-    def enum_value_count(self):
-        return None
-
-    @property
     def dynamic_batch_shape(self):
         return self._dynamic_batch_shape
 

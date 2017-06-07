@@ -166,38 +166,6 @@ class Distribution(VarScopeObject):
         raise NotImplementedError()
 
     @property
-    def is_enumerable(self):
-        """Whether or not the distribution is enumerable?
-
-        A distribution with a finite value range is enumerable.
-        Enumerable distributions could derive a special set of "samples",
-        such that the probability of every possible value against each
-        individual set of parameters could be computed.
-
-        Returns
-        -------
-        bool
-            A boolean indicating whether the distribution is enumerable.
-
-        See Also
-        --------
-        enum_values
-        """
-        raise NotImplementedError()
-
-    @property
-    def enum_value_count(self):
-        """Get the count of possible values from this distribution.
-
-        Returns
-        -------
-        int | tf.Tensor | None
-            Static or dynamic count of possible values.
-            If the distribution is not enumerable, it should return None.
-        """
-        raise NotImplementedError()
-
-    @property
     def dynamic_batch_shape(self):
         """Get the dynamic batch shape of this distribution.
 
@@ -454,62 +422,6 @@ class Distribution(VarScopeObject):
                 observed,
                 samples_ndims=1 if n_samples is not None else None,
                 group_event_ndims=group_event_ndims
-            )
-
-    def _enum_values(self):
-        raise RuntimeError('%s is not enumerable.' %
-                           self.__class__.__name__)
-
-    def enum_values(self, group_event_ndims=None, as_observed=False, name=None):
-        """Enumerate possible values as `StochasticTensor`.
-
-        The returned `StochasticTensor` should in the shape of
-        ``(enum_value_count,) + batch_shape + value_shape``, where
-        `enum_value_count` is the count of possible values from this
-        distribution.
-
-        Parameters
-        ----------
-        group_event_ndims : int | tf.Tensor
-            If specify, override the default `group_event_ndims`.
-
-        as_observed : bool
-            Whether or not to feed the enumerated values as observed?
-            (default False)
-
-            If set to True, the returned `StochasticTensor` will be
-            observed (that is, ``is_observed = True``).  Otherwise
-            the enumerated values will be treated as random samples.
-
-        name : str
-            Optional name of this operation.
-
-        Returns
-        -------
-        tfsnippet.bayes.StochasticTensor
-            The enumerated values as samples.
-
-        Raises
-        ------
-        RuntimeError
-            If the distribution is not enumerable.
-        """
-        from ..stochastic import StochasticTensor
-        with tf.name_scope(name, default_name='enum_values'):
-            if group_event_ndims is None:
-                group_event_ndims = self.group_event_ndims
-            enum_values = self._enum_values()
-
-            if as_observed:
-                feed_args = {'observed': enum_values}
-            else:
-                feed_args = {'samples': enum_values}
-
-            return StochasticTensor(
-                self,
-                group_event_ndims=group_event_ndims,
-                samples_ndims=1,
-                **feed_args
             )
 
     def _log_prob(self, x):

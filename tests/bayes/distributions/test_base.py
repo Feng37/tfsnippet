@@ -390,20 +390,6 @@ class DistributionTestCase(TestCase):
         with self.get_session():
             np.testing.assert_almost_equal(samples.eval(), self.p_data)
 
-    def test_enum_values(self):
-        dist = Bernoulli(0.)
-        self.assertEqual(dist.enum_values().samples_ndims, 1)
-
-    def test_error_enum_values(self):
-        dist = _MyDistribution(self.p_data)
-        self.assertFalse(dist.is_enumerable)
-        with self.assertRaisesRegex(
-                RuntimeError, '_MyDistribution is not enumerable.'):
-            _ = dist.enum_values()
-        with self.assertRaisesRegex(
-                RuntimeError, '_MyDistribution is not enumerable.'):
-            _ = dist.enum_values()
-
     def test_override_group_event_ndims_in_sample(self):
         dist = _MyDistribution(self.p_data, group_event_ndims=1)
 
@@ -434,12 +420,6 @@ class DistributionTestCase(TestCase):
                 group_event_ndims,
             2
         )
-
-        dist = Bernoulli(0., group_event_ndims=1)
-        self.assertEqual(
-            dist.enum_values().group_event_ndims, 1)
-        self.assertEqual(
-            dist.enum_values(group_event_ndims=4).group_event_ndims, 4)
 
     def test_check_numerics(self):
         distrib = _MyDistribution(self.p_data, check_numerics=True)

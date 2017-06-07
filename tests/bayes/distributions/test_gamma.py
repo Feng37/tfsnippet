@@ -35,7 +35,6 @@ class GammaTestCase(TestCase,
     }
     is_continuous = True
     is_reparameterized = False
-    is_enumerable = False
 
     def get_shapes_for_param(self, **params):
         x = params['alpha'] + params['beta']

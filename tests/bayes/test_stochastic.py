@@ -45,8 +45,7 @@ class StochasticTensorTestCase(TestCase):
             distrib = Normal(0., 1.)
             t = StochasticTensor(distrib, tf.constant(0.))
 
-            for k in ['is_continuous', 'is_reparameterized', 'is_enumerable',
-                      'enum_value_count']:
+            for k in ['is_continuous', 'is_reparameterized']:
                 self.assertEqual(getattr(distrib, k), getattr(t, k),
                                  msg='attribute %r mismatch.' % k)
 

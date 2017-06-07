@@ -157,33 +157,6 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         """Whether or not the distribution is re-parameterized?"""
         return self.distribution.is_reparameterized
 
-    @property
-    def is_enumerable(self):
-        """Whether or not the distribution is enumerable?
-
-        A distribution with a finite value range is enumerable.
-        Enumerable distribution could derive a special set of "samples",
-        such that the probability of every possible value against each
-        individual set of parameters could be computed.
-
-        See Also
-        --------
-        Distribution.enum_values
-        """
-        return self.distribution.is_enumerable
-
-    @property
-    def enum_value_count(self):
-        """Get the count of possible values from the distribution.
-
-        Returns
-        -------
-        int | tf.Tensor | None
-            Static or dynamic count of possible values.
-            If the distribution is not enumerable, it should return None.
-        """
-        return self.distribution.enum_value_count
-
     def log_lower_bound(self, name=None):
         return self.log_prob(name=name or 'log_lower_bound')
 
