@@ -48,7 +48,7 @@ class Distribution(VarScopeObject):
                  name=None, default_name=None):
         super(Distribution, self).__init__(name=name, default_name=default_name)
         self._group_event_ndims = group_event_ndims
-        self._check_numerics = check_numerics
+        self._should_check_numerics = check_numerics
 
     def __call__(self, n_samples=None, observed=None, group_event_ndims=None,
                  name=None):
@@ -78,8 +78,8 @@ class Distribution(VarScopeObject):
                                       group_event_ndims=group_event_ndims,
                                       name=name)
 
-    def _do_check_numerics(self, x, name):
-        if self._check_numerics:
+    def _check_numerics(self, x, name):
+        if self._should_check_numerics:
             message = '%r of %r has nan or inf value' % (
                 name, self.variable_scope.name
             )
@@ -87,6 +87,19 @@ class Distribution(VarScopeObject):
                     [tf.check_numerics(x, message)]):
                 return tf.identity(x)
         return x
+
+    @property
+    def has_specialized_prob_method(self):
+        """Is this distribution equipped with specialized prob method?
+
+        Returns
+        -------
+        bool
+            If the `prob` method of this distribution is specially designed
+            for reducing the numerical errors, instead of applying `tf.exp`
+            upon the result of `log_prob`, then this property should be True.
+        """
+        return False
 
     @property
     def group_event_ndims(self):
@@ -538,7 +551,10 @@ class Distribution(VarScopeObject):
             The likelihood of `x`.
         """
         with tf.name_scope(name, default_name='prob'):
-            return tf.exp(self.log_prob(x, group_event_ndims=group_event_ndims))
+            return self._check_numerics(
+                tf.exp(self.log_prob(x, group_event_ndims=group_event_ndims)),
+                'prob'
+            )
 
     def _analytic_kld(self, other):
         # `@instance_reuse` decorator should not be applied to this method.

@@ -131,9 +131,9 @@ class Gamma(Distribution):
 
     def _log_prob(self, x):
         x = tf.convert_to_tensor(x, dtype=self.param_dtype)
-        log_beta = self._do_check_numerics(tf.log(self.beta), 'log(beta)')
-        log_x = self._do_check_numerics(tf.log(x), 'log(x)')
-        lgamma_alpha = self._do_check_numerics(
+        log_beta = self._check_numerics(tf.log(self.beta), 'log(beta)')
+        log_x = self._check_numerics(tf.log(x), 'log(x)')
+        lgamma_alpha = self._check_numerics(
             tf.lgamma(self.alpha), 'lgamma(alpha)'
         )
         return (
@@ -143,19 +143,19 @@ class Gamma(Distribution):
 
     def _analytic_kld(self, other):
         if isinstance(other, Gamma):
-            self_digamma_alpha = self._do_check_numerics(
+            self_digamma_alpha = self._check_numerics(
                 tf.digamma(self.alpha), 'digamma(alpha)'
             )
-            self_lgamma_alpha = self._do_check_numerics(
+            self_lgamma_alpha = self._check_numerics(
                 tf.lgamma(self.alpha), 'lgamma(alpha)'
             )
-            self_log_beta = self._do_check_numerics(
+            self_log_beta = self._check_numerics(
                 tf.log(self.beta), 'log(beta)'
             )
-            other_lgamma_alpha = other._do_check_numerics(
+            other_lgamma_alpha = other._check_numerics(
                 tf.lgamma(other.alpha), 'lgamma(alpha)'
             )
-            other_log_beta = other._do_check_numerics(
+            other_log_beta = other._check_numerics(
                 tf.log(other.beta), 'log(beta)'
             )
 

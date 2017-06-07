@@ -97,6 +97,8 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         self._self_is_observed = is_observed
         self._self_distrib = distribution
         self._self_group_event_ndims = group_event_ndims
+        self._self_prob = None      # cached prob
+        self._self_log_prob = None  # cached log-prob
 
     def __repr__(self):
         return 'StochasticTensor(%r)' % (self.__wrapped__,)
@@ -191,12 +193,21 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         tf.Tensor
             The log-probability of this stochastic tensor.
         """
-        if group_event_ndims is None:
-            group_event_ndims = self.group_event_ndims
-        return self.distribution.log_prob(
-            self.__wrapped__, group_event_ndims=group_event_ndims,
-            name=name
-        )
+        if group_event_ndims is None or \
+                group_event_ndims == self.group_event_ndims:
+            # for default `group_event_ndims`, the result of `log_prob`
+            # could be cached for better computing performance
+            if self._self_log_prob is None:
+                self._self_log_prob = self.distribution.log_prob(
+                    self.__wrapped__, group_event_ndims=self.group_event_ndims,
+                    name=name
+                )
+            return self._self_log_prob
+        else:
+            return self.distribution.log_prob(
+                self.__wrapped__, group_event_ndims=group_event_ndims,
+                name=name
+            )
 
     def prob(self, group_event_ndims=None, name=None):
         """Compute the likelihood of this stochastic tensor.
@@ -215,12 +226,33 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         tf.Tensor
             The likelihood of this stochastic tensor.
         """
-        if group_event_ndims is None:
-            group_event_ndims = self.group_event_ndims
-        return self.distribution.prob(
-            self.__wrapped__, group_event_ndims=group_event_ndims,
-            name=name
-        )
+        if group_event_ndims is None or \
+                group_event_ndims == self.group_event_ndims:
+            # for default `group_event_ndims`, the result of `prob`
+            # could be cached for better computing performance
+            if self._self_prob is None:
+                if self.distribution.has_specialized_prob_method:
+                    self._self_prob = self.distribution.prob(
+                        self.__wrapped__,
+                        group_event_ndims=self.group_event_ndims,
+                        name=name
+                    )
+                else:
+                    self._self_prob = tf.exp(
+                        self.log_prob(group_event_ndims=self.group_event_ndims),
+                        name=name or 'prob'
+                    )
+                    # mimic the true behavior of distributions without
+                    # specialized prob method
+                    self._self_prob = self.distribution._check_numerics(
+                        self._self_prob, 'prob'
+                    )
+            return self._self_prob
+        else:
+            return self.distribution.prob(
+                self.__wrapped__, group_event_ndims=group_event_ndims,
+                name=name
+            )
 
     # mimic `tf.Tensor` interface
     def __dir__(self):

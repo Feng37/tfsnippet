@@ -59,9 +59,26 @@ class StochasticTensorTestCase(TestCase):
             observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
             t = StochasticTensor(distrib, observed=observed)
             np.testing.assert_almost_equal(
-                t.prob().eval(), distrib.prob(observed).eval())
-            np.testing.assert_almost_equal(
                 t.log_prob().eval(), distrib.log_prob(observed).eval())
+            np.testing.assert_almost_equal(
+                t.prob().eval(), distrib.prob(observed).eval())
+
+    def test_specialized_prob_method(self):
+        class MyNormal(Normal):
+            @property
+            def has_specialized_prob_method(self):
+                return True
+
+        with self.get_session():
+            distrib = MyNormal(
+                np.asarray(0., dtype=np.float32),
+                np.asarray([1.0, 2.0, 3.0], dtype=np.float32)
+            )
+            observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
+            t = StochasticTensor(distrib, observed=observed)
+            t.distribution._has_specialized_prob_method = True
+            np.testing.assert_almost_equal(
+                t.prob().eval(), distrib.prob(observed).eval())
 
     def test_prob_and_log_prob_with_default_group_event_ndims(self):
         with self.get_session():

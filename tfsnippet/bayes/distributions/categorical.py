@@ -92,7 +92,7 @@ class _BaseCategorical(Distribution):
                     probs_clipped = tf.clip_by_value(
                         probs, probs_eps, 1 - probs_eps
                     )
-                    logits = self._do_check_numerics(
+                    logits = self._check_numerics(
                         tf.log(probs, name='logits_given_probs'),
                         'logits'
                     )
@@ -228,14 +228,14 @@ class _BaseCategorical(Distribution):
             if self._probs_is_derived:
                 log_probs1 = tf.nn.log_softmax(self.logits)
             else:
-                log_probs1 = self._do_check_numerics(
+                log_probs1 = self._check_numerics(
                     tf.log(self._probs_clipped), 'log(p)'
                 )
 
             if other._probs_is_derived:
                 log_probs2 = tf.nn.log_softmax(other.logits)
             else:
-                log_probs2 = other._do_check_numerics(
+                log_probs2 = other._check_numerics(
                     tf.log(other._probs_clipped), 'log(p)')
 
             return tf.reduce_sum(
@@ -343,7 +343,7 @@ class Categorical(_BaseCategorical):
             self.n_categories,
             dtype=self.param_dtype
         )
-        log_p = self._do_check_numerics(
+        log_p = self._check_numerics(
             tf.log(self._probs_clipped),
             'log(p)'
         )
@@ -488,7 +488,7 @@ class OneHotCategorical(_BaseCategorical):
 
     def _log_prob_with_probs(self, x):
         x = tf.cast(x, dtype=self.param_dtype)
-        log_p = self._do_check_numerics(
+        log_p = self._check_numerics(
             tf.log(self._probs_clipped),
             'log(p)'
         )

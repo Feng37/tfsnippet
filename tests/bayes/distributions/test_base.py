@@ -401,7 +401,7 @@ class DistributionTestCase(TestCase):
 
     def test_check_numerics(self):
         distrib = _MyDistribution(self.p_data, check_numerics=True)
-        x = distrib._do_check_numerics(tf.constant(0.) / tf.constant(0.),
+        x = distrib._check_numerics(tf.constant(0.) / tf.constant(0.),
                                        'x')
         with self.get_session():
             with self.assertRaisesRegex(

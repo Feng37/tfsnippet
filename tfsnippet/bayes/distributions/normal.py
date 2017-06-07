@@ -97,17 +97,17 @@ class Normal(Distribution):
 
                 # derive the attributes of this Normal distribution
                 if self._stdx_is_log:
-                    self._stddev = self._do_check_numerics(
+                    self._stddev = self._check_numerics(
                         tf.exp(self._stdx, name='stddev'), 'stddev')
                     self._logstd = self._stdx
-                    self._var = self._do_check_numerics(
+                    self._var = self._check_numerics(
                         tf.exp(
                             tf.constant(2., dtype=dtype) * self._logstd,
                             name='variance'
                         ),
                         'variance'
                     )
-                    self._precision = self._do_check_numerics(
+                    self._precision = self._check_numerics(
                         tf.exp(
                             tf.constant(-2., dtype=dtype) * self._logstd,
                             name='precision'
@@ -116,10 +116,10 @@ class Normal(Distribution):
                     )
                 else:
                     self._stddev = self._stdx
-                    self._logstd = self._do_check_numerics(
+                    self._logstd = self._check_numerics(
                         tf.log(self._stdx, name='logstd'), 'logstd')
                     self._var = tf.square(self._stddev, name='variance')
-                    self._precision = self._do_check_numerics(
+                    self._precision = self._check_numerics(
                         tf.divide(
                             tf.constant(1., dtype=dtype), self._var,
                             name='precision'

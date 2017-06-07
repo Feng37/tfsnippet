@@ -96,7 +96,7 @@ class Bernoulli(Distribution):
                     probs_clipped = tf.clip_by_value(
                         probs, probs_eps, 1 - probs_eps
                     )
-                    logits = self._do_check_numerics(
+                    logits = self._check_numerics(
                         tf.subtract(
                             tf.log(probs_clipped), tf.log1p(-probs_clipped),
                             name='logits'
@@ -224,7 +224,7 @@ class Bernoulli(Distribution):
         if self._probs_is_derived:
             logits = self.logits
             x, logits = maybe_explicit_broadcast(x, logits)
-            return self._do_check_numerics(
+            return self._check_numerics(
                 -tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=x, logits=logits
                 ),
@@ -234,7 +234,7 @@ class Bernoulli(Distribution):
             # TODO: check whether this is better than using derived logits.
             log_p = tf.log(self._probs_clipped)
             log_one_minus_p = tf.log1p(-self._probs_clipped)
-            return self._do_check_numerics(
+            return self._check_numerics(
                 x * log_p + (1. - x) * log_one_minus_p, 'log_prob')
 
     def _analytic_kld(self, other):
@@ -243,8 +243,8 @@ class Bernoulli(Distribution):
                 log_p = -tf.nn.softplus(-o.logits)
                 log_one_minus_p = -tf.nn.softplus(o.logits)
             else:
-                log_p = o._do_check_numerics(tf.log(o._probs_clipped), 'log(p)')
-                log_one_minus_p = o._do_check_numerics(
+                log_p = o._check_numerics(tf.log(o._probs_clipped), 'log(p)')
+                log_one_minus_p = o._check_numerics(
                     tf.log1p(-o._probs_clipped), 'log(1-p)'
                 )
             return log_p, log_one_minus_p
