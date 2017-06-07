@@ -63,6 +63,11 @@ class Distribution(VarScopeObject):
         observed : tf.Tensor | np.ndarray
             The observations.
 
+            Note that the `samples_ndims` of the observations will be set
+            to 1 if `n_samples` is specified, and will be set to None if
+            `n_samples` is None, even if `observed` is another instance of
+            `StochasticTensor`.
+
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
@@ -74,9 +79,12 @@ class Distribution(VarScopeObject):
         tfsnippet.bayes.StochasticTensor
             The random samples or observations as tensor.
         """
-        return self.sample_or_observe(n_samples=n_samples, observed=observed,
-                                      group_event_ndims=group_event_ndims,
-                                      name=name)
+        return self.sample_or_observe(
+            n_samples=n_samples,
+            observed=observed,
+            group_event_ndims=group_event_ndims,
+            name=name
+        )
 
     def _check_numerics(self, x, name):
         if self._should_check_numerics:
@@ -261,7 +269,7 @@ class Distribution(VarScopeObject):
         with tf.name_scope(name, default_name='sample'):
             # derive the samples using ``n = prod(shape)``
             if is_deterministic_shape(shape):
-                ret = self._sample_n(np.prod(shape, dtype=np.int32))
+                samples = self._sample_n(np.prod(shape, dtype=np.int32))
                 static_sample_shape = tf.TensorShape(shape)
             else:
                 if isinstance(shape, (tuple, list)):
@@ -272,35 +280,54 @@ class Distribution(VarScopeObject):
                     shape = tf.stack(shape, axis=0)
                 else:
                     static_sample_shape = tf.TensorShape(None)
-                ret = self._sample_n(tf.reduce_prod(shape))
+                samples = self._sample_n(tf.reduce_prod(shape))
 
             # reshape the samples
-            tail_shape = ret.get_shape()[1:]
+            tail_static_shape = samples.get_shape()[1:]
+            tail_dynamic_shape = tf.shape(samples)[1:]
             with tf.name_scope('reshape'):
                 dynamic_shape = tf.concat(
-                    [shape, tf.shape(ret)[1:]], axis=0)
-                ret = tf.reshape(ret, dynamic_shape)
+                    [shape, tail_dynamic_shape], axis=0)
+                samples = tf.reshape(samples, dynamic_shape)
 
             # special fix: when `sample_shape` is a tensor, it would cause
             #   `static_sample_shape` to carry no information.  We thus
             #   re-capture the sample shape by query at the reshaped samples.
-            if tail_shape.ndims is not None and \
-                    ret.get_shape().ndims is not None and \
+            if tail_static_shape.ndims is not None and \
+                    samples.get_shape().ndims is not None and \
                     static_sample_shape.ndims is None:
-                tail_ndims = tail_shape.ndims
+                tail_ndims = tail_static_shape.ndims
                 if tail_ndims == 0:
-                    static_sample_shape = ret.get_shape()
+                    static_sample_shape = samples.get_shape()
                 else:
-                    static_sample_shape = ret.get_shape()[: -tail_ndims]
+                    static_sample_shape = samples.get_shape()[: -tail_ndims]
 
             # fix the static shape of samples
-            ret.set_shape(static_sample_shape.concatenate(tail_shape))
+            samples.set_shape(
+                static_sample_shape.concatenate(tail_static_shape)
+            )
 
+            # determine the dimensions of samples
+            if static_sample_shape.ndims is None:
+                tail_ndims = tail_static_shape.ndims
+                if tail_ndims is None:
+                    tail_ndims = tf.size(tail_dynamic_shape)
+                total_ndims = samples.get_shape().ndims
+                if total_ndims is None:
+                    total_ndims = tf.size(dynamic_shape)
+                samples_ndims = total_ndims - tail_ndims
+            else:
+                samples_ndims = static_sample_shape.ndims
+            if samples_ndims == 0:
+                samples_ndims = None
+
+            # construct the stochastic tensor object
             if group_event_ndims is None:
                 group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
-                samples=ret,
+                samples=samples,
+                samples_ndims=samples_ndims,
                 group_event_ndims=group_event_ndims
             )
 
@@ -337,24 +364,37 @@ class Distribution(VarScopeObject):
         with tf.name_scope(name, default_name='sample_n'):
             if n is None:
                 samples = tf.squeeze(self._sample_n(1), 0)
+                samples_ndims = None
             else:
                 samples = self._sample_n(n)
+                samples_ndims = 1
 
             if group_event_ndims is None:
                 group_event_ndims = self.group_event_ndims
             return StochasticTensor(
                 self,
                 samples=samples,
+                samples_ndims=samples_ndims,
                 group_event_ndims=group_event_ndims
             )
 
-    def observe(self, observed, group_event_ndims=None):
+    def observe(self, observed, samples_ndims=None, group_event_ndims=None):
         """Create a `StochasticTensor` with specified observations.
 
         Parameters
         ----------
         observed : tf.Tensor | np.ndarray
             The observations.
+
+        samples_ndims : tf.Tensor | int
+            The number of sampling dimensions for the observations.
+
+            If not specified, then no dimension would be considered as the
+            sampling dimension (i.e., only one sample without explicit
+            dimension for samples).  (default None)
+
+            Even if the `observed` tensor is another `StochasticTensor`,
+            this argument still requires to be specified explicitly.
 
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
@@ -370,6 +410,7 @@ class Distribution(VarScopeObject):
         return StochasticTensor(
             self,
             observed=observed,
+            samples_ndims=samples_ndims,
             group_event_ndims=group_event_ndims
         )
 
@@ -386,6 +427,11 @@ class Distribution(VarScopeObject):
         observed : tf.Tensor | np.ndarray
             The observations.
 
+            Note that the `samples_ndims` of the observations will be set
+            to 1 if `n_samples` is specified, and will be set to None if
+            `n_samples` is None, even if `observed` is another instance of
+            `StochasticTensor`.
+
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
@@ -399,10 +445,16 @@ class Distribution(VarScopeObject):
         """
         if observed is None:
             return self.sample_n(
-                n_samples, group_event_ndims=group_event_ndims, name=name)
+                n_samples,
+                group_event_ndims=group_event_ndims,
+                name=name
+            )
         else:
             return self.observe(
-                observed, group_event_ndims=group_event_ndims)
+                observed,
+                samples_ndims=1 if n_samples is not None else None,
+                group_event_ndims=group_event_ndims
+            )
 
     def _enum_values(self):
         raise RuntimeError('%s is not enumerable.' %
@@ -456,6 +508,7 @@ class Distribution(VarScopeObject):
             return StochasticTensor(
                 self,
                 group_event_ndims=group_event_ndims,
+                samples_ndims=1,
                 **feed_args
             )
 
@@ -540,7 +593,7 @@ class Distribution(VarScopeObject):
 
         group_event_ndims : int | tf.Tensor
             If specified, will override the attribute `group_event_ndims`
-            of this distribution object.
+            of this distribution object. (default None)
 
         name : str
             Optional name of this operation.

@@ -1,4 +1,5 @@
 # anaconda packages
+mock >= 2.0.0
 numpy >= 1.11
 pandas >= 0.18
 six >= 1.10.0
