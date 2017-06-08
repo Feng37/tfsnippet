@@ -47,9 +47,9 @@ class DerivedVAE(StochasticObject):
             raise ValueError('At least `x` and `z`, or `z_posterior` '
                              'should be specified.')
         self._vae = vae
-        self._x = x
-        self._z = z
-        self._z_posterior = z_posterior
+        self._x = x  # type: StochasticTensor
+        self._z = z  # type: StochasticTensor
+        self._z_posterior = z_posterior  # type: StochasticTensor
         self._latent_axis = latent_axis
 
         self._log_lower_bound = None  # cached log lower-bound
@@ -83,39 +83,48 @@ class DerivedVAE(StochasticObject):
         """Get the log lower-bound of this derived variational auto-encoder.
 
         The sampling axis of log lower-bound will be averaged out, so that
-        the log lower-bound would be pseudo :math:`log p(x)`.  To get the
-        log lower-bound with un-reduced latent axis(es), you may call
-        `VAE.compute_log_lower_bound` manually.
+        the log lower-bound would be pseudo :math:`log p(x)`.
+
+        Parameters
+        ----------
+        reduce_latent_axis : bool
+            Whether or not to average out the axis(es) of latent samples?
+            If False, the log lower-bound result may not be cached.
+            (default True)
+
+        name : str
+            Optional name of this operation.
 
         Returns
         -------
         tf.Tensor
             The computed log lower-bound.
         """
-        if self._log_lower_bound is None:
-            with tf.name_scope(name, default_name='log_lower_bound'):
-                if reduce_latent_axis:
-                    latent_axis = self.latent_axis
+        def f(latent_axis):
+            if self.z_posterior is not None:
+                if self.x is not None:
+                    assert (self.z is not None)
+                    ret = self.vae.variational_solver(
+                        model=[self.x, self.z],
+                        variational=[self.z_posterior]
+                    )
                 else:
-                    latent_axis = None
+                    assert (self.z is None)
+                    ret = self.z_posterior.log_prob()
+            else:
+                ret = sum(gather_log_lower_bound([self.x, self.z]))
 
-                if self.z_posterior is not None:
-                    if self.x is not None:
-                        assert(self.z is not None)
-                        ret = self.vae.variational_solver(
-                            model=[self.x, self.z],
-                            variational=[self.z_posterior],
-                            latent_axis=latent_axis
-                        )
-                    else:
-                        assert(self.z is None)
-                        ret = self.z_posterior.log_prob()
-                else:
-                    ret = sum(gather_log_lower_bound([self.x, self.z]))
-                    if latent_axis is not None:
-                        ret = tf.reduce_mean(ret, axis=latent_axis)
-            self._log_lower_bound = ret
-        return self._log_lower_bound
+            if latent_axis is not None:
+                ret = tf.reduce_mean(ret, axis=latent_axis)
+            return ret
+
+        with tf.name_scope(name, default_name='log_lower_bound'):
+            if reduce_latent_axis or self.latent_axis is None:
+                if self._log_lower_bound is None:
+                    self._log_lower_bound = f(self.latent_axis)
+                return self._log_lower_bound
+            else:
+                return f(latent_axis=None)
 
 
 class VAE(VarScopeObject):

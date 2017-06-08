@@ -79,19 +79,41 @@ class StochasticTensorTestCase(TestCase):
             np.testing.assert_almost_equal(
                 t.prob().eval(), distrib.prob(observed).eval())
 
-    def test_prob_and_log_prob(self):
+    def test_log_prob_with_group_events_ndims(self):
         with self.get_session():
             distrib = Normal(
                 np.asarray(0., dtype=np.float32),
                 np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
                 group_event_ndims=1
             )
-            observed = np.arange(24, dtype=np.float32).reshape([4, 2, 3])
+            observed = np.asarray([[-1., 1., 2.], [0., 0., 0.]])
             t = StochasticTensor(distrib, observed=observed)
-            np.testing.assert_almost_equal(
-                t.prob().eval(), distrib.prob(observed).eval())
-            np.testing.assert_almost_equal(
-                t.log_prob().eval(), distrib.log_prob(observed).eval())
+            np.testing.assert_allclose(
+                t.log_prob(group_event_ndims=0).eval(),
+                distrib.log_prob(t, group_event_ndims=0).eval()
+            )
+            np.testing.assert_allclose(
+                t.log_prob(group_event_ndims=1).eval(),
+                distrib.log_prob(t, group_event_ndims=1).eval()
+            )
+
+    def test_prob_with_group_events_ndims(self):
+        with self.get_session():
+            distrib = Normal(
+                np.asarray(0., dtype=np.float32),
+                np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
+                group_event_ndims=1
+            )
+            observed = np.asarray([[-1., 1., 2.], [0., 0., 0.]])
+            t = StochasticTensor(distrib, observed=observed)
+            np.testing.assert_allclose(
+                t.prob(group_event_ndims=0).eval(),
+                distrib.prob(t, group_event_ndims=0).eval()
+            )
+            np.testing.assert_allclose(
+                t.prob(group_event_ndims=1).eval(),
+                distrib.prob(t, group_event_ndims=1).eval()
+            )
 
     def test_dynamic_dimension_replaced_by_observed_shape(self):
         distrib = _MyDistribution(tf.placeholder(tf.float32, (None, 3, 4)))
