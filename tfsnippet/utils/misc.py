@@ -6,10 +6,17 @@ import numpy as np
 import tensorflow as tf
 
 __all__ = [
+    'NOT_SPECIFIED',
     'is_integer', 'is_float', 'is_dynamic_tensor_like',
     'convert_to_tensor_if_dynamic', 'get_preferred_tensor_dtype',
     'MetricAccumulator', 'humanize_duration',
 ]
+
+
+class NotSpecified(object):
+    """Type for `NOT_SPECIFIED` constant."""
+
+NOT_SPECIFIED = NotSpecified()
 
 
 def is_integer(x):

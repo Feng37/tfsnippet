@@ -3,7 +3,8 @@ import tensorflow as tf
 
 from tfsnippet.utils import (VarScopeObject,
                              instance_reuse,
-                             maybe_explicit_broadcast)
+                             maybe_explicit_broadcast,
+                             NOT_SPECIFIED)
 from ..distributions import Distribution
 from ..layers import StochasticLayer
 from ..stochastic import StochasticObject, StochasticTensor
@@ -11,8 +12,6 @@ from ..utils import gather_log_lower_bound
 from ..variational import sgvb
 
 __all__ = ['VAE', 'DerivedVAE']
-
-NOT_SPECIFIED = object()
 
 
 class DerivedVAE(StochasticObject):
@@ -289,6 +288,24 @@ class VAE(VarScopeObject):
             validate_shape=self._validate_shape
         )
 
+    def _detect_latent_axis(self, z, z_samples):
+        if z_samples is None:
+            latent_axis = None
+        else:
+            z_ndims = z.get_shape().ndims
+            if z_ndims == 0:
+                raise ValueError('`z_samples` is specified, but the '
+                                 'sampled z is 0-dimensional.')
+            elif z_ndims is None:
+                z_ndims_assertion = tf.assert_rank_at_least(
+                    z, 1, message='`z_samples` is specified, but the '
+                                  'sampled z is 0-dimensional'
+                )
+                with tf.control_dependencies([z_ndims_assertion]):
+                    z_ndims = tf.rank(z)
+            latent_axis = -z_ndims
+        return latent_axis
+
     @instance_reuse
     def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED, x_samples=None,
                     observe_x=False, latent_axis=NOT_SPECIFIED):
@@ -341,21 +358,7 @@ class VAE(VarScopeObject):
                           z_samples=z_samples, x_samples=x_samples)
 
         if latent_axis is NOT_SPECIFIED:
-            if z_samples is None:
-                latent_axis = None
-            else:
-                z_ndims = z.get_shape().ndims
-                if z_ndims == 0:
-                    raise ValueError('`z_samples` is set to True, but the '
-                                     'sampled z is 0-dimensional.')
-                elif z_ndims is None:
-                    z_ndims_assertion = tf.assert_rank_at_least(
-                        z, 1, message='`z_samples` is set to True, but the '
-                                      'sampled z is 0-dimensional.'
-                    )
-                    with tf.control_dependencies([z_ndims_assertion]):
-                        z_ndims = tf.rank(z)
-                latent_axis = -z_ndims
+            latent_axis = self._detect_latent_axis(z, z_samples)
 
         return DerivedVAE(self, x=x, z=z, z_posterior=z_posterior,
                           latent_axis=latent_axis)
