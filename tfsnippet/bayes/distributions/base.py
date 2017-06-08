@@ -50,8 +50,8 @@ class Distribution(VarScopeObject):
         self._group_event_ndims = group_event_ndims
         self._should_check_numerics = check_numerics
 
-    def __call__(self, n_samples=None, observed=None, group_event_ndims=None,
-                 name=None):
+    def __call__(self, n_samples=None, observed=None, validate_shape=False,
+                 group_event_ndims=None, name=None):
         """Create a `StochasticTensor` with random samples or observations.
 
         Parameters
@@ -68,6 +68,10 @@ class Distribution(VarScopeObject):
             `n_samples` is None, even if `observed` is another instance of
             `StochasticTensor`.
 
+        validate_shape : bool
+            Whether or not to validate the shape of observations?
+            (default False)
+
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
@@ -82,6 +86,7 @@ class Distribution(VarScopeObject):
         return self.sample_or_observe(
             n_samples=n_samples,
             observed=observed,
+            validate_shape=validate_shape,
             group_event_ndims=group_event_ndims,
             name=name
         )
@@ -208,6 +213,74 @@ class Distribution(VarScopeObject):
             The tensor shape object corresponding to `dynamic_value_shape`.
         """
         raise NotImplementedError()
+
+    def validate_samples_shape(self, x, name=None):
+        """Validate the shape of samples against this distribution.
+
+        The shape of samples should be considered as matching the distribution,
+        only if its rank is equal to or greater than the rank of ``batch_shape
+        + value_shape``, and if it is broadcastable against ``batch_shape +
+        value_shape``.
+
+        Parameters
+        ----------
+        x : tf.Tensor
+            The samples tensor to be validated.
+
+        name : str
+            Optional name of this operation.
+
+        Returns
+        -------
+        tf.Tensor
+            The original tensor `x` if the validation could be done
+            with the static shape, or a new tensor coupled with dynamic
+            assertions if the static shape cannot do full validation.
+        """
+        # check the static shape
+        static_shape = self.static_batch_shape.concatenate(
+            self.static_value_shape
+        )
+        x_static_shape = x.get_shape()
+
+        static_compatible = True
+        if static_shape.ndims is not None and x_static_shape.ndims is not None:
+            need_dynamic_check = False
+            x_dims = x_static_shape.as_list()
+            dims = static_shape.as_list()
+            if len(x_dims) < len(dims):
+                static_compatible = False
+            else:
+                for x_dim, dim in zip(reversed(x_dims), reversed(dims)):
+                    if x_dim is None or dim is None:
+                        need_dynamic_check = True
+                    elif not (x_dim == dim or x_dim == 1 or dim == 1):
+                        static_compatible = False
+                        break
+        else:
+            need_dynamic_check = True
+
+        if not static_compatible:
+            raise ValueError('The shape of `x` (%r) is not compatible '
+                             'with the shape of distribution samples '
+                             '(%r).' % (x_static_shape, static_shape))
+
+        # check the dynamic shape
+        if need_dynamic_check:
+            with tf.name_scope(name, default_name='validate_samples_shape'):
+                dynamic_shape = tf.concat(
+                    [self.dynamic_batch_shape, self.dynamic_value_shape],
+                    axis=0
+                )
+                rank_assertion = tf.assert_rank_at_least(
+                    x, tf.size(dynamic_shape),
+                    message='Too few dimensions for samples to match '
+                            'distribution %r' % self.variable_scope.name
+                )
+                b_shape = tf.broadcast_dynamic_shape(tf.shape(x), dynamic_shape)
+                with tf.control_dependencies([rank_assertion, b_shape]):
+                    x = tf.identity(x)
+        return x
 
     def _sample_n(self, n):
         # `@instance_reuse` decorator should not be applied to this method.
@@ -346,7 +419,8 @@ class Distribution(VarScopeObject):
                 group_event_ndims=group_event_ndims
             )
 
-    def observe(self, observed, samples_ndims=None, group_event_ndims=None):
+    def observe(self, observed, samples_ndims=None, validate_shape=False,
+                group_event_ndims=None):
         """Create a `StochasticTensor` with specified observations.
 
         Parameters
@@ -364,6 +438,10 @@ class Distribution(VarScopeObject):
             Even if the `observed` tensor is another `StochasticTensor`,
             this argument still requires to be specified explicitly.
 
+        validate_shape : bool
+            Whether or not to validate the shape of observations?
+            (default False)
+
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
 
@@ -375,15 +453,18 @@ class Distribution(VarScopeObject):
         from ..stochastic import StochasticTensor
         if group_event_ndims is None:
             group_event_ndims = self.group_event_ndims
+
         return StochasticTensor(
             self,
             observed=observed,
             samples_ndims=samples_ndims,
-            group_event_ndims=group_event_ndims
+            group_event_ndims=group_event_ndims,
+            validate_shape=validate_shape,
         )
 
     def sample_or_observe(self, n_samples=None, observed=None,
-                          group_event_ndims=None, name=None):
+                          validate_shape=False, group_event_ndims=None,
+                          name=None):
         """Create a `StochasticTensor` with random samples or observations.
 
         Parameters
@@ -399,6 +480,10 @@ class Distribution(VarScopeObject):
             to 1 if `n_samples` is specified, and will be set to None if
             `n_samples` is None, even if `observed` is another instance of
             `StochasticTensor`.
+
+        validate_shape : bool
+            Whether or not to validate the shape of observations?
+            (default False)
 
         group_event_ndims : int | tf.Tensor
             If specify, override the default `group_event_ndims`.
@@ -421,6 +506,7 @@ class Distribution(VarScopeObject):
             return self.observe(
                 observed,
                 samples_ndims=1 if n_samples is not None else None,
+                validate_shape=validate_shape,
                 group_event_ndims=group_event_ndims
             )
 

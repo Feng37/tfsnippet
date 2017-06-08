@@ -155,6 +155,10 @@ class VAE(VarScopeObject):
 
         Note that `group_event_ndims` will always be set to 1.
 
+    validate_shape : bool
+        Whether or not to validate the shape of samples or observations?
+        (default False)
+
     variational_solver
         The algorithm for deriving log lower-bound (default `sgvb`)
 
@@ -170,7 +174,7 @@ class VAE(VarScopeObject):
     """
 
     def __init__(self, x_net, x_layer, z_net, z_layer, z_prior,
-                 variational_solver=sgvb, z_samples=None,
+                 validate_shape=False, variational_solver=sgvb, z_samples=None,
                  name=None, default_name=None):
         super(VAE, self).__init__(name=name, default_name=default_name)
         self._x_net = x_net
@@ -178,6 +182,7 @@ class VAE(VarScopeObject):
         self._z_net = z_net
         self._z_layer = z_layer
         self._z_prior = z_prior
+        self._validate_shape = validate_shape
         self._variational_solver = variational_solver
         self._z_samples = z_samples
 
@@ -221,7 +226,9 @@ class VAE(VarScopeObject):
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
         z = self._z_prior.sample_or_observe(
-            z_samples, observed=z, group_event_ndims=1, name='z')
+            z_samples, observed=z, validate_shape=self._validate_shape,
+            group_event_ndims=1, name='z'
+        )
 
         if y is None:
             features = z
@@ -233,7 +240,9 @@ class VAE(VarScopeObject):
         x_params = self._x_net(features)
 
         x = self._x_layer(
-            x_params, n_samples=x_samples, observed=x, group_event_ndims=1)
+            x_params, n_samples=x_samples, observed=x, group_event_ndims=1,
+            validate_shape=self._validate_shape
+        )
 
         return z, x
 
@@ -276,7 +285,9 @@ class VAE(VarScopeObject):
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
         return self._z_layer(
-            z_params, n_samples=z_samples, observed=z, group_event_ndims=1)
+            z_params, n_samples=z_samples, observed=z, group_event_ndims=1,
+            validate_shape=self._validate_shape
+        )
 
     @instance_reuse
     def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED, x_samples=None,
@@ -301,22 +312,20 @@ class VAE(VarScopeObject):
         x_samples : int | tf.Tensor | None
             Specify the number of samples to take for x.
             (default None)
-            
+
         observe_x : bool
             Whether or not to fix observed x in output `StochasticTensor`?
-    
+
             If True, the output x `StochasticTensor` will observe `x`.
             Otherwise the output x will have random samples.
             (default False)
-            
+
         latent_axis : int | tuple[int] | tf.Tensor | None
             The axis(es) to be considered as the sampling dimensions of z.
-            
-            If not specified, will automatically infer the latent dimensions
-            according to `z_samples` and `x_samples`: it will equal to None
-            if `z_samples` is not specified, or it will be set to 0 if only
-            `z_samples` is specified, or else it will be set to 1 if both
-            `z_samples` and `x_samples` are specified.
+
+            If not specified, will be automatically inferred.
+            Explicitly set to None will force to consider no dimension as
+            latent axis(es).
 
         Returns
         -------
@@ -327,18 +336,26 @@ class VAE(VarScopeObject):
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
 
-        if latent_axis is NOT_SPECIFIED:
-            if z_samples is not None:
-                if x_samples is not None:
-                    latent_axis = 1
-                else:
-                    latent_axis = 0
-            else:
-                latent_axis = None
-
         z_posterior = self.variational(x, y=y, z_samples=z_samples)
         z, x = self.model(z_posterior, y=y, x=x if observe_x else None,
                           z_samples=z_samples, x_samples=x_samples)
+
+        if latent_axis is NOT_SPECIFIED:
+            if z_samples is None:
+                latent_axis = None
+            else:
+                z_ndims = z.get_shape().ndims
+                if z_ndims == 0:
+                    raise ValueError('`z_samples` is set to True, but the '
+                                     'sampled z is 0-dimensional.')
+                elif z_ndims is None:
+                    z_ndims_assertion = tf.assert_rank_at_least(
+                        z, 1, message='`z_samples` is set to True, but the '
+                                      'sampled z is 0-dimensional.'
+                    )
+                    with tf.control_dependencies([z_ndims_assertion]):
+                        z_ndims = tf.rank(z)
+                latent_axis = -z_ndims
 
         return DerivedVAE(self, x=x, z=z, z_posterior=z_posterior,
                           latent_axis=latent_axis)

@@ -17,9 +17,10 @@ class BernoulliLayer(StochasticLayer):
     """
 
     def _call(self, logits=None, probs=None, n_samples=None,
-              observed=None, group_event_ndims=None):
+              observed=None, group_event_ndims=None, validate_shape=False):
         bernoulli = Bernoulli(logits=logits, probs=probs,
                               group_event_ndims=group_event_ndims)
         return bernoulli.sample_or_observe(
-            n_samples=n_samples, observed=observed
+            n_samples=n_samples, observed=observed,
+            validate_shape=validate_shape
         )

@@ -67,15 +67,20 @@ class StochasticLayer(Component):
 
         See `Distribution`, `StochasticTensor` for more details.
 
+    validate_shape : bool
+        Whether or not to validate the shape of samples or observations?
+        (default False)
+
     name, default_name : str
         Optional name or default name of this `StochasticLayer`.
     """
 
     def __init__(self, n_samples=None, observed=None, group_event_ndims=None,
-                 name=None, default_name=None):
+                 validate_shape=False, name=None, default_name=None):
         self._n_samples = n_samples
         self._observed = observed
         self._group_event_ndims = group_event_ndims
+        self._validate_shape = validate_shape
         super(StochasticLayer, self).__init__(name=name,
                                               default_name=default_name)
 
@@ -113,6 +118,11 @@ class StochasticLayer(Component):
         """
         return self._group_event_ndims
 
+    @property
+    def validate_shape(self):
+        """Whether or not to validate the shape of samples or observations?"""
+        return self._validate_shape
+
     def __call__(self, inputs, **kwargs):
         """Derive the `StochasticTensor` output from this `StochasticLayer`.
 
@@ -133,6 +143,7 @@ class StochasticLayer(Component):
             raise TypeError('`inputs` is expected to be a dict, but got %r.'
                             % (inputs,))
         kwargs.update(inputs)
-        for k in ('n_samples', 'observed', 'group_event_ndims'):
+        for k in ('n_samples', 'observed', 'group_event_ndims',
+                  'validate_shape'):
             kwargs.setdefault(k, getattr(self, k))
         return self._call(**kwargs)

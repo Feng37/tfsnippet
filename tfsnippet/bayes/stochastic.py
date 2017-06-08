@@ -25,7 +25,7 @@ class StochasticObject(object):
         ----------
         name : str
             Optional name of this operation.
-            
+
         reduce_latent_axis : bool
             Whether or not to average out the log lower-bounds along
             the sampling dimensions of latent variables?
@@ -73,10 +73,16 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
     group_event_ndims : int | tf.Tensor
         If specified, override the default `group_event_ndims` of
         `distribution`.  (default None)
+
+    validate_shape : bool
+        Whether or not to validate the shape of samples or observations?
+        See `Distribution.validate_samples_shape` for more details.
+        (default False)
     """
 
     def __init__(self, distribution, samples=None, observed=None,
-                 samples_ndims=None, group_event_ndims=None):
+                 samples_ndims=None, group_event_ndims=None,
+                 validate_shape=False):
         if (samples is not None and observed is not None) or \
                 (samples is None and observed is None):
             raise ValueError('One and only one of `samples`, `observed` '
@@ -98,6 +104,9 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
             tensor = tf.convert_to_tensor(tensor, distribution.dtype)
         if tensor.dtype != distribution.dtype:
             tensor = tf.cast(tensor, dtype=distribution.dtype)
+
+        if validate_shape:
+            tensor = distribution.validate_samples_shape(tensor)
 
         self.__wrapped__ = tensor
         self._self_is_observed = is_observed

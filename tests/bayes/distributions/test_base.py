@@ -351,7 +351,8 @@ class DistributionTestCase(TestCase):
 
     def test_observe(self):
         dist = _MyDistribution(self.p_data)
-        samples = dist.observe(self.x_data, samples_ndims=2)
+        samples = dist.observe(self.x_data, samples_ndims=2,
+                               validate_shape=True)
         self.assertIsInstance(samples, StochasticTensor)
         self.assertEqual(samples.samples_ndims, 2)
         with self.get_session():
@@ -360,17 +361,18 @@ class DistributionTestCase(TestCase):
     def test_sample_or_observe(self):
         dist = _MyDistribution(self.p_data)
 
-        samples = dist.sample_or_observe()
+        samples = dist.sample_or_observe(validate_shape=True)
         self.assertIsInstance(samples, StochasticTensor)
         self.assertEqual(samples.get_shape(), [2, 3, 4])
         self.assertIsNone(samples.samples_ndims)
 
-        samples = dist.sample_or_observe(10)
+        samples = dist.sample_or_observe(10, validate_shape=True)
         self.assertIsInstance(samples, StochasticTensor)
         self.assertEqual(samples.get_shape(), [10, 2, 3, 4])
         self.assertEqual(samples.samples_ndims, 1)
 
-        samples = dist.sample_or_observe(10, observed=self.p_data)
+        samples = dist.sample_or_observe(10, observed=self.p_data,
+                                         validate_shape=True)
         self.assertIsInstance(samples, StochasticTensor)
         self.assertEqual(samples.get_shape(), list(self.p_data.shape))
         self.assertEqual(samples.samples_ndims, 1)
@@ -423,12 +425,93 @@ class DistributionTestCase(TestCase):
 
     def test_check_numerics(self):
         distrib = _MyDistribution(self.p_data, check_numerics=True)
-        x = distrib._check_numerics(tf.constant(0.) / tf.constant(0.),
-                                       'x')
+        x = distrib._check_numerics(tf.constant(0.) / tf.constant(0.), 'x')
         with self.get_session():
             with self.assertRaisesRegex(
                     Exception, "'x' of 'my_distribution' has nan or inf value"):
                 _ = x.eval()
+
+    def test_validate_samples_shape_static(self):
+        distrib = _MyDistribution(self.p_data[:, :1, :])  # [2, 1, 4]
+
+        # fully match
+        x = tf.convert_to_tensor(self.p_data[:, :1, :])
+        self.assertIs(distrib.validate_samples_shape(x), x)
+
+        # broadcast match
+        x = tf.convert_to_tensor(np.reshape([0., 1., 2.], [1, 3, 1]))
+        self.assertIs(distrib.validate_samples_shape(x), x)
+
+        # okay with auxiliary dimensions
+        x = tf.convert_to_tensor(self.x_data[:, :, :1, :])
+        self.assertIs(distrib.validate_samples_shape(x), x)
+
+        # bad shape with non-broadcastable shape
+        x = tf.convert_to_tensor(self.p_data[:, :, :2])
+        with self.assertRaisesRegex(
+                ValueError, 'The shape of `x` .* is not compatible with the '
+                            'shape of distribution samples .*'):
+            _ = distrib.validate_samples_shape(x)
+
+        # bad shape with in-sufficient dimensions
+        x = tf.convert_to_tensor(self.p_data[0, ...])
+        with self.assertRaisesRegex(
+                ValueError, 'The shape of `x` .* is not compatible with the '
+                            'shape of distribution samples .*'):
+            _ = distrib.validate_samples_shape(x)
+
+    def test_validate_samples_shape_dynamic(self):
+        with self.get_session():
+            # static distribution params with dynamic samples
+            distrib = _MyDistribution(self.p_data)
+            x = tf.placeholder(tf.int32, shape=[None, 3, None])
+            x_valid = distrib.validate_samples_shape(x)
+            self.assertIsNot(x_valid, x)
+
+            # fully match
+            _ = x_valid.eval({x: self.p_data})
+            # broadcast match
+            _ = x_valid.eval({x: self.p_data[:1, :, :1]})
+
+            with self.assertRaisesRegex(
+                    Exception, 'Incompatible shapes: .*'):
+                _ = x_valid.eval({x: self.p_data[:, :, :2]})
+
+            # dynamic distribution params with static samples
+            distrib = _MyDistribution(self.p1)
+            x = tf.convert_to_tensor(self.p_data)
+            x_valid = distrib.validate_samples_shape(x)
+            self.assertIsNot(x_valid, x)
+
+            # fully match
+            _ = x_valid.eval({self.p1: self.p_data})
+            # broadcast match
+            _ = x_valid.eval({self.p1: self.p_data[:, :, :1]})
+
+    def test_validate_samples_shape_fully_dynamic(self):
+        with self.get_session():
+            # static distribution params with dynamic samples
+            p = tf.placeholder(tf.float32)
+            x = tf.placeholder(tf.int32)
+            distrib = _MyDistribution(p)
+            x_valid = distrib.validate_samples_shape(x)
+            self.assertIsNot(x_valid, x)
+
+            # fully match
+            _ = x_valid.eval({p: self.p_data, x: self.p_data})
+            # broadcast match
+            _ = x_valid.eval({p: self.p_data, x: self.p_data[:1, :, :1]})
+            # match with auxiliary dimensions
+            _ = x_valid.eval({p: self.p_data, x: self.x_data})
+
+            with self.assertRaisesRegex(
+                    Exception, 'Too few dimensions for samples to match '
+                               'distribution .*'):
+                _ = x_valid.eval({p: self.p_data, x: self.x_data[0, 0, ...]})
+
+            with self.assertRaisesRegex(
+                    Exception, 'Incompatible shapes: .*'):
+                _ = x_valid.eval({p: self.p_data, x: self.x_data[..., :2]})
 
 
 if __name__ == '__main__':

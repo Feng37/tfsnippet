@@ -64,7 +64,7 @@ class _MyDistribution(Distribution):
                 [
                     [n],
                     tf.ones(
-                        tf.stack([tf.size(tf.shape(self.p))]),
+                        tf.stack([tf.rank(self.p)]),
                         dtype=tf.int32
                     )
                 ],

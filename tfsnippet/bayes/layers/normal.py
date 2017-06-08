@@ -17,7 +17,10 @@ class NormalLayer(StochasticLayer):
     """
 
     def _call(self, mean, stddev=None, logstd=None, n_samples=None,
-              observed=None, group_event_ndims=None):
+              observed=None, group_event_ndims=None, validate_shape=False):
         normal = Normal(mean=mean, stddev=stddev, logstd=logstd,
                         group_event_ndims=group_event_ndims)
-        return normal.sample_or_observe(n_samples=n_samples, observed=observed)
+        return normal.sample_or_observe(
+            n_samples=n_samples, observed=observed,
+            validate_shape=validate_shape
+        )
