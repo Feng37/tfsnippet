@@ -67,6 +67,9 @@ class StochasticLayer(Component):
 
         See `Distribution`, `StochasticTensor` for more details.
 
+    check_numerics : bool
+        Whether or not to check numerical issues? (default False)
+
     validate_shape : bool
         Whether or not to validate the shape of samples or observations?
         (default False)
@@ -76,10 +79,12 @@ class StochasticLayer(Component):
     """
 
     def __init__(self, n_samples=None, observed=None, group_event_ndims=None,
-                 validate_shape=False, name=None, default_name=None):
+                 check_numerics=False, validate_shape=False,
+                 name=None, default_name=None):
         self._n_samples = n_samples
         self._observed = observed
         self._group_event_ndims = group_event_ndims
+        self._check_numerics = check_numerics
         self._validate_shape = validate_shape
         super(StochasticLayer, self).__init__(name=name,
                                               default_name=default_name)
@@ -119,6 +124,11 @@ class StochasticLayer(Component):
         return self._group_event_ndims
 
     @property
+    def check_numerics(self):
+        """Whether or not to check numerical issues?"""
+        return self._check_numerics
+
+    @property
     def validate_shape(self):
         """Whether or not to validate the shape of samples or observations?"""
         return self._validate_shape
@@ -144,6 +154,6 @@ class StochasticLayer(Component):
                             % (inputs,))
         kwargs.update(inputs)
         for k in ('n_samples', 'observed', 'group_event_ndims',
-                  'validate_shape'):
+                  'check_numerics', 'validate_shape'):
             kwargs.setdefault(k, getattr(self, k))
         return self._call(**kwargs)

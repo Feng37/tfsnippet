@@ -31,56 +31,67 @@ class StochasticLayerTestCase(TestCase):
         output = _MyStochasticLayer()({'a': 1, 'b': 2})
         self.assertEqual(output, {'a': 1, 'b': 2, 'n_samples': None,
                                   'observed': None, 'group_event_ndims': None,
-                                  'validate_shape': False})
+                                  'validate_shape': False,
+                                  'check_numerics': False})
 
     def test_overwrite_sampling_args_by_inputs(self):
         layer = _MyStochasticLayer(n_samples=100, observed=[1, 2, 3],
                                    group_event_ndims=3)
         output = layer({
             'a': 1, 'b': 2, 'n_samples': 101, 'observed': [2, 3, 4],
-            'group_event_ndims': 4, 'validate_shape': True
+            'group_event_ndims': 4, 'check_numerics': True,
+            'validate_shape': True
         })
         self.assertEqual(output, {
             'a': 1, 'b': 2, 'n_samples': 101, 'observed': [2, 3, 4],
-            'group_event_ndims': 4, 'validate_shape': True
+            'group_event_ndims': 4, 'check_numerics': True,
+            'validate_shape': True
         })
 
     def test_overwrite_sampling_args_by_named_args(self):
         layer = _MyStochasticLayer(n_samples=100, observed=[1, 2, 3],
-                                   group_event_ndims=3, validate_shape=True)
+                                   group_event_ndims=3, check_numerics=True,
+                                   validate_shape=True)
         output = layer(
             {'a': 1, 'b': 2}, n_samples=101, observed=[2, 3, 4],
-            group_event_ndims=4, validate_shape=False
+            group_event_ndims=4, check_numerics=False, validate_shape=False
         )
         self.assertEqual(output, {
             'a': 1, 'b': 2, 'n_samples': 101, 'observed': [2, 3, 4],
-            'group_event_ndims': 4, 'validate_shape': False
+            'group_event_ndims': 4, 'check_numerics': False,
+            'validate_shape': False
         })
 
     def test_overwrite_sampling_args_by_both(self):
         layer = _MyStochasticLayer(n_samples=100, observed=[1, 2, 3],
-                                   group_event_ndims=3, validate_shape=True)
+                                   group_event_ndims=3, check_numerics=True,
+                                   validate_shape=True)
         output = layer(
             {'a': 1, 'b': 2, 'n_samples': 101, 'observed': [2, 3, 4],
-             'group_event_ndims': 4, 'validate_shape': True},
+             'group_event_ndims': 4, 'check_numerics': True,
+             'validate_shape': True},
             n_samples=102, observed=[3, 4, 5],
-            group_event_ndims=5, validate_shape=False
+            group_event_ndims=5, check_numerics=False, validate_shape=False
         )
         self.assertEqual(output, {
             'a': 1, 'b': 2, 'n_samples': 101, 'observed': [2, 3, 4],
-            'group_event_ndims': 4, 'validate_shape': True
+            'group_event_ndims': 4, 'check_numerics': True,
+            'validate_shape': True
         })
 
     def test_overwrite_sampling_args_with_None(self):
         layer = _MyStochasticLayer(n_samples=100, observed=[1, 2, 3],
-                                   group_event_ndims=3, validate_shape=True)
+                                   group_event_ndims=3, check_numerics=True,
+                                   validate_shape=True)
         output = layer({
             'a': 1, 'b': 2, 'n_samples': None, 'observed': None,
-            'group_event_ndims': None, 'validate_shape': False
+            'group_event_ndims': None, 'check_numerics': False,
+            'validate_shape': False
         })
         self.assertEqual(output, {
             'a': 1, 'b': 2, 'n_samples': None, 'observed': None,
-            'group_event_ndims': None, 'validate_shape': False
+            'group_event_ndims': None, 'check_numerics': False,
+            'validate_shape': False
         })
 
     def test_error_call(self):
