@@ -177,12 +177,21 @@ class VAE(VarScopeObject):
     z_samples : int | tf.Tensor | None
         The number of z samples to take.  (default None)
 
+    y_in_variational_net : bool
+        Whether or not to use y in CVAE variational net, if specified?
+        (default True)
+
+    y_in_generative_net : bool
+        Whether or not to use y in CVAE generative net, if specified?
+        (default True)
+
     name, default_name : str
         Optional name and default name of this VAE.
     """
 
     def __init__(self, x_net, x_layer, z_net, z_layer, z_prior,
                  validate_shape=False, variational_solver=sgvb, z_samples=None,
+                 y_in_variational_net=True, y_in_generative_net=True,
                  name=None, default_name=None):
         super(VAE, self).__init__(name=name, default_name=default_name)
         self._x_net = x_net
@@ -193,6 +202,8 @@ class VAE(VarScopeObject):
         self._validate_shape = validate_shape
         self._variational_solver = variational_solver
         self._z_samples = z_samples
+        self._y_in_variational_net = y_in_variational_net
+        self._y_in_generative_net = y_in_generative_net
 
     @property
     def variational_solver(self):
@@ -203,6 +214,9 @@ class VAE(VarScopeObject):
     def model(self, z, y=None, x=None, z_samples=NOT_SPECIFIED,
               x_samples=None):
         """Derive the `StochasticTensor` objects of generation network.
+
+        The behavior of this method is not affected by `y_in_generative_model`,
+        thus `y` will always be used if it is specified.
 
         Parameters
         ----------
@@ -257,6 +271,9 @@ class VAE(VarScopeObject):
     @instance_reuse
     def variational(self, x, y=None, z=None, z_samples=NOT_SPECIFIED):
         """Derive the `StochasticTensor` objects of variational network.
+
+        The behavior of this method is not affected by `y_in_variational_model`,
+        thus `y` will always be used if it is specified.
 
         Parameters
         ----------
@@ -315,6 +332,19 @@ class VAE(VarScopeObject):
             latent_axis = -z_ndims
         return latent_axis
 
+    def _check_y_arg(self, y):
+        if not self._y_in_variational_net and not self._y_in_generative_net \
+                and y is not None:
+            raise ValueError('`y` is specified, but neither '
+                             '`y_in_generative_net` nor `y_in_generative_net` '
+                             'is True.')
+        y1, y2 = y, y
+        if not self._y_in_variational_net:
+            y1 = None
+        if not self._y_in_generative_net:
+            y2 = None
+        return y1, y2
+
     @instance_reuse
     def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED, x_samples=None,
                     observe_x=False, latent_axis=NOT_SPECIFIED):
@@ -327,6 +357,9 @@ class VAE(VarScopeObject):
 
         y : tf.Tensor
             Optional conditional input for CVAE.  See [1] for more details.
+
+            Whether or not to use `y` in variational and generative network
+            is controlled by `y_in_variational_net` and `y_in_generative_net`.
 
             [1] Lee, Honglak. "Tutorial on deep learning and applications."
                 NIPS 2010 Workshop on Deep Learning and Unsupervised Feature
@@ -359,12 +392,16 @@ class VAE(VarScopeObject):
             The derived `StochasticTensor` objects as well as the log
             lower-bound of this variational auto-encoder.
         """
+        y_variational, y_generative = self._check_y_arg(y)
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
 
-        z_posterior = self.variational(x, y=y, z_samples=z_samples)
-        z, x = self.model(z_posterior, y=y, x=x if observe_x else None,
-                          z_samples=z_samples, x_samples=x_samples)
+        z_posterior = self.variational(x, y=y_variational, z_samples=z_samples)
+        z, x = self.model(z_posterior,
+                          y=y_generative,
+                          x=x if observe_x else None,
+                          z_samples=z_samples,
+                          x_samples=x_samples)
 
         if latent_axis is NOT_SPECIFIED:
             latent_axis = self._detect_latent_axis(z, z_samples)
