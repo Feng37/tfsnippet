@@ -4,6 +4,7 @@ import tensorflow as tf
 from tfsnippet.utils import (VarScopeObject,
                              instance_reuse,
                              maybe_explicit_broadcast,
+                             is_dynamic_tensor_like,
                              NOT_SPECIFIED)
 from ..distributions import Distribution
 from ..layers import StochasticLayer
@@ -302,17 +303,23 @@ class VAE(VarScopeObject):
             latent_axis = None
         else:
             z_ndims = z.get_shape().ndims
-            if z_ndims == 0:
-                raise ValueError('`z_samples` is specified, but the '
-                                 'sampled z is 0-dimensional.')
-            elif z_ndims is None:
+            z_group_event_ndims = z.group_event_ndims
+            if z_group_event_ndims is None:
+                z_group_event_ndims = 0
+
+            if z_ndims is None or is_dynamic_tensor_like(z_group_event_ndims):
                 z_ndims_assertion = tf.assert_rank_at_least(
-                    z, 1, message='`z_samples` is specified, but the '
-                                  'sampled z is 0-dimensional'
+                    z, z_group_event_ndims + 1,
+                    message='`z_samples` is specified, but the log '
+                            'lower-bounds for z is 0-dimensional'
                 )
                 with tf.control_dependencies([z_ndims_assertion]):
                     z_ndims = tf.rank(z)
-            latent_axis = -z_ndims
+            elif z_ndims <= z_group_event_ndims:
+                raise ValueError('`z_samples` is specified, but the log '
+                                 'lower-bounds for z is 0-dimensional')
+
+            latent_axis = z_group_event_ndims - z_ndims
         return latent_axis
 
     @instance_reuse
@@ -347,11 +354,16 @@ class VAE(VarScopeObject):
             (default False)
 
         latent_axis : int | tuple[int] | tf.Tensor | None
-            The axis(es) to be considered as the sampling dimensions of z.
+            The axis(es) to be considered as the sampling dimensions of z
+            in log lower-bounds.
 
             If not specified, will be automatically inferred.
             Explicitly set to None will force to consider no dimension as
             latent axis(es).
+
+            Note that this argument should ignore the group event dimensions,
+            since it will be used to average out the sampling dimensions in
+            log lower-bounds, instead of in the samples.
 
         Returns
         -------
