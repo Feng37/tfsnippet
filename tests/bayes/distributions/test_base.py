@@ -423,6 +423,9 @@ class DistributionTestCase(TestCase):
             2
         )
 
+    @unittest.skipIf(tf.__version__ == '1.2.0',
+                     'Bug in TensorFlow 1.2.0: '
+                     'https://github.com/tensorflow/tensorflow/issues/11098')
     def test_check_numerics(self):
         distrib = _MyDistribution(self.p_data, check_numerics=True)
         x = distrib._check_numerics(tf.constant(np.nan), 'x')
