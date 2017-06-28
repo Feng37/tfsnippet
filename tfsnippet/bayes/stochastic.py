@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import six
 import tensorflow as tf
+from tensorflow.python.client.session import \
+    register_session_run_conversion_functions
 
 from tfsnippet.utils import TensorArithmeticMixin
 from .distributions import Distribution
@@ -326,13 +328,6 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
             'a tensor.'
         )
 
-    def _as_graph_element(self, allow_tensor=True, allow_operation=True):
-        # this method brings support to ``session.run(...)`` and other
-        # related methods which expects a graph element.
-        if not allow_tensor:
-            raise RuntimeError('Can not convert a Tensor into a Operation.')
-        return self.__wrapped__
-
 
 def _to_tensor(value, dtype=None, name=None, as_ref=False):
     if dtype and not dtype.is_compatible_with(value.dtype):
@@ -344,3 +339,12 @@ def _to_tensor(value, dtype=None, name=None, as_ref=False):
     return value.__wrapped__
 
 tf.register_tensor_conversion_function(StochasticTensor, _to_tensor)
+
+# bring support for session.run(StochasticTensor), and for using as keys
+# in feed_dict.
+register_session_run_conversion_functions(
+    StochasticTensor,
+    fetch_function=lambda t: ([getattr(t, '__wrapped__')], lambda val: val[0]),
+    feed_function=lambda t, v: [(getattr(t, '__wrapped__'), v)],
+    feed_function_for_partial_run=lambda t: [getattr(t, '__wrapped__')]
+)

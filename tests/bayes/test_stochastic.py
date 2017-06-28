@@ -173,20 +173,29 @@ class StochasticTensorTestCase(TestCase):
                 dtype=tf.int32
             )
 
-    def test_as_graph_element(self):
-        g = tf.get_default_graph()
-        t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
-        self.assertIs(t._as_graph_element(), t.__wrapped__)
-        self.assertIs(g.as_graph_element(t), t.__wrapped__)
-
-        with self.assertRaisesRegex(
-                RuntimeError, 'Can not convert a Tensor into a Operation.'):
-            _ = t._as_graph_element(allow_tensor=False)
-
     def test_session_run(self):
         with self.get_session() as sess:
+            # test session run
             t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
             np.testing.assert_almost_equal(sess.run(t), [1., 2., 3.])
+
+            # test using in feed_dict
+            np.testing.assert_almost_equal(
+                sess.run(tf.identity(t), feed_dict={
+                    t: np.asarray([4., 5., 6.])
+                }),
+                np.asarray([4., 5., 6.])
+            )
+
+    def test_session_run_issue_49(self):
+        # test fix for the bug at https://github.com/thu-ml/zhusuan/issues/49
+        x_mean = tf.zeros([1, 2])
+        x_logstd = tf.zeros([1, 2])
+        x = Normal(mean=x_mean, logstd=x_logstd).sample()
+
+        with self.get_session() as sess:
+            sess.run(tf.global_variables_initializer())
+            _ = sess.run(x)
 
     def test_get_attributes(self):
         t = StochasticTensor(self.distrib, tf.constant([1., 2., 3.]))
