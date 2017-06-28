@@ -425,7 +425,7 @@ class DistributionTestCase(TestCase):
 
     def test_check_numerics(self):
         distrib = _MyDistribution(self.p_data, check_numerics=True)
-        x = distrib._check_numerics(tf.constant(0.) / tf.constant(0.), 'x')
+        x = distrib._check_numerics(tf.constant(np.nan), 'x')
         with self.get_session():
             with self.assertRaisesRegex(
                     Exception, "'x' of 'my_distribution' has nan or inf value"):
