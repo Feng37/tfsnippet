@@ -96,9 +96,10 @@ class Distribution(VarScopeObject):
             message = '%r of %r has nan or inf value' % (
                 name, self.variable_scope.name
             )
-            with tf.control_dependencies(
-                    [tf.check_numerics(x, message)]):
-                return tf.identity(x)
+            # with tf.control_dependencies(
+            #         [tf.check_numerics(x, message)]):
+            #     return tf.identity(x)
+            return tf.check_numerics(x, message)
         return x
 
     @property
