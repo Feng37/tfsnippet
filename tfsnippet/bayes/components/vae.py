@@ -227,8 +227,10 @@ class VAE(VarScopeObject):
         y : tf.Tensor
             Optional conditional input for CVAE.  See [1] for more details.
 
-            [1] Doersch C. Tutorial on variational autoencoders[J].
-                arXiv preprint arXiv:1606.05908, 2016.
+            [1] K. Sohn, H. Lee, and X. Yan, “Learning structured output
+                representation using deep conditional generative models,”
+                in Advances in Neural Information Processing Systems, 2015,
+                pp. 3483–3491.
 
         x : tf.Tensor
             The observations for the output `StochasticTensor`. (default None)
@@ -283,8 +285,10 @@ class VAE(VarScopeObject):
         y : tf.Tensor
             Optional conditional input for CVAE.  See [1] for more details.
 
-            [1] Doersch C. Tutorial on variational autoencoders[J].
-                arXiv preprint arXiv:1606.05908, 2016.
+            [1] K. Sohn, H. Lee, and X. Yan, “Learning structured output
+                representation using deep conditional generative models,”
+                in Advances in Neural Information Processing Systems, 2015,
+                pp. 3483–3491.
 
         z : tf.Tensor | StochasticTensor
             The latent variable observations.  (default None)
@@ -366,8 +370,10 @@ class VAE(VarScopeObject):
             Whether or not to use `y` in variational and generative network
             is controlled by `y_in_variational_net` and `y_in_generative_net`.
 
-            [1] Doersch C. Tutorial on variational autoencoders[J].
-                arXiv preprint arXiv:1606.05908, 2016.
+            [1] K. Sohn, H. Lee, and X. Yan, “Learning structured output
+                representation using deep conditional generative models,”
+                in Advances in Neural Information Processing Systems, 2015,
+                pp. 3483–3491.
 
         z_samples : int | tf.Tensor | None
             If specified, override `z_samples` specified in the constructor.
