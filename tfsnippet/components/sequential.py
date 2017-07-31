@@ -56,16 +56,24 @@ class Sequential(Component):
         Name and default name of this sequential component.
     """
 
-    def __init__(self, layers, name=None, default_name=None):
+    def __init__(self, layers, name=None, default_name=None, temp_outputs=None):
         layers = tuple(layers)
         if not layers:
             raise ValueError('`components` must not be empty.')
         super(Sequential, self).__init__(name=name, default_name=default_name)
         self._layers = layers
+        self._temp_outputs = temp_outputs
 
     def _call(self, inputs):
-        outputs = inputs
+        if self._temp_outputs is not None:
+            if not isinstance(self._temp_outputs, list) or \
+                            len(self._temp_outputs) > 0:
+                raise ValueError('`temp_outputs` must be a empty list.')
+            outputs = self._temp_outputs
+        else:
+            outputs = []
+        outputs.append(inputs)
         for i, c in enumerate(self._layers):
             with tf.variable_scope('layer%d' % i):
-                outputs = c(outputs)
-        return outputs
+                outputs.append(c(outputs[i]))
+        return outputs[-1]
