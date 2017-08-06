@@ -356,7 +356,7 @@ class VAE(VarScopeObject):
 
     @instance_reuse
     def reconstruct(self, x, y=None, z_samples=NOT_SPECIFIED, x_samples=None,
-                    observe_x=False, latent_axis=NOT_SPECIFIED):
+                    observe_x=None, latent_axis=NOT_SPECIFIED):
         """Derive the variational auto-encoder for x reconstruction.
 
         Parameters
@@ -382,12 +382,13 @@ class VAE(VarScopeObject):
             Specify the number of samples to take for x.
             (default None)
 
-        observe_x : bool
-            Whether or not to fix observed x in output `StochasticTensor`?
+        observe_x : bool | tf.Tensor | None
+            Whether or not to observe x in output `StochasticTensor`.
 
-            If True, the output x `StochasticTensor` will observe `x`.
-            Otherwise the output x will have random samples.
-            (default False)
+            If True, the output x `StochasticTensor` will observe input `x`.
+            If False or None, the output x `StochasticTensor` will get a sample.
+            If a tensor is specified, it will be observed instead of input `x`.
+            (default None)
 
         latent_axis : int | tuple[int] | tf.Tensor | None
             The axis(es) to be considered as the sampling dimensions of z
@@ -411,10 +412,15 @@ class VAE(VarScopeObject):
         if z_samples is NOT_SPECIFIED:
             z_samples = self._z_samples
 
+        if observe_x is True:
+            observe_x = x
+        elif observe_x is False:
+            observe_x = None
+
         z_posterior = self.variational(x, y=y_variational, z_samples=z_samples)
         z, x = self.model(z_posterior,
                           y=y_generative,
-                          x=x if observe_x else None,
+                          x=observe_x,
                           z_samples=z_samples,
                           x_samples=x_samples)
 
