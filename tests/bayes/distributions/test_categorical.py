@@ -162,22 +162,6 @@ class CategoricalTestCase(TestCase, _CategoricalTestMixin):
             log_prob = np.sum(log_prob.reshape(grouped_shape), axis=-1)
         return log_prob
 
-    def test_big_number_law(self):
-        with self.get_session(use_gpu=True):
-            logits = self.simple_params['logits']
-            probs = _softmax(logits)
-            x, prob, log_prob = self.get_samples_and_prob(
-                sample_shape=[self.big_number_samples],
-                **self.simple_params
-            )
-            for i in range(logits.shape[-1]):
-                mean_i = probs[..., i]
-                stddev_i = mean_i * (1. - mean_i)
-                big_number_verify(
-                    np.average(x == i, axis=0), mean_i, stddev_i,
-                    self.big_number_scale, self.big_number_samples
-                )
-
 
 class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
 
@@ -195,23 +179,6 @@ class OneHotCategoricalTestCase(TestCase, _CategoricalTestMixin):
             grouped_shape = log_prob.shape[: -group_event_ndims] + (-1,)
             log_prob = np.sum(log_prob.reshape(grouped_shape), axis=-1)
         return log_prob
-
-    def test_big_number_law(self):
-        with self.get_session(use_gpu=True):
-            logits = self.simple_params['logits']
-            probs = _softmax(logits)
-            x, prob, log_prob = self.get_samples_and_prob(
-                sample_shape=[self.big_number_samples],
-                **self.simple_params
-            )
-            np.testing.assert_equal(np.sum(x, -1), 1.)
-            for i in range(logits.shape[-1]):
-                mean_i = probs[..., i]
-                stddev_i = mean_i * (1. - mean_i)
-                big_number_verify(
-                    np.average(np.argmax(x, -1) == i, axis=0), mean_i, stddev_i,
-                    self.big_number_scale, self.big_number_samples
-                )
 
     def test_boundary_values_of_probs(self):
         with self.get_session():
