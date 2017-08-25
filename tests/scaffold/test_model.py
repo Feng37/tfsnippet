@@ -70,7 +70,7 @@ class ModelTestCase(TestCase):
 
         # test name de-duplication
         self.assertEqual(_MyModel().variable_scope.name, 'my_model_1')
-        self.assertEqual(_MyModel('the_model').variable_scope.name,
+        self.assertEqual(_MyModel(scope='the_model').variable_scope.name,
                          'the_model')
 
     def test_set_global_step(self):

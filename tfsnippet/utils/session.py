@@ -5,7 +5,7 @@ import six
 import tensorflow as tf
 from logging import getLogger
 
-from .scope import VarScopeObject
+from .scope import VarScopeObject, lagacy_default_name_arg
 
 __all__ = [
     'get_default_session_or_error', 'try_get_variable_value',
@@ -206,21 +206,19 @@ class VariableSaver(VarScopeObject):
     save_meta : bool
         Whether or not to save meta graph (default is True).
 
-    name : str
-        Name of this session restorer.
-
-    default_name : str
-        Default name of this session restorer.
+    name, scope : str
+        Optional name and scope of this session restorer.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, variables, save_dir, max_versions=2,
                  filename='variables.dat', latest_file='latest',
-                 save_meta=True, name=None, default_name=None):
+                 save_meta=True, name=None, scope=None):
         if not isinstance(variables, dict):
             variables = list(variables)
         if max_versions < 2:
             raise ValueError('At least 2 versions should be kept.')
-        super(VariableSaver, self).__init__(name, default_name)
+        super(VariableSaver, self).__init__(scope, name)
         self.variables = variables
         self.save_dir = os.path.abspath(save_dir)
         self.filename = filename

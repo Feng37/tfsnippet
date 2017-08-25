@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
+from tfsnippet.utils import lagacy_default_name_arg
 from .base import Component
 
 __all__ = ['Sequential']
@@ -52,15 +53,16 @@ class Sequential(Component):
         The outputs of the last layer will be the outputs of the
         whole sequential component.
 
-    name, default_name : str
-        Name and default name of this sequential component.
+    name, scope : str
+        Optional name and scope of this sequential component.
     """
 
-    def __init__(self, layers, name=None, default_name=None):
+    @lagacy_default_name_arg
+    def __init__(self, layers, name=None, scope=None):
         layers = tuple(layers)
         if not layers:
             raise ValueError('`components` must not be empty.')
-        super(Sequential, self).__init__(name=name, default_name=default_name)
+        super(Sequential, self).__init__(name=name, scope=scope)
         self._layers = layers
 
     def _call(self, inputs):

@@ -5,6 +5,7 @@ from tfsnippet.utils import (VarScopeObject,
                              instance_reuse,
                              maybe_explicit_broadcast,
                              is_dynamic_tensor_like,
+                             lagacy_default_name_arg,
                              NOT_SPECIFIED)
 from ..distributions import Distribution
 from ..layers import StochasticLayer
@@ -186,15 +187,16 @@ class VAE(VarScopeObject):
         Whether or not to use y in CVAE generative net, if specified?
         (default True)
 
-    name, default_name : str
-        Optional name and default name of this VAE.
+    name, scope : str
+        Optional name and scope of this VAE.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, x_net, x_layer, z_net, z_layer, z_prior,
                  validate_shape=False, variational_solver=sgvb, z_samples=None,
                  y_in_variational_net=True, y_in_generative_net=True,
-                 name=None, default_name=None):
-        super(VAE, self).__init__(name=name, default_name=default_name)
+                 name=None, scope=None):
+        super(VAE, self).__init__(name=name, scope=scope)
         self._x_net = x_net
         self._x_layer = x_layer
         self._z_net = z_net

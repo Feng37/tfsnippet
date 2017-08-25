@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import get_preferred_tensor_dtype, reopen_variable_scope
+from tfsnippet.utils import (get_preferred_tensor_dtype, reopen_variable_scope,
+                             lagacy_default_name_arg)
 from .base import Distribution
 
 __all__ = ['Gamma']
@@ -33,15 +34,13 @@ class Gamma(Distribution):
     check_numerics : bool
         Whether or not to check numerical issues? (default False)
 
-    name : str
-        Name of this normal distribution.
-
-    default_name : str
-        Default name of this normal distribution.
+    name, scope : str
+        Optional name and scope of this normal distribution.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, alpha, beta, group_event_ndims=None,
-                 check_numerics=False, name=None, default_name=None):
+                 check_numerics=False, name=None, scope=None):
         # check the arguments
         dtype = get_preferred_tensor_dtype(alpha)
         if not dtype.is_floating:
@@ -51,7 +50,7 @@ class Gamma(Distribution):
         super(Gamma, self).__init__(group_event_ndims=group_event_ndims,
                                     check_numerics=check_numerics,
                                     name=name,
-                                    default_name=default_name)
+                                    scope=scope)
 
         with reopen_variable_scope(self.variable_scope):
             with tf.name_scope('init'):

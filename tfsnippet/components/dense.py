@@ -51,8 +51,8 @@ class Dense(Lambda):
         Whether or not to add the variables to the graph collection
         `tf.GraphKeys.TRAINABLE_VARIABLES`? (default True)
 
-    name, default_name : str
-        Name and default name of this linear component.
+    name, scope : str
+        Optional name and scope of this linear component.
     """
 
     def __init__(self,
@@ -65,8 +65,8 @@ class Dense(Lambda):
                  biases_initializer=tf.zeros_initializer(),
                  biases_regularizer=None,
                  trainable=True,
-                 name=None,
-                 default_name=None):
+                 scope=None,
+                 name=None):
         super(Dense, self).__init__(
             functools.partial(
                 layers.fully_connected,
@@ -81,7 +81,7 @@ class Dense(Lambda):
                 trainable=trainable,
             ),
             name=name,
-            default_name=default_name
+            scope=scope,
         )
 
 
@@ -119,8 +119,8 @@ class Linear(Dense):
         Whether or not to add the variables to the graph collection
         `tf.GraphKeys.TRAINABLE_VARIABLES`? (default True)
 
-    name, default_name : str
-        Name and default name of this linear component.
+    name, scope : str
+        Optional name and scope of this linear component.
     """
 
     def __init__(self,
@@ -132,8 +132,8 @@ class Linear(Dense):
                  biases_initializer=tf.zeros_initializer(),
                  biases_regularizer=None,
                  trainable=True,
-                 name=None,
-                 default_name=None):
+                 scope=None,
+                 name=None):
         super(Linear, self).__init__(
             num_outputs=num_outputs,
             activation_fn=None,
@@ -145,5 +145,5 @@ class Linear(Dense):
             biases_regularizer=biases_regularizer,
             trainable=trainable,
             name=name,
-            default_name=default_name,
+            scope=scope,
         )

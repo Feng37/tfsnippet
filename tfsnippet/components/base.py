@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 
-from tfsnippet.utils import VarScopeObject, auto_reuse_variables
+from tfsnippet.utils import (VarScopeObject, auto_reuse_variables,
+                             lagacy_default_name_arg)
 
 __all__ = [
     'Component', 'Lambda',
@@ -61,12 +62,13 @@ class Lambda(Component):
     f : (*args, **kwargs) -> outputs
         The function or lambda expression that derives the outputs.
 
-    name, default_name : str
-        Name and default name of the lambda component.
+    name, scope : str
+        Optional name and scope of the lambda component.
     """
 
-    def __init__(self, f, name=None, default_name=None):
-        super(Lambda, self).__init__(name=name, default_name=default_name)
+    @lagacy_default_name_arg
+    def __init__(self, f, name=None, scope=None):
+        super(Lambda, self).__init__(name=name, scope=scope)
         self._factory = f
 
     def _call(self, *args, **kwargs):

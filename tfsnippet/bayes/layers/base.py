@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.components import Component
+from tfsnippet.utils import lagacy_default_name_arg
 from ..stochastic import StochasticTensor
 
 __all__ = ['StochasticLayer']
@@ -74,20 +75,20 @@ class StochasticLayer(Component):
         Whether or not to validate the shape of samples or observations?
         (default False)
 
-    name, default_name : str
+    name, scope : str
         Optional name or default name of this `StochasticLayer`.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, n_samples=None, observed=None, group_event_ndims=None,
                  check_numerics=False, validate_shape=False,
-                 name=None, default_name=None):
+                 name=None, scope=None):
         self._n_samples = n_samples
         self._observed = observed
         self._group_event_ndims = group_event_ndims
         self._check_numerics = check_numerics
         self._validate_shape = validate_shape
-        super(StochasticLayer, self).__init__(name=name,
-                                              default_name=default_name)
+        super(StochasticLayer, self).__init__(name=name, scope=scope)
 
     @property
     def n_samples(self):

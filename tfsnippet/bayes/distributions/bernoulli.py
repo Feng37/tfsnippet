@@ -4,7 +4,8 @@ import tensorflow as tf
 from tfsnippet.utils import (get_preferred_tensor_dtype,
                              reopen_variable_scope,
                              is_deterministic_shape,
-                             maybe_explicit_broadcast)
+                             maybe_explicit_broadcast,
+                             lagacy_default_name_arg)
 from .base import Distribution
 
 __all__ = ['Bernoulli']
@@ -44,16 +45,14 @@ class Bernoulli(Distribution):
     check_numerics : bool
         Whether or not to check numerical issues? (default False)
 
-    name : str
-        Name of this normal distribution.
-
-    default_name : str
-        Default name of this normal distribution.
+    name, scope : str
+        Optional name and scope of this normal distribution.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, logits=None, probs=None, dtype=None,
                  group_event_ndims=None, check_numerics=False,
-                 name=None, default_name=None):
+                 name=None, scope=None):
         # check the arguments
         if (logits is None and probs is None) or \
                 (logits is not None and probs is not None):
@@ -76,7 +75,7 @@ class Bernoulli(Distribution):
             group_event_ndims=group_event_ndims,
             check_numerics=check_numerics,
             name=name,
-            default_name=default_name,
+            scope=scope,
         )
 
         with reopen_variable_scope(self.variable_scope):

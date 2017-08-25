@@ -18,8 +18,8 @@ class _MyComponent(Component):
 
 class ComponentTestCase(TestCase):
 
-    def test_construction_with_default_name(self):
-        c = _MyComponent(default_name='comp')
+    def test_construction_with_name(self):
+        c = _MyComponent(name='comp')
         v1, v2, op = c()
         self.assertEqual(v1.name, 'comp/a/var:0')
         self.assertEqual(v2.name, 'comp/a_1/var:0')
@@ -29,7 +29,7 @@ class ComponentTestCase(TestCase):
         self.assertIs(v2_1, v2)
         self.assertEqual(op_1.name, 'comp/build_1/op:0')
 
-        c2 = _MyComponent(default_name='comp')
+        c2 = _MyComponent(name='comp')
         v1_2, v2_2, op_2 = c2()
         self.assertEqual(v1_2.name, 'comp_1/a/var:0')
         self.assertEqual(v2_2.name, 'comp_1/a_1/var:0')
@@ -38,21 +38,21 @@ class ComponentTestCase(TestCase):
         self.assertIsNot(v2_2, v2)
 
     def test_construction_in_nested_scope(self):
-        c = _MyComponent(default_name='comp')
+        c = _MyComponent(name='comp')
         with tf.variable_scope('child'):
             v1, v2, op = c()
             self.assertEqual(v1.name, 'comp/a/var:0')
             self.assertEqual(v2.name, 'comp/a_1/var:0')
             self.assertEqual(op.name, 'comp/build/op:0')
 
-    def test_construction_with_name(self):
-        c = _MyComponent(name='comp')
+    def test_construction_with_scope(self):
+        c = _MyComponent(scope='comp')
         v1, v2, op = c()
         self.assertEqual(v1.name, 'comp/a/var:0')
         self.assertEqual(v2.name, 'comp/a_1/var:0')
         self.assertEqual(op.name, 'comp/build/op:0')
 
-        c2 = _MyComponent(name='comp')
+        c2 = _MyComponent(scope='comp')
         v1_1, v2_1, op_1 = c2()
         self.assertEqual(v1_1.name, 'comp/a/var:0')
         self.assertEqual(v2_1.name, 'comp/a_1/var:0')

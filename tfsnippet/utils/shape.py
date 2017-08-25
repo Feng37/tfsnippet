@@ -4,7 +4,6 @@ import tensorflow as tf
 from .misc import (is_integer,
                    is_dynamic_tensor_like,
                    convert_to_tensor_if_dynamic)
-from .scope import NameScopeObject, instance_name_scope
 
 __all__ = [
     'get_dimension_size',

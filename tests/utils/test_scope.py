@@ -8,8 +8,6 @@ from tfsnippet.utils import (get_variables_as_dict,
                              root_variable_scope,
                              VarScopeObject,
                              instance_reuse,
-                             NameScopeObject,
-                             instance_name_scope,
                              is_tensorflow_version_higher_or_equal)
 from tests.helper import TestCase
 
@@ -178,7 +176,8 @@ class VarScopeObjectTestCase(TestCase):
             def f(self):
                 return tf.get_variable('var', shape=()), tf.add(1, 2, name='op')
 
-        o1 = _VarScopeObject(default_name='o')
+        o1 = _VarScopeObject(name='o')
+        self.assertEqual(o1.name, 'o')
         self.assertEqual(o1.variable_scope.name, 'o')
         self.assertEqual(o1.variable_scope.original_name_scope, 'o/')
         var_1, op_1 = o1.f()
@@ -192,15 +191,17 @@ class VarScopeObjectTestCase(TestCase):
             self.assertEqual(op_child.name, 'o/f_1/op:0')
 
         # test the second object with the same default name
-        o2 = _VarScopeObject(default_name='o')
+        o2 = _VarScopeObject(name='o')
+        self.assertEqual(o2.name, 'o')
         self.assertEqual(o2.variable_scope.name, 'o_1')
         self.assertEqual(o2.variable_scope.original_name_scope, 'o_1/')
         var_2, op_2 = o2.f()
         self.assertEqual(var_2.name, 'o_1/f/var:0')
         self.assertEqual(op_2.name, 'o_1/f/op:0')
 
-        # test the third object with the same name as o1
-        o3 = _VarScopeObject(name='o')
+        # test the third object with the same scope as o1
+        o3 = _VarScopeObject(scope='o')
+        self.assertIsNone(o3.name)
         self.assertEqual(o3.variable_scope.name, 'o')
         self.assertEqual(o3.variable_scope.original_name_scope, 'o_2/')
         var_3, op_3 = o3.f()
@@ -209,49 +210,13 @@ class VarScopeObjectTestCase(TestCase):
 
         # test the object under other scope
         with tf.variable_scope('c'):
-            o4 = _VarScopeObject(default_name='o')
+            o4 = _VarScopeObject(name='o')
+            self.assertEqual(o4.name, 'o')
             self.assertEqual(o4.variable_scope.name, 'c/o')
             self.assertEqual(o4.variable_scope.original_name_scope, 'c/o/')
             var_4, op_4 = o4.f()
             self.assertEqual(var_4.name, 'c/o/f/var:0')
             self.assertEqual(op_4.name, 'c/o/f/op:0')
-
-
-class NameScopeObjectTestCase(TestCase):
-
-    def test_NameScopeObject(self):
-        class _NameScopeObject(NameScopeObject):
-            def f(self):
-                with tf.name_scope(self.name_scope):
-                    return tf.add(1, 2, name='op')
-
-            @instance_name_scope
-            def g(self):
-                return tf.add(1, 2, name='op')
-
-            @instance_name_scope(scope='g')
-            def h(self):
-                return tf.add(1, 2, name='op')
-
-        o1 = _NameScopeObject(name='o')
-        self.assertEqual(o1.name_scope, 'o/')
-        self.assertEqual(o1.f().name, 'o/op:0')
-        self.assertEqual(o1.f().name, 'o/op_1:0')
-        self.assertEqual(o1.g().name, 'o/g/op:0')
-        self.assertEqual(o1.g().name, 'o/g_1/op:0')
-        self.assertEqual(o1.h().name, 'o/g_2/op:0')
-        self.assertEqual(o1.h().name, 'o/g_3/op:0')
-
-        with tf.name_scope('child'):
-            self.assertEqual(o1.f().name, 'o/op_2:0')
-            self.assertEqual(o1.g().name, 'o/g_4/op:0')
-            self.assertEqual(o1.h().name, 'o/g_5/op:0')
-
-        o2 = _NameScopeObject(name='o')
-        self.assertEqual(o2.name_scope, 'o_1/')
-        self.assertEqual(o2.f().name, 'o_1/op:0')
-        self.assertEqual(o2.g().name, 'o_1/g/op:0')
-        self.assertEqual(o2.h().name, 'o_1/g_1/op:0')
 
 
 class GetVariablesTestCase(TestCase):

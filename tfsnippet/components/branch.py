@@ -4,6 +4,7 @@ import re
 import six
 import tensorflow as tf
 
+from tfsnippet.utils import lagacy_default_name_arg
 from .base import Component
 
 __all__ = ['DictMapper']
@@ -46,18 +47,19 @@ class DictMapper(Component):
         A dict of mappers, which produces corresponding output given
         the layer inputs.
 
-    name, default_name : str
-        Name and default name of this `DictMapper` component.
+    name, scope : str
+        Optional name and scope of this `DictMapper` component.
     """
 
-    def __init__(self, mapper, name=None, default_name=None):
+    @lagacy_default_name_arg
+    def __init__(self, mapper, name=None, scope=None):
         for k in six.iterkeys(mapper):
             if not _VALID_KEY_FOR_DICT_MAPPER.match(k):
                 raise ValueError('The key for `DictMapper` must be a valid '
                                  'Python identifier (matching the pattern '
                                  '"^[A-Za-z_][A-Za-z0-9_]*$").')
 
-        super(DictMapper, self).__init__(name=name, default_name=default_name)
+        super(DictMapper, self).__init__(name=name, scope=scope)
         self._mapper = mapper
 
     def _call(self, *args, **kwargs):

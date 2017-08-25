@@ -68,8 +68,8 @@ class BatchNorm(Component):
         If `True` also add variables to the graph collection
         `tf.GraphKeys.TRINABLE_VARIABLES`. (default True)
 
-    name, default_name : str
-        Name and default name of the component.
+    name, scope : str
+        Optional name and scope of the component.
     """
 
     def __init__(self,
@@ -86,8 +86,8 @@ class BatchNorm(Component):
                  gamma_regularizer=None,
                  is_training=True,
                  trainable=True,
-                 name=None,
-                 default_name=None):
+                 scope=None,
+                 name=None):
         if not isinstance(axis, six.integer_types):
             raise TypeError('`axis` is expected to be an integer, '
                             'but got %r.' % (axis,))
@@ -105,7 +105,7 @@ class BatchNorm(Component):
         self.gamma_regularizer = gamma_regularizer
         self.is_training = is_training
         self.trainable = trainable
-        super(BatchNorm, self).__init__(name=name, default_name=default_name)
+        super(BatchNorm, self).__init__(name=name, scope=scope)
 
     def _call(self, inputs, is_training=None):
         """Apply Batch Normalization on `inputs`.

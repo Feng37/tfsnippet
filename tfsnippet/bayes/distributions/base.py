@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from tfsnippet.utils import (VarScopeObject, is_integer, is_deterministic_shape,
-                             is_dynamic_tensor_like)
+                             is_dynamic_tensor_like, lagacy_default_name_arg)
 
 __all__ = ['Distribution']
 
@@ -40,13 +40,14 @@ class Distribution(VarScopeObject):
     check_numerics : bool
         Whether or not to check numerical issues? (default False)
 
-    name, default_name : str
-        Optional name or default name of this distribution.
+    name, scope : str
+        Optional name and scope of this distribution.
     """
 
+    @lagacy_default_name_arg
     def __init__(self, group_event_ndims=None, check_numerics=False,
-                 name=None, default_name=None):
-        super(Distribution, self).__init__(name=name, default_name=default_name)
+                 name=None, scope=None):
+        super(Distribution, self).__init__(name=name, scope=scope)
         self._group_event_ndims = group_event_ndims
         self._should_check_numerics = check_numerics
 

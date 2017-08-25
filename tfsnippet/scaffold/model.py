@@ -10,7 +10,8 @@ from tfsnippet.utils import (ensure_variables_initialized,
                              VarScopeObject,
                              get_variables_as_dict,
                              reopen_variable_scope,
-                             VariableSaver)
+                             VariableSaver,
+                             lagacy_default_name_arg)
 
 __all__ = ['Model']
 
@@ -27,26 +28,27 @@ class Model(VarScopeObject):
     name : str
         Name of the model.
 
-        Note that if `name` is specified, the variable scope of constructed
-        model will take exactly this name, even if another model has already
-        taken such name.  That is to say, these two models will share the same
-        variable scope.
-
-    default_name : str
-        Default name of the model.
-
-        When `name` is not specified, the model will obtain a variable scope
-        with unique name, according to the name suggested by `default_name`.
-        If `default_name` is also not specified, it will use the underscored
+        When `scope` is not specified, the model will obtain a variable scope
+        with unique name, according to the name suggested by `name`.
+        If `name` is also not specified, it will use the underscored
         class name as the default name.
+
+    scope : str
+        Scope of the model.
+
+        Note that if `scope` is specified, the variable scope of constructed
+        model will take exactly this scope, even if another model has already
+        taken such scope.  That is to say, these two models will share the same
+        variable scope.
 
     global_step : tf.Variable
         Manually specify a `global_step` variable instead of using the one
         which is created inside the model variable scope.
     """
 
-    def __init__(self, name=None, default_name=None, global_step=None):
-        super(Model, self).__init__(name=name, default_name=default_name)
+    @lagacy_default_name_arg
+    def __init__(self, name=None, scope=None, global_step=None):
+        super(Model, self).__init__(name=name, scope=scope)
 
         # whether or not the model has been built?
         self._has_built = False

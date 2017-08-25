@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-import functools
-import inspect
+import warnings
 from contextlib import contextmanager
 
 import six
@@ -12,8 +11,7 @@ from .misc import camel_to_underscore
 __all__ = [
     'get_variables_as_dict',
     'reopen_variable_scope', 'root_variable_scope',
-    'VarScopeObject',
-    'NameScopeObject', 'instance_name_scope',
+    'lagacy_default_name_arg', 'VarScopeObject',
 ]
 
 
@@ -109,6 +107,23 @@ def root_variable_scope(reuse=None,
         scope._name = old_name
 
 
+def lagacy_default_name_arg(method):
+    """Add legacy support for `default_name` argument."""
+    @six.wraps(method)
+    def wrapper(*args, **kwargs):
+        if 'default_name' in kwargs:
+            warnings.warn('`default_name` is deprecated, please use `name` '
+                          'instead.', category=DeprecationWarning)
+            if 'scope' in kwargs:
+                raise ValueError('`default_name` and `scope` cannot '
+                                 'be specified at the same time.')
+            if 'name' in kwargs:
+                kwargs['scope'] = kwargs.pop('name')
+            kwargs['name'] = kwargs.pop('default_name')
+        return method(*args, **kwargs)
+    return wrapper
+
+
 class VarScopeObject(object):
     """Base class for object that owns a variable scope.
 
@@ -119,29 +134,42 @@ class VarScopeObject(object):
     name : str
         Name of this object.
 
-        Note that if `name` is specified, the variable scope of constructed
-        object will take exactly this name, even if another object has already
-        taken such name.  That is to say, these two objects will share the same
-        variable scope.
-
-    default_name : str
-        Default name of this object.
-
-        When `name` is not specified, the object will obtain a variable scope
-        with unique name, according to the name suggested by `default_name`.
-        If `default_name` is also not specified, it will use the underscored
+        When `scope` is not specified, the object will obtain a variable scope
+        with unique name, according to the name suggested by `name`.
+        If `scope` is also not specified, it will use the underscored
         class name as the default name.
+
+        This argument will be stored and can be accessed via `name` attribute.
+        (And if it will be None if not specified in construction argument)
+
+    scope : str
+        Scope of this object.
+
+        Note that if `scope` is specified, the variable scope of constructed
+        object will take exactly this scope, even if another object has already
+        taken such scope.  That is to say, these two objects will share the same
+        variable scope.
     """
 
-    def __init__(self, name=None, default_name=None):
-        # get the TensorFlow variable scope
+    @lagacy_default_name_arg
+    def __init__(self, name=None, scope=None):
+        scope = scope or None
         name = name or None
-        default_name = default_name or None
-        if not name and not default_name:
+
+        if not scope and not name:
             default_name = camel_to_underscore(self.__class__.__name__)
             default_name = default_name.lstrip('_')
-        with tf.variable_scope(name, default_name=default_name) as vs:
+        else:
+            default_name = name
+
+        with tf.variable_scope(scope, default_name=default_name) as vs:
             self._variable_scope = vs       # type: tf.VariableScope
+            self._name = name
+
+    @property
+    def name(self):
+        """Get the name of this object."""
+        return self._name
 
     @property
     def variable_scope(self):
@@ -150,138 +178,6 @@ class VarScopeObject(object):
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.variable_scope.name)
-
-
-def instance_name_scope(method=None, scope=None):
-    """Decorate an instance method within proper name scope.
-
-    This decorator should be applied to unbound instance methods, and
-    the instances that owns the methods are expected to have `name_scope`
-    attribute.  For example:
-
-        class Foo(object):
-
-            def __init__(self, name):
-                with tf.name_scope(name) as ns:
-                    self.name_scope = ns
-
-            @instance_name_scope
-            def foo(self):
-                return tf.add(1, 2, name='add')
-
-    The above example is then equivalent to the following code:
-
-        class Foo(object):
-
-            def __init__(self, name):
-                with tf.name_scope(name) as ns:
-                    self.name_scope = ns
-
-            def foo(self):
-                with tf.name_scope(self.name_scope):
-                    with tf.name_scope('foo'):
-                        return tf.add(1, 2, name='add')
-
-    In which the `instance_name_scope` decorator will first re-open the
-    `name_scope` of the instance, then open a new name scope (with unique
-    name) according to the method name.
-
-    Parameters
-    ----------
-    scope : str
-        The name of the scope.  If not set, will use the name of the method
-        as scope name.
-    """
-
-    if method is None:
-        return functools.partial(instance_name_scope, scope=scope)
-
-    # check whether or not `method` looks like an instance method
-    if six.PY2:
-        getargspec = inspect.getargspec
-    else:
-        getargspec = inspect.getfullargspec
-
-    argspec = getargspec(method)
-    if argspec.args[0] != 'self':
-        raise TypeError('`method` seems not to be an instance method '
-                        '(whose first argument should be `self`).')
-    if inspect.ismethod(method):
-        raise TypeError('`method` is expected to be unbound instance method.')
-
-    # determine the scope name
-    scope = scope or method.__name__
-
-    @six.wraps(method)
-    def wrapper(*args, **kwargs):
-        obj = args[0]
-        name_scope = obj.name_scope
-        if not isinstance(name_scope, six.string_types) or \
-                (name_scope and not name_scope.endswith('/')):
-            raise TypeError('`name_scope` attribute of the instance %r '
-                            'is expected to be the full name of a name scope, '
-                            'but got %r.' % (obj, name_scope,))
-
-        with tf.name_scope(name_scope):
-            with tf.name_scope(scope):
-                return method(*args, **kwargs)
-
-    return wrapper
-
-
-class NameScopeObject(object):
-    """Base class for all objects that owns a name scope.
-
-    Unlike `VarScopeObject`, a `NameScopeObject` does not own variable scope.
-    A `NameScopeObject` can reuse its name scope as follows:
-
-        class MyScopeObject(NameScopeObject):
-
-            def f(self):
-                with tf.name_scope(self.name_scope):
-                    op1 = tf.add(1, 2, name='op1')
-                    with tf.name_scope('sub_scope'):
-                        op2 = tf.add(1, 2, name='op2')
-
-    In the above example, each `op1` will be directly created in the object
-    name scope, while each `op2` will be created in some sub scope within
-    the object name scope.
-
-    See Also
-    --------
-    instance_name_scope
-
-    Notes
-    -----
-    It is better to use `VarScopeObject` instead of `NameScopeObject`
-    if the class might be used as a basis for other classes, since the
-    designer of the base class may not know whether or not the child
-    classes need to create variables ahead of time.
-
-    Parameters
-    ----------
-    name : str
-        Default name of this object.
-
-        The object will obtain a name scope with unique name, according to the
-        specified `name`.  If `name` is not specified, the underscored class
-        name will be chosen as the name.
-    """
-
-    def __init__(self, name=None):
-        # get the TensorFlow name scope
-        name = name or None
-        if not name:
-            default_name = camel_to_underscore(self.__class__.__name__)
-        else:
-            default_name = None
-        with tf.name_scope(name, default_name=default_name) as ns:
-            self._name_scope = ns
-
-    @property
-    def name_scope(self):
-        """Get the full name scope of this object."""
-        return self._name_scope
 
 
 def get_variables_as_dict(scope=None, collection=tf.GraphKeys.GLOBAL_VARIABLES):
