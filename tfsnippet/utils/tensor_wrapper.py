@@ -35,9 +35,10 @@ class TensorWrapper(object):
             # code is based on
             # http://www.quora.com/How-dir-is-implemented-Is-there-any-PEP-related-to-that
             def get_attrs(obj):
+                import types
                 if not hasattr(obj, '__dict__'):
                     return []  # slots only
-                if not isinstance(obj.__dict__, dict):
+                if not isinstance(obj.__dict__, (dict, types.DictProxyTypes)):
                     raise TypeError("%s.__dict__ is not a dictionary"
                                     "" % obj.__name__)
                 return obj.__dict__.keys()
