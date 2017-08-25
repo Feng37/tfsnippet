@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
-import six
 import tensorflow as tf
-from tensorflow.python.client.session import \
-    register_session_run_conversion_functions
 
-from tfsnippet.utils import TensorArithmeticMixin
+from tfsnippet.utils import TensorWrapper, register_tensor_wrapper_class
 from .distributions import Distribution
 
 __all__ = [
@@ -41,7 +38,7 @@ class StochasticObject(object):
         raise NotImplementedError()
 
 
-class StochasticTensor(StochasticObject, TensorArithmeticMixin):
+class StochasticTensor(TensorWrapper, StochasticObject):
     """Tensor-like object that represents a stochastic variable.
 
     A `StochasticTensor` should be created by methods of a `Distribution`,
@@ -100,7 +97,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
             raise TypeError('`distribution` is expected to be a Distribution '
                             'but got %r.' % (distribution,))
 
-        if isinstance(tensor, StochasticTensor):
+        if isinstance(tensor, TensorWrapper):
             tensor = tensor.__wrapped__
         if not isinstance(tensor, tf.Tensor):
             tensor = tf.convert_to_tensor(tensor, distribution.dtype)
@@ -110,7 +107,7 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
         if validate_shape:
             tensor = distribution.validate_samples_shape(tensor)
 
-        self.__wrapped__ = tensor
+        super(StochasticTensor, self).__init__(tensor)
         self._self_is_observed = is_observed
         self._self_distrib = distribution
         self._self_samples_ndims = samples_ndims
@@ -248,103 +245,4 @@ class StochasticTensor(StochasticObject, TensorArithmeticMixin):
                 name=name
             )
 
-    # mimic `tf.Tensor` interface
-    def __dir__(self):
-        if six.PY3:
-            ret = object.__dir__(self)
-        else:
-            # code is based on
-            # http://www.quora.com/How-dir-is-implemented-Is-there-any-PEP-related-to-that
-            def get_attrs(obj):
-                import types
-                if not hasattr(obj, '__dict__'):
-                    return []  # slots only
-                if not isinstance(obj.__dict__, (dict, types.DictProxyType)):
-                    raise TypeError("%s.__dict__ is not a dictionary"
-                                    "" % obj.__name__)
-                return obj.__dict__.keys()
-
-            def dir2(obj):
-                attrs = set()
-                if not hasattr(obj, '__bases__'):
-                    # obj is an instance
-                    if not hasattr(obj, '__class__'):
-                        # slots
-                        return sorted(get_attrs(obj))
-                    klass = obj.__class__
-                    attrs.update(get_attrs(klass))
-                else:
-                    # obj is a class
-                    klass = obj
-
-                for cls in klass.__bases__:
-                    attrs.update(get_attrs(cls))
-                    attrs.update(dir2(cls))
-                attrs.update(get_attrs(obj))
-                return list(attrs)
-
-            ret = dir2(self)
-
-        ret = list(set(dir(self.__wrapped__) + ret))
-        return ret
-
-    def __getattr__(self, name):
-        return getattr(self.__wrapped__, name)
-
-    def __setattr__(self, name, value):
-        if name.startswith('_self_') or name == '__wrapped__':
-            object.__setattr__(self, name, value)
-        elif hasattr(type(self), name):
-            object.__setattr__(self, name, value)
-        else:
-            setattr(self.__wrapped__, name, value)
-
-    def __delattr__(self, name):
-        if name.startswith('_self_'):
-            object.__delattr__(self, name)
-        elif hasattr(type(self), name):
-            object.__delattr__(self, name)
-        else:
-            delattr(self.__wrapped__, name)
-
-    def __iter__(self):
-        raise TypeError('`StochasticTensor` object is not iterable.')
-
-    def __bool__(self):
-        raise TypeError(
-            'Using a `StochasticTensor` as a Python `bool` is not allowed. '
-            'Use `if t is not None:` instead of `if t:` to test if a '
-            'tensor is defined, and use TensorFlow ops such as '
-            'tf.cond to execute subgraphs conditioned on the value of '
-            'a tensor.'
-        )
-
-    def __nonzero__(self):
-        raise TypeError(
-            'Using a `StochasticTensor` as a Python `bool` is not allowed. '
-            'Use `if t is not None:` instead of `if t:` to test if a '
-            'tensor is defined, and use TensorFlow ops such as '
-            'tf.cond to execute subgraphs conditioned on the value of '
-            'a tensor.'
-        )
-
-
-def _to_tensor(value, dtype=None, name=None, as_ref=False):
-    if dtype and not dtype.is_compatible_with(value.dtype):
-        raise ValueError('Incompatible type conversion requested to type '
-                         '%s for tensor of type %s' %
-                         (dtype.name, value.dtype.name))
-    if as_ref:
-        raise ValueError('%r: Ref type not supported.' % value)
-    return value.__wrapped__
-
-tf.register_tensor_conversion_function(StochasticTensor, _to_tensor)
-
-# bring support for session.run(StochasticTensor), and for using as keys
-# in feed_dict.
-register_session_run_conversion_functions(
-    StochasticTensor,
-    fetch_function=lambda t: ([getattr(t, '__wrapped__')], lambda val: val[0]),
-    feed_function=lambda t, v: [(getattr(t, '__wrapped__'), v)],
-    feed_function_for_partial_run=lambda t: [getattr(t, '__wrapped__')]
-)
+register_tensor_wrapper_class(StochasticTensor)

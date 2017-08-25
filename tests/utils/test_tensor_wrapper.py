@@ -7,34 +7,27 @@ import tensorflow as tf
 
 from tests.utils._div_op import regular_div, floor_div
 from tests.utils._true_div_op import true_div
-from tfsnippet.utils import TensorArithmeticMixin
+from tfsnippet.utils import TensorWrapper, register_tensor_wrapper_class
 from tests.helper import TestCase
 
 
-class _SimpleTensor(TensorArithmeticMixin):
+class _SimpleTensor(TensorWrapper):
 
-    def __init__(self, value):
-        self.value = tf.convert_to_tensor(value)
+    def __init__(self, wrapped, flag=None):
+        self._self_flag_ = flag
+        super(_SimpleTensor, self).__init__(wrapped)
 
     @property
-    def dtype(self):
-        return self.value.dtype
+    def flag(self):
+        return self._self_flag_
+
+    def get_flag(self):
+        return self._self_flag_
+
+register_tensor_wrapper_class(_SimpleTensor)
 
 
-def _to_tensor(value, dtype=None, name=None, as_ref=False):
-    if dtype and not dtype.is_compatible_with(value.dtype):
-        raise ValueError('Incompatible type conversion requested to type '
-                         '%s for tensor of type %s' %
-                         (dtype.name, value.dtype.name))
-    if as_ref:
-        raise ValueError('%r: Ref type not supported.' % value)
-    return value.value
-
-
-tf.register_tensor_conversion_function(_SimpleTensor, _to_tensor)
-
-
-class ArithMixinTestCase(TestCase):
+class TensorWrapperArithTestCase(TestCase):
 
     def test_prerequisite(self):
         if six.PY2:
@@ -225,6 +218,128 @@ class ArithMixinTestCase(TestCase):
                     check_getitem(data, s, x_simple_tensor, y_tensor)
                     check_getitem(data, s, x_simple_tensor, y_simple_tensor)
                     check_getitem(data, s, x_tensor, y_simple_tensor)
+
+
+class TensorWrapperInterfaceTestCase(TestCase):
+
+    def test_disallowed_op(self):
+        with self.assertRaisesRegex(
+                TypeError, '`_SimpleTensor` object is not iterable.'):
+            _ = iter(_SimpleTensor(tf.constant(1)))
+
+        with self.assertRaisesRegex(
+                TypeError, 'Using a `_SimpleTensor` as a Python `bool` '
+                           'is not allowed.'):
+            _ = not _SimpleTensor(tf.constant(1))
+
+        with self.assertRaisesRegex(
+                TypeError, 'Using a `_SimpleTensor` as a Python `bool` '
+                           'is not allowed.'):
+            if _SimpleTensor(tf.constant(1)):
+                pass
+
+    def test_convert_to_tensor(self):
+        with self.get_session():
+            t = _SimpleTensor(tf.constant(1.))
+            self.assertIsInstance(tf.convert_to_tensor(t), tf.Tensor)
+            self.assertNotIsInstance(tf.convert_to_tensor(t), _SimpleTensor)
+
+    def test_error_convert_to_tensor(self):
+        with self.assertRaisesRegex(
+                ValueError, 'Incompatible type conversion requested to '
+                            'type .* for tensor of type .*'):
+            _ = tf.convert_to_tensor(
+                _SimpleTensor(tf.constant(1.)),
+                dtype=tf.int32
+            )
+
+    def test_session_run(self):
+        with self.get_session() as sess:
+            # test session run
+            t = _SimpleTensor(tf.constant([1., 2., 3.]))
+            np.testing.assert_equal(sess.run(t), [1., 2., 3.])
+
+            # test using in feed_dict
+            np.testing.assert_equal(
+                sess.run(tf.identity(t), feed_dict={
+                    t: np.asarray([4., 5., 6.])
+                }),
+                np.asarray([4., 5., 6.])
+            )
+
+    def test_get_attributes(self):
+        t = _SimpleTensor(tf.constant([1., 2., 3.]), flag=123)
+        self.assertEqual(t.flag, 123)
+        self.assertEqual(t._self_flag_, 123)
+        members = dir(t)
+        for member in ['flag', '_self_flag_', 'get_flag', '__wrapped__']:
+            self.assertIn(
+                member, members,
+                msg='%r should in dir(t), but not.' % (members,)
+            )
+            self.assertTrue(
+                hasattr(t, member),
+                msg='_SimpleTensor should has member %r, but not.' %
+                    (member,)
+            )
+
+    def test_set_attributes(self):
+        t = _SimpleTensor(tf.constant([1., 2., 3.]))
+
+        self.assertTrue(hasattr(t, '_self_flag_'))
+        self.assertFalse(hasattr(t.__wrapped__, '_self_flag_'))
+        t._self_flag_ = 123
+        self.assertEqual(t._self_flag_, 123)
+        self.assertFalse(hasattr(t.__wrapped__, '_self_flag_'))
+
+        self.assertTrue(hasattr(t, 'get_flag'))
+        self.assertFalse(hasattr(t.__wrapped__, 'get_flag'))
+        t.get_flag = 456
+        self.assertEqual(t.get_flag, 456)
+        self.assertTrue(hasattr(t, 'get_flag'))
+        self.assertFalse(hasattr(t.__wrapped__, 'get_flag'))
+
+        self.assertTrue(hasattr(t, 'get_shape'))
+        self.assertTrue(hasattr(t.__wrapped__, 'get_shape'))
+        t.get_shape = 789
+        self.assertEqual(t.get_shape, 789)
+        self.assertEqual(t.__wrapped__.get_shape, 789)
+        self.assertTrue(hasattr(t, 'get_shape'))
+        self.assertTrue(hasattr(t.__wrapped__, 'get_shape'))
+
+        t.abc = 1001
+        self.assertEqual(t.abc, 1001)
+        self.assertEqual(t.__wrapped__.abc, 1001)
+        self.assertTrue(hasattr(t, 'abc'))
+        self.assertTrue(hasattr(t.__wrapped__, 'abc'))
+
+        t.__wrapped__.xyz = 2002
+        self.assertEqual(t.xyz, 2002)
+        self.assertEqual(t.__wrapped__.xyz, 2002)
+        self.assertTrue(hasattr(t, 'xyz'))
+        self.assertTrue(hasattr(t.__wrapped__, 'xyz'))
+
+    def test_del_attributes(self):
+        t = _SimpleTensor(tf.constant([1., 2., 3.]), flag=123)
+
+        del t._self_flag_
+        self.assertFalse(hasattr(t, '_self_flag_'))
+        self.assertFalse(hasattr(t.__wrapped__, '_self_flag_'))
+
+        t.abc = 1001
+        del t.abc
+        self.assertFalse(hasattr(t, 'abc'))
+        self.assertFalse(hasattr(t.__wrapped__, 'abc'))
+
+        t.__wrapped__.xyz = 2002
+        del t.xyz
+        self.assertFalse(hasattr(t, 'xyz'))
+        self.assertFalse(hasattr(t.__wrapped__, 'xyz'))
+
+        t.get_flag = 123
+        del t.get_flag
+        self.assertFalse(hasattr(t.__wrapped__, 'get_flag'))
+        self.assertNotEqual(t.get_flag, 123)
 
 if __name__ == '__main__':
     unittest.main()
