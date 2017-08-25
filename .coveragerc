@@ -18,9 +18,6 @@ exclude_lines =
 
 [run]
 omit =
-    # demo report generator
-    mlcomp/report/demo/*
-
     # test code need not coverage statistics
     tests/*
 

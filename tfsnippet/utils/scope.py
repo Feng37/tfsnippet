@@ -7,7 +7,7 @@ import six
 import tensorflow as tf
 from tensorflow.python.ops import variable_scope as variable_scope_ops
 
-from .imported import camel_to_underscore
+from .misc import camel_to_underscore
 
 __all__ = [
     'get_variables_as_dict',

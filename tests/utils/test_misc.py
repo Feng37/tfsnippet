@@ -8,10 +8,7 @@ import tensorflow as tf
 from tests.helper import TestCase
 from tfsnippet.bayes import StochasticTensor
 from tfsnippet.bayes import Normal
-from tfsnippet.utils import (is_integer, get_preferred_tensor_dtype, is_float,
-                             is_dynamic_tensor_like,
-                             convert_to_tensor_if_dynamic, MetricAccumulator,
-                             humanize_duration)
+from tfsnippet.utils import *
 
 
 class MiscTestCase(TestCase):
@@ -212,6 +209,88 @@ class MiscTestCase(TestCase):
                 msg='humanize_duraion(%r) is expected to be %r, but got %r.' %
                     (seconds, answer, result)
             )
+
+    def test_unique(self):
+        self.assertEqual(unique([]), [])
+        self.assertEqual(unique([1, 4, 1, 3, 2, 1, 2, 3]), [1, 4, 3, 2])
+        self.assertEqual(
+            unique(list(range(100, 500)) + list(range(1000, 0, -1))),
+            (list(range(100, 500)) + list(range(1000, 499, -1)) +
+             list(range(99, 0, -1)))
+        )
+
+    def test_camel_to_underscore(self):
+        def assert_convert(camel, underscore):
+            self.assertEqual(
+                camel_to_underscore(camel),
+                underscore,
+                msg='%r should be converted to %r.' % (camel, underscore)
+            )
+
+        examples = [
+            ('simpleTest', 'simple_test'),
+            ('easy', 'easy'),
+            ('HTML', 'html'),
+            ('simpleXML', 'simple_xml'),
+            ('PDFLoad', 'pdf_load'),
+            ('startMIDDLELast', 'start_middle_last'),
+            ('AString', 'a_string'),
+            ('Some4Numbers234', 'some4_numbers234'),
+            ('TEST123String', 'test123_string'),
+        ]
+        for camel, underscore in examples:
+            assert_convert(camel, underscore)
+            assert_convert(underscore, underscore)
+            assert_convert('_%s_' % camel, '_%s_' % underscore)
+            assert_convert('_%s_' % underscore, '_%s_' % underscore)
+            assert_convert('__%s__' % camel, '__%s__' % underscore)
+            assert_convert('__%s__' % underscore, '__%s__' % underscore)
+            assert_convert(
+                '_'.join([s.capitalize() for s in underscore.split('_')]),
+                underscore
+            )
+            assert_convert(
+                '_'.join([s.upper() for s in underscore.split('_')]),
+                underscore
+            )
+
+
+class AutoReprObjectTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(repr(AutoReprObject()), 'AutoReprObject()')
+
+        class MyObject(AutoReprObject):
+            pass
+        self.assertEqual(repr(MyObject()), 'MyObject()')
+
+    def test_default_ordering(self):
+        class MyObject(AutoReprObject):
+            def __init__(self):
+                self.b = 3
+                self.a = 1
+                self.aa = '2'
+                self.bb = 4.0
+        self.assertEqual(repr(MyObject()), "MyObject(a=1,aa='2',b=3,bb=4.0)")
+
+    def test_manual_ordering(self):
+        class MyObject(AutoReprObject):
+            __repr_attributes__ = ('bb', 'aa')
+
+            def __init__(self):
+                self.b = 3
+                self.a = 1
+                self.aa = '2'
+                self.bb = 4.0
+        self.assertEqual(repr(MyObject()), "MyObject(bb=4.0,aa='2',a=1,b=3)")
+
+    def test_class_attributes(self):
+        class MyObject(AutoReprObject):
+            a = 1
+            b = 2
+        self.assertEqual(repr(MyObject()), "MyObject()")
+        MyObject.__repr_attributes__ = ('a',)
+        self.assertEqual(repr(MyObject()), "MyObject(a=1)")
 
 if __name__ == '__main__':
     unittest.main()

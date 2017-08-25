@@ -4,13 +4,13 @@ __version__ = '0.1'
 
 
 def _init_config():
-    import os
     import sys
-    from flask import Config
     from . import defconfig
 
-    config = Config(os.path.abspath(os.path.curdir))
-    config.from_object(defconfig)
+    config = {}
+    for k in dir(defconfig):
+        if k.isupper() and not k.startswith('_'):
+            config[k] = getattr(defconfig, k)
     del sys.modules[__name__]._init_config
     return config
 
