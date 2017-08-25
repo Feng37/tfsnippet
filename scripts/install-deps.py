@@ -36,7 +36,7 @@ tf_deps = []  # which will be installed after TensorFlow is installed
 conda_deps = []
 pip_deps = []
 active_deps = pip_deps
-requirements_file = os.path.join(script_root, '../requirements.txt')
+requirements_file = os.path.join(script_root, '../requirements-dev.txt')
 
 if sys.version_info[0] == 2:
     f = open(requirements_file, 'rb')
