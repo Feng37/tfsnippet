@@ -38,7 +38,7 @@ class TensorWrapper(object):
                 import types
                 if not hasattr(obj, '__dict__'):
                     return []  # slots only
-                if not isinstance(obj.__dict__, (dict, types.DictProxyTypes)):
+                if not isinstance(obj.__dict__, (dict, types.DictProxyType)):
                     raise TypeError("%s.__dict__ is not a dictionary"
                                     "" % obj.__name__)
                 return obj.__dict__.keys()

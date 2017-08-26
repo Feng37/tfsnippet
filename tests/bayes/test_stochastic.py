@@ -7,6 +7,7 @@ import tensorflow as tf
 from tfsnippet.bayes import StochasticTensor, Normal
 from tests.bayes.distributions._helper import _MyDistribution
 from tests.helper import TestCase
+from tfsnippet.utils import TensorWrapper
 
 
 class StochasticTensorTestCase(TestCase):
@@ -39,6 +40,11 @@ class StochasticTensorTestCase(TestCase):
             self.assertEqual(t.eval(), 12345678)
             self.assertIsInstance(t.__wrapped__, tf.Tensor)
             self.assertEqual(t.__wrapped__.eval(), 12345678)
+
+    def test_initialize_from_tensor_wrapper(self):
+        samples = tf.constant(1.)
+        t = StochasticTensor(self.distrib, samples=TensorWrapper(samples))
+        self.assertIs(t.__wrapped__, samples)
 
     def test_attributes_from_distribution(self):
         with self.get_session():

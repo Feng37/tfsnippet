@@ -222,6 +222,11 @@ class TensorWrapperArithTestCase(TestCase):
 
 class TensorWrapperInterfaceTestCase(TestCase):
 
+    def test_initialize_from_tensor_wrapper(self):
+        samples = tf.constant(1.)
+        t = _SimpleTensor(TensorWrapper(samples))
+        self.assertIs(t.__wrapped__, samples)
+
     def test_disallowed_op(self):
         with self.assertRaisesRegex(
                 TypeError, '`_SimpleTensor` object is not iterable.'):
@@ -271,6 +276,7 @@ class TensorWrapperInterfaceTestCase(TestCase):
         t = _SimpleTensor(tf.constant([1., 2., 3.]), flag=123)
         self.assertEqual(t.flag, 123)
         self.assertEqual(t._self_flag_, 123)
+        self.assertEqual(t.get_flag(), 123)
         members = dir(t)
         for member in ['flag', '_self_flag_', 'get_flag', '__wrapped__']:
             self.assertIn(
@@ -282,6 +288,19 @@ class TensorWrapperInterfaceTestCase(TestCase):
                 msg='_SimpleTensor should has member %r, but not.' %
                     (member,)
             )
+        for member in dir(t.__wrapped__):
+            if not member.startswith('_'):
+                self.assertIn(
+                    member, members,
+                    msg='%r should in dir(t), but not.' % (members,)
+                )
+                self.assertTrue(
+                    hasattr(t, member),
+                    msg='_SimpleTensor should has member %r, but not.' %
+                        (member,)
+                )
+                self.assertEqual(getattr(t, member),
+                                 getattr(t.__wrapped__, member))
 
     def test_set_attributes(self):
         t = _SimpleTensor(tf.constant([1., 2., 3.]))
