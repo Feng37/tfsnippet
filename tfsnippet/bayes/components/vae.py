@@ -209,6 +209,11 @@ class VAE(VarScopeObject):
         self._y_in_generative_net = y_in_generative_net
 
     @property
+    def z_prior(self):
+        """Get the prior of z."""
+        return self._z_prior
+
+    @property
     def variational_solver(self):
         """Get the algorithm for deriving log lower-bound."""
         return self._variational_solver
