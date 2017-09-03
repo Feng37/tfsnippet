@@ -219,7 +219,7 @@ class VAE(VarScopeObject):
         return self._variational_solver
 
     @instance_reuse
-    def model(self, z, y=None, x=None, z_samples=NOT_SPECIFIED,
+    def model(self, z=None, y=None, x=None, z_samples=NOT_SPECIFIED,
               x_samples=None):
         """Derive the `StochasticTensor` objects of generation network.
 
@@ -229,7 +229,7 @@ class VAE(VarScopeObject):
         Parameters
         ----------
         z : tf.Tensor | StochasticTensor
-            The latent variable samples.
+            Optional latent variable samples.
 
         y : tf.Tensor
             Optional conditional input for CVAE.  See [1] for more details.
