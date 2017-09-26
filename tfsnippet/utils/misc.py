@@ -242,7 +242,7 @@ def unique(iterable):
         return ret
 
     if hasattr(iterable, '__len__'):
-        if len(iterable) < 1000:
+        if len(iterable) < 16:
             return small()
     return large()
 
